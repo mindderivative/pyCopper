@@ -30,3 +30,12 @@ tests/golden/failures/
 # MCP local config
 .mcp.json
 .mcp.json.mcpmux-bak
+
+# Personal M3 reference library: 2.2MB of content scraped from m3.material.io,
+# with embedded Google CDN image URLs. Kept locally for the m3-lookup skill and
+# deliberately out of history -- the skill fails loudly if it is absent rather
+# than answering from recalled Material Design knowledge.
+M3-References/
+
+# Superseded skills, kept locally for reference
+.claude/old_skills.bck/
