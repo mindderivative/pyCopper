@@ -17,6 +17,7 @@ from .runtime.engine import Engine
 from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent
 from .runtime.signals import batch, bind_thread
 from .spec import SpecError, ViewSpec, load_view, parse_view
+from .text import TextEngine
 from .theme import Palette, Theme
 from .tree.element import PaintContext
 from .tree.reconcile import ReconcileStats, reconcile
@@ -49,6 +50,9 @@ class App:
         self.root = build_element(self.view.root)
         self.layout_owner = LayoutOwner()
         self.root.attach(self.layout_owner)
+
+        self.text = TextEngine()
+        self.root.set_text_engine(self.text)
 
         self.dispatcher = EventDispatcher()
         self.dispatcher.root = self.root
@@ -98,6 +102,7 @@ class App:
         assert isinstance(stats, ReconcileStats)
         self.view = new_view
         self.root.attach(self.layout_owner)
+        self.root.set_text_engine(self.text)
         self.dispatcher.root = self.root
         if self._mounted:
             self.mount()
@@ -123,6 +128,7 @@ class App:
         ctx = PaintContext(
             display_list=display_list,
             palette=self.palette,
+            text=self.text,
             pixel_ratio=self.engine.pixel_ratio if self.engine else 1.0,
         )
         self.root.paint(ctx, OFFSET_ZERO)
@@ -138,6 +144,11 @@ class App:
     # ------------------------------------------------------------- lifecycle
 
     def attach(self, engine: Engine) -> None:
+        # One atlas per application: promote the App's CPU-only text engine to
+        # the device rather than leaving the Engine's separate one bound.
+        self.text.attach_device(engine.device)
+        engine.text = self.text
+        engine.pipeline.bind_glyph_atlas(self.text.atlas.texture)
         engine.palette = self.palette
         engine.painter = self.paint
         engine.canvas.add_event_handler(self._on_canvas_event, "*")

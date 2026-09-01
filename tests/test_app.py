@@ -94,7 +94,20 @@ def test_paint_emits_instances(app) -> None:
     dl = DisplayList()
     app.paint(dl)
     assert len(dl) > 0
-    assert all(f in (Kind.BOX, Kind.SHADOW) for f in dl.view["flags"][:, 0])
+    kinds = set(dl.view["flags"][:, 0].tolist())
+    assert kinds <= {Kind.BOX, Kind.SHADOW, Kind.GLYPH}
+
+
+def test_paint_emits_real_glyphs_for_the_button_label(app) -> None:
+    """The button's label is shaped text, not boxes standing in for it."""
+    dl = DisplayList()
+    app.paint(dl)
+    glyphs = [i for i in dl.view if i["flags"][0] == Kind.GLYPH]
+    assert glyphs, "no glyph instances emitted"
+    # Every glyph samples a real sub-rectangle of the atlas.
+    for g in glyphs:
+        u0, v0, u1, v1 = g["uv"]
+        assert 0.0 <= u0 < u1 <= 1.0 and 0.0 <= v0 < v1 <= 1.0
 
 
 def test_paint_order_is_parent_then_children(app) -> None:

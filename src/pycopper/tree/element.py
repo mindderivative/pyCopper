@@ -24,6 +24,7 @@ from ..layout import OFFSET_ZERO, Offset, Rect
 from ..paint import NO_TOKEN, DisplayList
 from ..runtime.signals import Effect
 from ..spec import StyleSpec, Template, WidgetSpec
+from ..text import TextEngine
 from ..theme import Palette
 
 if TYPE_CHECKING:
@@ -32,6 +33,20 @@ if TYPE_CHECKING:
 __all__ = ["ElementMixin", "PaintContext", "WidgetState"]
 
 _NO_CLIP = (0.0, 0.0, 0.0, 0.0)
+
+_DEFAULT_TEXT: TextEngine | None = None
+
+
+def default_text_engine() -> TextEngine:
+    """Process-wide CPU-only engine for elements built outside an App.
+
+    An App installs its own on mount; this exists so a widget can be measured
+    in a unit test without standing up an application.
+    """
+    global _DEFAULT_TEXT
+    if _DEFAULT_TEXT is None:
+        _DEFAULT_TEXT = TextEngine()
+    return _DEFAULT_TEXT
 
 
 @dataclass(slots=True)
@@ -51,6 +66,7 @@ class PaintContext:
 
     display_list: DisplayList
     palette: Palette
+    text: TextEngine = field(default_factory=default_text_engine)
     pixel_ratio: float = 1.0
     clip: tuple[float, float, float, float] = _NO_CLIP
     clip_radii: tuple[float, float, float, float] = _NO_CLIP
@@ -72,6 +88,7 @@ class ElementMixin:
     _cached: np.ndarray | None
     _cached_origin: Offset | None
     _needs_paint: bool
+    _text_engine: TextEngine | None
 
     def init_element(self, spec: WidgetSpec) -> None:
         self.spec = spec
@@ -83,6 +100,7 @@ class ElementMixin:
         self._cached = None
         self._cached_origin = None
         self._needs_paint = True
+        self._text_engine = None
 
     def update_spec(self, spec: WidgetSpec) -> None:
         """Adopt a new spec, keeping all runtime state. The reconciler's core
@@ -97,6 +115,17 @@ class ElementMixin:
     def configure(self) -> None:
         """Push spec-derived values into layout parameters. Overridden by
         widgets whose layout config is captured at construction."""
+
+    @property
+    def text_engine(self) -> TextEngine:
+        """The engine used to measure this element's text during layout."""
+        return self._text_engine if self._text_engine is not None else default_text_engine()
+
+    def set_text_engine(self, engine: TextEngine) -> None:
+        self._text_engine = engine
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.set_text_engine(engine)
 
     # ------------------------------------------------------------- identity
 
@@ -249,7 +278,20 @@ class ElementMixin:
 
     # ------------------------------------------------------------- hit testing
 
-    def absolute_rect(self, origin: Offset = OFFSET_ZERO) -> Rect:
+    def absolute_rect(self, origin: Offset | None = None) -> Rect:
+        """This element's rect in root coordinates.
+
+        With no *origin* the ancestor chain is walked, so the result really is
+        absolute. Passing an origin is the fast path for callers that already
+        know it -- paint and hit testing both thread it down the tree.
+        """
+        if origin is None:
+            offset = self.offset
+            node = self.parent
+            while node is not None:
+                offset = offset + node.offset
+                node = node.parent
+            return Rect.from_offset_size(offset, self.size)
         return Rect.from_offset_size(origin + self.offset, self.size)
 
     def hit_test(self, x: float, y: float, origin: Offset = OFFSET_ZERO) -> list[Any]:

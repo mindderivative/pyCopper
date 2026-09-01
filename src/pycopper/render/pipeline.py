@@ -169,6 +169,16 @@ class UIPipeline:
 
     # ---------------------------------------------------------------- frame
 
+    def bind_glyph_atlas(self, texture: Any) -> None:
+        """Swap in the real glyph atlas, replacing the 1x1 placeholder.
+
+        Rebuilding the bind group is the only way to change a bound texture in
+        WebGPU. It happens once at start-up, not per frame -- the atlas image
+        changes, but the texture object it lives in does not.
+        """
+        self.glyph_atlas = texture
+        self.bind_group = self._make_bind_group()
+
     def upload_palette(self, palette: np.ndarray) -> None:
         self.device.queue.write_buffer(
             self.palette_buffer, 0, np.ascontiguousarray(palette, dtype=np.float32)

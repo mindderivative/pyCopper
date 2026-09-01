@@ -19,6 +19,7 @@ import wgpu
 from ..config import Settings
 from ..paint import DisplayList
 from ..render import UIPipeline
+from ..text import TextEngine
 from ..theme import Palette, Theme
 
 __all__ = ["Engine"]
@@ -46,6 +47,9 @@ class Engine:
 
         self.pipeline = UIPipeline(self.device, self.format)
         self.display_list = DisplayList()
+
+        self.text = TextEngine(self.device)
+        self.pipeline.bind_glyph_atlas(self.text.atlas.texture)
 
         #: Fills the display list each frame. M3 replaces this with a walk of
         #: the element tree; until then it is the way to draw anything.
@@ -120,6 +124,10 @@ class Engine:
         if self.palette.dirty:
             self.pipeline.upload_palette(self.palette.data)
             self.palette.mark_uploaded()
+
+        # New glyphs may have been packed during paint; push them before the
+        # draw that samples them.
+        self.text.atlas.upload()
 
         width, height = self.canvas.get_physical_size()
         self.pipeline.upload_globals(width, height, self.pixel_ratio)

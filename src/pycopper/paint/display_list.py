@@ -270,6 +270,46 @@ class DisplayList:
         s["flags"][:, 3] = NO_TOKEN
         return start
 
+    def add_glyphs(
+        self,
+        rects: np.ndarray,
+        uvs: np.ndarray,
+        *,
+        color: tuple[float, float, float, float] = _WHITE,
+        token: int = NO_TOKEN,
+        clip: tuple[float, float, float, float] = _ZERO4,
+        clip_radii: tuple[float, float, float, float] = _ZERO4,
+    ) -> int:
+        """Vectorised emission of N glyph quads.
+
+        The scalar :meth:`add_glyph` costs roughly 4 microseconds per glyph,
+        which exceeds the text budget at around 400 glyphs. Writing whole
+        columns at once is the same rule §12 states for boxes.
+        """
+        rects = np.asarray(rects, dtype=np.float32)
+        uvs = np.asarray(uvs, dtype=np.float32)
+        if rects.ndim != 2 or rects.shape[1] != 4:
+            raise ValueError(f"rects must be (N, 4), got {rects.shape}")
+        if uvs.shape != rects.shape:
+            raise ValueError(f"uvs must match rects, got {uvs.shape} vs {rects.shape}")
+
+        n = len(rects)
+        start = self._count
+        s = self._next(n)
+        s["rect"] = rects
+        s["uv"] = uvs
+        s["radii"] = 0.0
+        s["clip"] = clip
+        s["clip_radii"] = clip_radii
+        s["fill"] = color
+        s["border"] = 0.0
+        s["params"] = 0.0
+        s["flags"][:, 0] = Kind.GLYPH
+        s["flags"][:, 1] = 0
+        s["flags"][:, 2] = token
+        s["flags"][:, 3] = NO_TOKEN
+        return start
+
     def snapshot(self, start: int, end: int | None = None) -> np.ndarray:
         """Copy a range out for subtree caching."""
         return self._data[start : self._count if end is None else end].copy()

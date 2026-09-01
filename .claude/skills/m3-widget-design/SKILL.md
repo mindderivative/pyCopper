@@ -154,7 +154,7 @@ what to close before implementing.
 
 ## Current framework state
 
-*Last updated: end of M3. Update this section whenever a milestone changes it.*
+*Last updated: end of M4. Update this section whenever a milestone changes it.*
 
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
@@ -164,17 +164,30 @@ shadows, analytic antialiasing and rounded in-shader clipping; the full 59-token
 MD3 palette with one-upload theme switching; events with hit testing,
 capture/bubble, pointer capture, hover and focus.
 
+**Text is real as of M4.** Shaped through HarfBuzz with GPOS kerning and
+ligatures, wrapped per UAX #14, fallback resolved per grapheme cluster, and
+rasterised into the shared glyph atlas. Roboto Regular/Medium and Noto Sans are
+bundled (`pycopper.assets`), so M3's `label-large` medium weight is available.
+Measure with `TextEngine.measure` / `measure_text`, paint with `paint_text` --
+both take `font_size` in logical px, matching M3's `sp`/`dp` figures 1:1.
+
 **Widgets today:** Container, Row, Column, Stack, Button, Text, Spacer.
 
 **Not available yet -- design around these, and say so when a spec needs one:**
 
-- **Real text.** `measure_text`/`paint_text` are placeholders drawing one
-  rounded box per character. Shaping, fonts, and the glyph atlas land in M4.
-  Any widget whose spec depends on typography (label sizing, text fields,
-  lists) can be laid out now but will not read correctly until then.
+- **The M3 type scale.** Widgets take a raw `font_size`; the 15 baseline and
+  15 emphasized type-scale roles (`label-large`, `title-medium`, …) are not
+  modelled as named styles. Note the scraped token tables in `M3-References`
+  are empty and the scattered values disagree with themselves (`headline-large`
+  appears as both 32sp and 36sp), so a real source is needed before hardcoding
+  the scale.
+- **RTL text.** Direction and run ordering work, but the bundled fonts carry no
+  Arabic or Hebrew glyphs, and caret/selection across a direction boundary is
+  unimplemented (risk R9).
 - **Icons.** No icon pipeline. The image atlas and `Kind.IMAGE` exist in the
-  shader, but nothing loads or packs icons yet. Most M3 components assume a
-  24dp icon, so this blocks faithful FABs, icon buttons, chips, and nav items.
+  shader, and the glyph atlas now proves the packing path works, but nothing
+  loads or packs icons yet. Most M3 components assume a 24dp icon, so this
+  blocks faithful FABs, icon buttons, chips, and nav items.
 - **Scrolling / viewports.** No scroll element; `state.scroll` exists but
   nothing consumes it.
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target on a

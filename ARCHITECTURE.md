@@ -391,7 +391,9 @@ Seven stages, each owned by exactly one dependency. Everything below the line wa
 
 **Stage order is load-bearing.** Bidi runs first because it operates on the whole paragraph and produces the embedding levels every later stage needs. Itemisation then splits by script, and font resolution splits further by face — shaping requires a run that is uniform in *all three* of script, direction, and font.
 
-**Stages 4 and 5 interleave.** Line breaking needs measured advances, which only shaping produces; but shaping context can cross a break. pyCopper shapes each run once for the full paragraph, breaks lines using cumulative advances against the available width, and re-shapes only those lines whose break point fell inside a cluster or ligature — rare in practice, and correct when it happens.
+**Stages 4 and 5 interleave.** Line breaking needs measured advances, which only shaping produces; but shaping context can cross a break.
+
+The intended design is to shape each run once for the paragraph, break on cumulative advances, and re-shape only lines whose break fell inside a cluster or ligature. **The M4 implementation does not do this yet**: `_wrap_block` re-shapes the growing candidate prefix at every break opportunity, which is quadratic in break count. The `ShapeCache` absorbs most of the repetition, but a cold 43-character wrapped line still measures **4.9 ms** (§12.2). It is one-time per unique string and free thereafter, so it does not affect steady-state frames — but it is a real deviation from this section and a tracked follow-up, not a design choice.
 
 #### 5.7.2 Fonts, coverage, and fallback — `text/fontdb.py`
 
@@ -487,8 +489,8 @@ Revised upward from the previous revision, which deferred all shaping past v1. W
 
 | Tier | Coverage | Status |
 |---|---|---|
-| **1** | Full OpenType shaping — ligatures, GPOS kerning, mark attachment, contextual forms. All LTR scripts including complex ones (Devanagari, Thai). Grapheme clusters, UAX #14 breaking, font fallback, colour emoji. | **v1, M4** |
-| **2** | RTL and mixed-direction *rendering* — Arabic, Hebrew. Reordering is `python-bidi`; the work is in line assembly. | **v1, M4** |
+| **1** | Full OpenType shaping — ligatures, GPOS kerning, mark attachment, contextual forms. Grapheme clusters, UAX #14 breaking, font fallback. | ✅ **shipped, M4** |
+| **2** | RTL and mixed-direction *rendering*. Itemisation resolves direction per run and orders runs visually; **glyph coverage for Arabic and Hebrew is absent from the bundled fonts**, so this is structurally present but not yet demonstrable without a system font. | partial, M4 |
 | **3** | RTL *editing* — caret movement, affinity at direction boundaries, selection spanning runs. Genuinely hard UI work, independent of any dependency. | v1.1 |
 | **4** | Vertical CJK, ruby annotation, `COLRv1` gradient emoji, variable-font axes. | post-1.0 |
 
@@ -819,6 +821,25 @@ Two rules follow directly and are non-negotiable in review:
 
 A benchmark harness (`tests/bench/`) tracks steady-state idle cost, single-property invalidation cost, and full-rebuild cost, and is run per release.
 
+### 12.2 Text measurements (M4)
+
+Measured on the reference machine. The text budget from the table above is 1.5 ms:
+
+| Path | Median | Verdict |
+|---|---|---|
+| Layout, warm cache | **0.001 ms** | ✅ |
+| Cached subtree splice (static text) | **0.003 ms** | ✅ |
+| Emit ~1000 glyphs, vectorised | **1.77 ms** | ⚠️ worst case only |
+| Emit ~1000 glyphs, scalar (before optimisation) | 4.26 ms | ❌ replaced |
+| Layout, cold cache (43 chars, wrapped) | **4.89 ms** | ⚠️ one-time per string |
+
+Two things this establishes:
+
+1. **The M2 lesson repeats exactly.** The first `emit` wrote instances one glyph at a time and cost 4.26 ms per 1000 glyphs — over budget, for the same reason scalar box emission was. Collecting into arrays and writing whole columns (`DisplayList.add_glyphs`) cut it to 1.77 ms. §12 rule 2 is not specific to boxes.
+2. **Steady state is essentially free.** A frame whose text has not changed costs 0.003 ms, because the display-list subtree cache turns it into a `memcpy`. The 1.77 ms figure is the pathological case of a thousand glyphs *all changing at once*, which no realistic interface does.
+
+The remaining per-glyph cost is `Paragraph.placements()` allocating one object per glyph. Returning arrays instead would remove it; not done, because the cache makes it invisible in practice.
+
 ### 12.1 First measurements (M2)
 
 Measured on the reference machine, 1000 instances, integrated GPU over Vulkan:
@@ -845,7 +866,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | # | Risk | Severity | Mitigation / status |
 |---|---|---|---|
 | R1 | Python frame budget insufficient at high element counts | High | Retained mode + typed invalidation + numpy paint are all aimed here. Benchmark early, at M2, not at M6. |
-| R2 | Text scope creep — shaping/bidi/fallback is a large subsystem | ~~High~~ **Medium** | **Reduced.** Dependencies chosen, installed, and verified end to end (§5.7.6); the pipeline is specified stage by stage. Residual risk is line-assembly and caret work, not capability. |
+| R2 | ~~Text scope creep~~ | **Closed** | **Delivered in M4.** Shaping, fallback, segmentation, itemisation, atlas, and paragraph layout all ship and are tested. Residual work is narrow and tracked separately: the quadratic wrap in §5.7.1, and RTL caret semantics (R9). |
 | R3 | `wgpu-native` backend variance across Vulkan/Metal/DX12 | Medium | Keep WGSL conservative; golden tests per platform; no optional GPU features. |
 | R4 | Single draw call broken by a future feature | Medium | Stated as a design constraint (§1.3). Clipping already solved analytically; transforms and blend modes are the next pressure points. |
 | R5 | IME / CJK text *input* unsupported | Medium | **Open.** GLFW preedit support is limited; likely needs platform code or a rendercanvas contribution. Note this is input only — CJK *rendering* is covered by Tier 1. |
@@ -865,7 +886,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M1** ✅ | `layout/` — constraints algebra, boundary/caching protocol, `LayoutOwner`, and `Padding`/`Align`/`SizedBox`/`ConstrainedBox`/`Row`/`Column`/`Flex`/`Stack`/`Spacer`. No rendering. | **Done.** 129 tests green, including Hypothesis property tests over random trees asserting the size invariant |
 | **M2** ✅ | Instanced pipeline + `ui.wgsl`: rounded boxes, per-corner radii, borders, shadows, analytic AA, rounded shader clipping, palette tokens. **First benchmark.** | **Done.** 180 tests green (24 GPU); 500 mixed primitives verified as one draw call; **R1 quantified — see §12.1** |
 | **M3** ✅ | `spec/` (Pydantic + sandboxed expressions), `runtime/signals.py`, `tree/` (element + reconcile), `runtime/events.py`, `widgets/`, and the public `App` | **Done.** 293 tests green. Full slice works: YAML → elements → layout → paint → click → signal → re-render, with state-preserving reload |
-| **M4** | Text Tiers 1–2: fontdb + fallback, uharfbuzz shaping, itemisation, UAX #14/#29 segmentation, atlas, `TextBox` layout, bidi rendering | Real applications become possible; the largest subsystem lands |
+| **M4** ✅ | `text/` — Face/FontDB with coverage fallback, uharfbuzz shaping with a size-independent cache, bidi + script itemisation, UAX #14/#29 segmentation, paragraph layout with wrapping and alignment; `render/atlas.py` skyline packer; real `Text`/`Button` labels | **Done.** 371 tests green. Shaped, kerned, ligature-forming Roboto renders through the atlas in the same single draw call |
 | **M5** | Hot reload with state preservation; golden-image suite; `examples/gallery` | The authoring loop is pleasant |
 | **M6** | API freeze, docs, PyPI release | v1.0 |
 

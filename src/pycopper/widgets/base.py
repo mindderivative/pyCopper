@@ -24,10 +24,11 @@ from ..layout import (
     Stack,
 )
 from ..spec import StyleSpec, WidgetKind, WidgetSpec
-from ..tree.element import ElementMixin, PaintContext
+from ..text import FontRequest, TextEngine
+from ..text.layout import Alignment as TextAlignment
+from ..tree.element import ElementMixin, PaintContext, default_text_engine
 
 __all__ = [
-    "ADVANCE",
     "ButtonElement",
     "ColumnElement",
     "ContainerElement",
@@ -57,7 +58,7 @@ _CROSS = {
 }
 
 
-def _resolve_axis(spec_size: Any, available: float, _content: float = 0.0) -> float | None:
+def _resolve_axis(spec_size: Any, available: float) -> float | None:
     """Turn a SizeSpec into a concrete extent, or None to mean 'use content'."""
     match spec_size.kind:
         case "fixed":
@@ -74,8 +75,8 @@ class _StyledMixin(ElementMixin):
     """Applies width/height/padding from the spec around a layout algorithm."""
 
     def sized(self, constraints: Constraints, style: StyleSpec) -> Constraints:
-        w = _resolve_axis(style.width, constraints.max_width, 0.0)
-        h = _resolve_axis(style.height, constraints.max_height, 0.0)
+        w = _resolve_axis(style.width, constraints.max_width)
+        h = _resolve_axis(style.height, constraints.max_height)
         return constraints.tighten(width=w, height=h)
 
 
@@ -148,39 +149,44 @@ class StackElement(_StyledMixin, Stack):
         return super().perform_layout(self.sized(constraints, self.style))
 
 
-ADVANCE = 0.55  # em per character; a rough sans-serif average
-
-
-def measure_text(text: str, font_size: float) -> Size:
-    """Placeholder metrics. M4 replaces this with real shaped advances."""
-    return Size(len(text) * font_size * ADVANCE, font_size * 1.4)
+def measure_text(
+    text: str,
+    font_size: float,
+    *,
+    engine: TextEngine | None = None,
+    max_width: float | None = None,
+) -> Size:
+    """Shaped metrics for *text*. Memoised by the engine."""
+    return (engine or default_text_engine()).measure(text, px=font_size, max_width=max_width)
 
 
 def paint_text(
-    ctx: PaintContext, x: float, y: float, text: str, font_size: float, token: int
-) -> None:
-    """Placeholder glyph painting: one rounded box per character.
+    ctx: PaintContext,
+    x: float,
+    y: float,
+    text: str,
+    font_size: float,
+    token: int,
+    *,
+    max_width: float | None = None,
+    alignment: str = TextAlignment.START,
+) -> int:
+    """Emit shaped glyphs at logical position ``(x, y)``.
 
-    Deliberately crude. It exists so layout, bindings, reconciliation, and
-    events can be built and tested now; M4 swaps in shaped glyphs from the
-    atlas without changing any caller.
+    ``x``/``y`` are the top-left of the text block; the baseline offset comes
+    from the font's own ascent, so lines sit correctly whatever face is used.
     """
-    dpr = ctx.pixel_ratio
-    advance = font_size * ADVANCE * dpr
-    for i, char in enumerate(text):
-        if char.isspace():
-            continue
-        ctx.display_list.add_box(
-            x + i * advance,
-            y,
-            advance * 0.72,
-            font_size * 0.72 * dpr,
-            token=token,
-            color=(1.0, 1.0, 1.0, 1.0),
-            radii=(1.0, 1.0, 1.0, 1.0),
-            clip=ctx.clip,
-            clip_radii=ctx.clip_radii,
-        )
+    paragraph = ctx.text.layout(text, px=font_size, max_width=max_width, alignment=alignment)
+    return ctx.text.emit(
+        ctx.display_list,
+        paragraph,
+        x=x,
+        y=y,
+        pixel_ratio=ctx.pixel_ratio,
+        token=token,
+        clip=ctx.clip,
+        clip_radii=ctx.clip_radii,
+    )
 
 
 class ButtonElement(ContainerElement):
@@ -209,11 +215,12 @@ class ButtonElement(ContainerElement):
 
         if self._text.strip():
             font = self.style.font_size
-            label = measure_text(self._text, font)
+            label = measure_text(self._text, font, engine=self.text_engine)
+            metrics = self.text_engine.db.face_for(FontRequest()).metrics(font)
             paint_text(
                 ctx,
-                (absolute.x + (size.width - label.width) / 2) * dpr,
-                (absolute.y + (size.height - font * 0.72) / 2) * dpr,
+                absolute.x + (size.width - label.width) / 2,
+                absolute.y + (size.height - metrics.line_height) / 2,
                 self._text,
                 font,
                 token,
@@ -221,14 +228,7 @@ class ButtonElement(ContainerElement):
 
 
 class TextElement(_StyledMixin, Padding):
-    """Text placeholder.
-
-    M4 replaces the measurement and painting here with the real text pipeline.
-    Until then a glyph is approximated as a fixed-advance box so layout,
-    reconciliation, and bindings can be built and tested now.
-    """
-
-    ADVANCE = 0.55  # em per character, roughly a sans-serif average
+    """A run of text, shaped and wrapped to the available width."""
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, spec.style.padding)
@@ -237,37 +237,41 @@ class TextElement(_StyledMixin, Padding):
     def configure(self) -> None:
         self._padding = self.style.padding
 
-    def measure(self) -> Size:
-        return measure_text(self._text, self.style.font_size)
+    def _wrap_width(self, constraints: Constraints) -> float | None:
+        """Width available for text, or None when the box is unbounded."""
+        width = _resolve_axis(self.style.width, constraints.max_width)
+        if width is None:
+            if not constraints.has_bounded_width:
+                return None
+            width = constraints.max_width
+        return max(0.0, width - self._padding.horizontal)
+
+    def measure(self, constraints: Constraints | None = None) -> Size:
+        wrap = self._wrap_width(constraints) if constraints is not None else None
+        return measure_text(
+            self._text,
+            self.style.font_size,
+            engine=self.text_engine,
+            max_width=wrap,
+        )
 
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
-        return outer.constrain(self.measure().inflate(self._padding))
+        return outer.constrain(self.measure(constraints).inflate(self._padding))
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         super().paint_self(ctx, absolute)
         if not self._text.strip():
             return
-        dpr = ctx.pixel_ratio
-        font = self.style.font_size
-        token = ctx.palette.index(self.style.color)
-        x = (absolute.x + self._padding.left) * dpr
-        y = (absolute.y + self._padding.top + font * 0.25) * dpr
-        advance = font * self.ADVANCE * dpr
-        for i, char in enumerate(self._text):
-            if char.isspace():
-                continue
-            ctx.display_list.add_box(
-                x + i * advance,
-                y,
-                advance * 0.72,
-                font * 0.72 * dpr,
-                token=token,
-                color=(1.0, 1.0, 1.0, 1.0),
-                radii=(1.0, 1.0, 1.0, 1.0),
-                clip=ctx.clip,
-                clip_radii=ctx.clip_radii,
-            )
+        paint_text(
+            ctx,
+            absolute.x + self._padding.left,
+            absolute.y + self._padding.top,
+            self._text,
+            self.style.font_size,
+            ctx.palette.index(self.style.color),
+            max_width=max(0.0, self.size.width - self._padding.horizontal) or None,
+        )
 
 
 class SpacerElement(_StyledMixin, Padding):
