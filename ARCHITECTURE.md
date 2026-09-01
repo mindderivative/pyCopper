@@ -412,6 +412,24 @@ Measured on the installed stack, DejaVu Sans covers `U+0041 A` (gid 36) and `U+0
 
 **A default font is bundled with the package.** This is not a convenience — it is required by two other parts of the architecture. Golden-image tests (§11) cannot be deterministic against whatever fonts a CI runner happens to have, and a framework that renders nothing until the user configures a font path is not usable out of the box. System font *enumeration* (fontconfig on Linux, DirectWrite on Windows, CoreText on macOS) is genuinely platform-specific and is deferred past v1; explicit font paths are supported from M4.
 
+#### The bundled stack
+
+Material Design 3 names **Roboto** as the default typeface of its type scale and **Noto Sans** as the fallback collection, with the chain `Roboto Flex → Roboto → Noto Sans`. Roboto Flex is excluded deliberately: M3 states it "isn't yet part of the M3 typescale".
+
+| File | Size | Weight | Codepoints | Role |
+|---|---|---|---|---|
+| `Roboto-Regular.ttf` | 154 KB | 400 | 927 | Default face |
+| `Roboto-Medium.ttf` | 154 KB | 500 | 927 | `label-large` and other medium-weight roles |
+| `NotoSans-Regular.ttf` | 612 KB | 400 | 3,094 | Fallback tier |
+
+**≈920 KB total**, exposed through `pycopper.assets` (`DEFAULT_FONT`, `MEDIUM_FONT`, `FALLBACK_CHAIN`).
+
+Three decisions worth recording:
+
+- **M3's fallback collection cannot be shipped.** The full Noto Sans set is 119 MB, plus 299 MB for CJK — against PyPI's ~60 MB project cap. Only the Latin/Greek/Cyrillic Noto family is bundled. It adds **2,187 codepoints** over Roboto (841 extended Latin, 289 Greek, 533 combining marks and modifiers, 129 Devanagari, 115 Cyrillic), so the fallback chain is genuinely exercised in v1 rather than being dead code — but it widens coverage *within* those scripts and adds no CJK, Arabic, or emoji. Broader fallback waits on system font discovery.
+- **Static instances, not variable fonts.** `google/fonts` publishes both families only as variable fonts. The bundled faces are produced with `fontTools.varLib.instancer`, pinning `wght` and `wdth`. That saves ~1.6 MB and keeps the loader free of variation-axis configuration.
+- **Roboto's coverage matches Tier 1 exactly.** Its 927 codepoints span Latin, Greek, and Cyrillic — precisely the scope §5.7.7 commits to, so the bundled font and the documented text tier agree without either being bent to fit.
+
 #### 5.7.3 Shaping — `text/shaping.py`
 
 ```python
@@ -696,7 +714,11 @@ pyCopper/
 │       │   ├── segment.py       # line breaks (UAX #14), graphemes (UAX #29)
 │       │   └── layout.py        # line assembly, alignment, caret/selection geometry
 │       ├── assets/
-│       │   └── fonts/           # BUNDLED default font — required by golden tests (§11)
+│       │   ├── __init__.py      # DEFAULT_FONT, MEDIUM_FONT, FALLBACK_CHAIN
+│       │   └── fonts/           # BUNDLED fonts — required by golden tests (§11)
+│       │       ├── Roboto-Regular.ttf   Roboto-Medium.ttf
+│       │       ├── NotoSans-Regular.ttf # fallback tier
+│       │       └── LICENSE-*.txt        # OFL 1.1, must ship with the fonts
 │       ├── theme/
 │       │   ├── tokens.py        # frozen TOKEN_ORDER (versioned!)
 │       │   └── palette.py       # materialyoucolor -> float32 palette buffer
@@ -828,7 +850,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | R4 | Single draw call broken by a future feature | Medium | Stated as a design constraint (§1.3). Clipping already solved analytically; transforms and blend modes are the next pressure points. |
 | R5 | IME / CJK text *input* unsupported | Medium | **Open.** GLFW preedit support is limited; likely needs platform code or a rendercanvas contribution. Note this is input only — CJK *rendering* is covered by Tier 1. |
 | R9 | RTL caret/selection semantics (Tier 3) | Medium | Deferred to v1.1 and stated as such. Reordering is solved; bidirectional caret affinity is independent UI work. |
-| R10 | Bundled font licensing and size | Low | Choose an OFL-licensed family; ship one weight and synthesise or subset rather than bundling a full family. |
+| R10 | ~~Bundled font licensing and size~~ | **Closed** | **Resolved.** Roboto and Noto Sans are both **SIL OFL 1.1**, compatible with MIT, with licence texts redistributed alongside them (§5.7.2). Note Roboto was *relicensed*: builds predating its move to `ofl/` in `google/fonts` — including the v2.137 copy some distributions still ship — are Apache-2.0 instead. Size resolved at ≈920 KB by instancing static faces and bundling only the Latin/Greek/Cyrillic Noto family. |
 | R6 | No accessibility tree | Medium | **Open.** Architecturally reserved: the Element tree is the natural source for AT-SPI/UIA. Not v1. |
 | R7 | Over-invalidation silently costs frames | Medium | Tested directly (§11) rather than left to profiling. |
 | R8 | Atlas thrashing under many fonts/sizes | Low | LRU + skyline; budgeted at 2048², growable to 4096². |
