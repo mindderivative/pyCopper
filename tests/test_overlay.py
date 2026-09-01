@@ -33,7 +33,7 @@ def make(overlays, root_children=None, **signals):
         "overlays": overlays,
     }
     app = App(view, theme=Theme(dark=True))
-    app.expose(**{k: v for k, v in signals.items()})
+    app.expose(**signals)
     app.mount()
     app.update()
     return app
