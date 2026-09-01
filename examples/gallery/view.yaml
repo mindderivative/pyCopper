@@ -1,0 +1,99 @@
+# pyCopper widget gallery.
+#
+# Doubles as the corpus for the golden-image suite, so it deliberately
+# exercises every widget kind and most style properties.
+id: root
+widget: Column
+style:
+  background: surface
+  padding: 20
+  spacing: 16
+  width: expand
+  height: expand
+  cross_alignment: stretch
+
+children:
+  # --- header row: title, spacer pushing the action to the far edge ---
+  - id: header
+    widget: Row
+    style: {height: 40, width: expand, cross_alignment: center}
+    children:
+      - id: title
+        widget: Text
+        text: "pyCopper gallery"
+        style: {color: on_surface, font_size: 22}
+      - id: header_gap
+        widget: Spacer
+        style: {width: expand}
+      - id: theme_btn
+        widget: Button
+        text: "{{ 'Light' if dark.get() else 'Dark' }}"
+        style:
+          width: 96
+          height: 40
+          background: secondary_container
+          color: on_secondary_container
+          corner_radius: 20
+        handlers: {on_click: toggle_theme}
+
+  # --- elevated card containing wrapped body text ---
+  - id: card
+    widget: Container
+    style:
+      height: 92
+      background: surface_container_high
+      corner_radius: 16
+      padding: 16
+      border: {width: 1, color: outline_variant}
+      shadow: {blur: 14, offset_y: 4, opacity: 0.4}
+    children:
+      - id: body
+        widget: Text
+        text: "Shaped text with real kerning and ligatures: fi fl ffi. This line wraps at the container width."
+        style: {color: on_surface_variant, font_size: 14}
+
+  # --- tonal swatches ---
+  - id: swatches
+    widget: Row
+    style: {height: 56, spacing: 10, width: expand}
+    children:
+      - {id: sw_primary,   widget: Container, style: {width: 56, height: 56, background: primary, corner_radius: 12}}
+      - {id: sw_secondary, widget: Container, style: {width: 56, height: 56, background: secondary, corner_radius: 12}}
+      - {id: sw_tertiary,  widget: Container, style: {width: 56, height: 56, background: tertiary, corner_radius: 12}}
+      - {id: sw_error,     widget: Container, style: {width: 56, height: 56, background: error, corner_radius: 12}}
+      - {id: sw_outline,   widget: Container, style: {width: 56, height: 56, background: surface_container_highest, corner_radius: 12, border: {width: 2, color: outline}}}
+
+  # --- stack: a badge overlaid on a surface ---
+  - id: stacked
+    widget: Stack
+    style: {height: 64, align_x: 1.0, align_y: 0.0}
+    children:
+      - id: stack_base
+        widget: Container
+        style: {width: expand, height: 64, background: surface_container, corner_radius: 12}
+      - id: badge
+        widget: Container
+        style: {width: 28, height: 28, background: error, corner_radius: 14}
+
+  # --- action row ---
+  - id: actions
+    widget: Row
+    style: {height: 44, spacing: 12, width: expand}
+    children:
+      - id: count_label
+        widget: Text
+        text: "Clicked {{ clicks.get() }}x"
+        style: {color: on_surface_variant, font_size: 14}
+      - id: actions_gap
+        widget: Spacer
+        style: {width: expand}
+      - id: reset_btn
+        widget: Button
+        text: "Reset"
+        style: {width: 100, height: 44, background: surface_container_highest, color: on_surface, corner_radius: 22}
+        handlers: {on_click: reset}
+      - id: confirm_btn
+        widget: Button
+        text: "Confirm"
+        style: {width: 130, height: 44, background: primary, color: on_primary, corner_radius: 22}
+        handlers: {on_click: confirm}

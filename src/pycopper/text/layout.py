@@ -68,6 +68,10 @@ class Paragraph:
     text: str
     lines: list[TextLine] = field(default_factory=list)
     size: Size = SIZE_ZERO
+    #: Width the text was wrapped and aligned to. `size.width` is the INK
+    #: extent -- the widest line -- so a Text widget shrink-wraps instead of
+    #: claiming its whole wrap box and starving its siblings in a Row.
+    box_width: float = 0.0
     px: float = 14.0
     base_direction: str = Direction.LTR
 
@@ -129,6 +133,7 @@ def layout_text(
 
     if not text:
         para.size = Size(0.0, primary.metrics(px).line_height)
+        para.box_width = max_width or 0.0
         return para
 
     items = itemize(text, db, req)
@@ -178,7 +183,8 @@ def layout_text(
             line.x = slack
 
     para.lines = lines
-    para.size = Size(box_width, y)
+    para.box_width = box_width
+    para.size = Size(widest, y)
     return para
 
 

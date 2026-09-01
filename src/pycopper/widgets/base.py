@@ -112,6 +112,22 @@ class _FlexElement(_StyledMixin, Flex):
         self._padding = style.padding
         self.init_element(spec)
 
+    def flex_of(self, child: Any) -> int:
+        """A child styled `expand` or `flex:n` along the main axis is flexible.
+
+        Without this a Spacer with `width: expand` is treated as inflexible,
+        measured against all remaining space, and starves its siblings.
+        """
+        explicit = super().flex_of(child)
+        if explicit:
+            return explicit
+        if not isinstance(child, ElementMixin):
+            return 0
+        size = child.style.width if self.axis is Axis.HORIZONTAL else child.style.height
+        if size.kind == "flex":
+            return max(1, int(size.value))
+        return 1 if size.kind == "expand" else 0
+
     def configure(self) -> None:
         style = self.style
         self._main_alignment = _MAIN[style.main_alignment]

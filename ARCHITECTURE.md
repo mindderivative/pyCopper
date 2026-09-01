@@ -789,7 +789,7 @@ The architecture was shaped partly by testability; this is the payoff.
 | Spec validation | Malformed YAML corpus; assert error type, key path, and line number. | No |
 | Hit testing | Synthetic trees with overlaps and clips; assert the hit path. | No |
 | Text pipeline | Shaping against the **bundled** font: assert glyph IDs, advances, cluster mapping. Fallback chain resolution. Break opportunities and grapheme counts against UAX test data. | No |
-| Rendering | `rendercanvas.offscreen` → render → read texture → compare PNG against a baseline with a small per-pixel tolerance. The `examples/gallery` app is the corpus. | Yes |
+| Rendering | `rendercanvas.offscreen` → render → read texture → compare against a **committed baseline PNG**. Tolerance is 4/255 per channel with at most 0.2% of pixels allowed to exceed it — an exact match would be unmaintainable across drivers, anything looser stops catching real changes. `examples/gallery` is the corpus. | Yes |
 | Shader | Covered indirectly by goldens. WGSL is kept small and branch-light for this reason. | Yes |
 
 The overwhelming majority of the framework's logic is testable in CI with no GPU, on any runner. Golden tests run on a Linux runner with `lavapipe` (software Vulkan) for determinism, and are the only tests permitted to be platform-conditional.
@@ -840,6 +840,19 @@ Two things this establishes:
 
 The remaining per-glyph cost is `Paragraph.placements()` allocating one object per glyph. Returning arrays instead would remove it; not done, because the cache makes it invisible in practice.
 
+### 11.1 Regenerating golden baselines
+
+```bash
+PYCOPPER_REGEN_GOLDEN=1 .venv/bin/python -m pytest tests/golden -m gpu
+```
+
+**A regeneration run fails on purpose whenever it writes a file.** A baseline
+that silently rewrote itself to match the current output would assert nothing;
+forcing a failure means the new image has to be looked at and committed
+deliberately. On a mismatch the harness writes `actual` and `diff` images to
+`tests/golden/failures/` (gitignored) so the change can be seen rather than
+guessed at.
+
 ### 12.1 First measurements (M2)
 
 Measured on the reference machine, 1000 instances, integrated GPU over Vulkan:
@@ -887,7 +900,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M2** ✅ | Instanced pipeline + `ui.wgsl`: rounded boxes, per-corner radii, borders, shadows, analytic AA, rounded shader clipping, palette tokens. **First benchmark.** | **Done.** 180 tests green (24 GPU); 500 mixed primitives verified as one draw call; **R1 quantified — see §12.1** |
 | **M3** ✅ | `spec/` (Pydantic + sandboxed expressions), `runtime/signals.py`, `tree/` (element + reconcile), `runtime/events.py`, `widgets/`, and the public `App` | **Done.** 293 tests green. Full slice works: YAML → elements → layout → paint → click → signal → re-render, with state-preserving reload |
 | **M4** ✅ | `text/` — Face/FontDB with coverage fallback, uharfbuzz shaping with a size-independent cache, bidi + script itemisation, UAX #14/#29 segmentation, paragraph layout with wrapping and alignment; `render/atlas.py` skyline packer; real `Text`/`Button` labels | **Done.** 371 tests green. Shaped, kerned, ligature-forming Roboto renders through the atlas in the same single draw call |
-| **M5** | Hot reload with state preservation; golden-image suite; `examples/gallery` | The authoring loop is pleasant |
+| **M5** ✅ | `runtime/hotreload.py` (watchfiles → engine thread), golden-image suite with six committed baselines, `examples/gallery` | **Done.** 390 tests green. Editing a view file updates the window without losing click count, focus, or scroll |
 | **M6** | API freeze, docs, PyPI release | v1.0 |
 
 ---

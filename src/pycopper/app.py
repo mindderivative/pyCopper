@@ -15,6 +15,7 @@ from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
 from .paint import DisplayList
 from .runtime.engine import Engine
 from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent
+from .runtime.hotreload import HotReloader
 from .runtime.signals import batch, bind_thread
 from .spec import SpecError, ViewSpec, load_view, parse_view
 from .text import TextEngine
@@ -46,6 +47,7 @@ class App:
         self.theme = theme or Theme()
         self.palette = Palette(self.theme)
 
+        self._source = Path(view) if isinstance(view, str | Path) else None
         self.view = self._load(view)
         self.root = build_element(self.view.root)
         self.layout_owner = LayoutOwner()
@@ -60,6 +62,8 @@ class App:
         self.context: dict[str, Any] = {}
         self._handlers: dict[str, Callable[[Any], None]] = {}
         self.engine: Engine | None = None
+        self.reloader: HotReloader | None = None
+        self.reload_errors: list[str] = []
         self._mounted = False
 
     @staticmethod
@@ -94,6 +98,45 @@ class App:
 
     # ------------------------------------------------------------ hot reload
 
+    @property
+    def view_path(self) -> Path | None:
+        """The file this view was loaded from, if any. Dict views have none."""
+        return self._source
+
+    def watch(self) -> HotReloader:
+        """Start watching the view file for changes.
+
+        Opt-in: a file watcher is unwanted overhead in a shipped application,
+        so this is never started automatically unless Settings.hot_reload is on.
+        """
+        if self._source is None:
+            raise ValueError("cannot watch a view that was not loaded from a file")
+        if self.reloader is None:
+            self.reloader = HotReloader([self._source])
+        self.reloader.start()
+        return self.reloader
+
+    def unwatch(self) -> None:
+        if self.reloader is not None:
+            self.reloader.stop()
+
+    def poll_reload(self) -> int:
+        """Apply any pending file changes. Called from the engine thread.
+
+        Returns the number of files reloaded successfully. A rejected reload is
+        recorded in `reload_errors` and the previous tree keeps running.
+        """
+        if self.reloader is None:
+            return 0
+        events = self.reloader.apply(lambda p: self.reload(p))
+        for event in events:
+            if event.error:
+                self.reload_errors.append(event.error)
+        applied = sum(1 for e in events if not e.error and e.change != "DELETED")
+        if applied and self.engine is not None:
+            self.engine.request_draw()
+        return applied
+
     def reload(self, view: str | Path | ViewSpec | dict[str, Any]) -> ReconcileStats:
         """Swap in a new view, preserving runtime state where ids still match."""
         new_view = self._load(view)
@@ -118,6 +161,7 @@ class App:
 
     def update(self) -> None:
         """Frame steps 1-5: drain events, flush signals, relayout."""
+        self.poll_reload()
         self.dispatcher.drain()
         self.layout_owner.flush()
         self.root.layout(Constraints.tight(self.logical_size()))
@@ -155,6 +199,8 @@ class App:
         self.engine = engine
         if not self._mounted:
             self.mount()
+        if self.settings.hot_reload and self._source is not None:
+            self.watch()
 
     def _on_canvas_event(self, event: dict[str, Any]) -> None:
         kind = event.get("event_type")

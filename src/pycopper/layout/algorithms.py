@@ -359,11 +359,20 @@ class Flex(LayoutNode):
             return Constraints(min_main, max_main, min_cross, max_cross)
         return Constraints(min_cross, max_cross, min_main, max_main)
 
+    # --- flex participation -------------------------------------------
+
+    def flex_of(self, child: LayoutNode) -> int:
+        """Flex weight of *child*. Overridden by widgets to read their spec."""
+        return _flex_of(child)
+
+    def fit_of(self, child: LayoutNode) -> FlexFit:
+        return _fit_of(child)
+
     # --- layout -------------------------------------------------------
 
     def perform_layout(self, constraints: Constraints) -> Size:
         max_main = self._max_main(constraints)
-        total_flex = sum(_flex_of(c) for c in self._children)
+        total_flex = sum(self.flex_of(c) for c in self._children)
         gaps = self._spacing * max(0, len(self._children) - 1)
 
         if total_flex > 0 and max_main == INF:
@@ -376,7 +385,7 @@ class Flex(LayoutNode):
         allocated = 0.0
         max_cross_seen = 0.0
         for child in self._children:
-            if _flex_of(child) > 0:
+            if self.flex_of(child) > 0:
                 continue
             size = child.layout(
                 self._child_constraints(
@@ -393,14 +402,14 @@ class Flex(LayoutNode):
         remaining = free
         flex_seen = 0
         for child in self._children:
-            flex = _flex_of(child)
+            flex = self.flex_of(child)
             if flex == 0:
                 continue
             flex_seen += flex
             # Distribute by running total so rounding never loses a pixel.
             share = (free * flex_seen / total_flex) - (free - remaining)
             remaining -= share
-            tight = _fit_of(child) is FlexFit.TIGHT
+            tight = self.fit_of(child) is FlexFit.TIGHT
             size = child.layout(
                 self._child_constraints(share if tight else 0.0, share, constraints)
             )

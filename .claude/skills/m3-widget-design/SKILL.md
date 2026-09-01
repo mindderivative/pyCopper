@@ -154,7 +154,7 @@ what to close before implementing.
 
 ## Current framework state
 
-*Last updated: end of M4. Update this section whenever a milestone changes it.*
+*Last updated: end of M5. Update this section whenever a milestone changes it.*
 
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
@@ -172,6 +172,16 @@ Measure with `TextEngine.measure` / `measure_text`, paint with `paint_text` --
 both take `font_size` in logical px, matching M3's `sp`/`dp` figures 1:1.
 
 **Widgets today:** Container, Row, Column, Stack, Button, Text, Spacer.
+
+**Sizing inside a Row or Column:** a child styled `width: expand` (or `flex:n`)
+along the main axis is flexible and shares the free space; anything else is
+measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
+extent, so it will not starve its siblings.
+
+**Verifying a widget visually:** add it to `examples/gallery/view.yaml` and
+regenerate the golden baseline (ARCHITECTURE.md §11.1). The gallery is the
+golden corpus, so a widget that appears there is regression-tested from then
+on. Run the example with hot reload on and edit the YAML live while iterating.
 
 **Not available yet -- design around these, and say so when a spec needs one:**
 
