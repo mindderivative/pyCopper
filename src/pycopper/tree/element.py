@@ -1,0 +1,287 @@
+"""The Element tree: mutable runtime nodes that persist across hot reloads.
+
+This is tree 2 of the four (ARCHITECTURE.md 4). It holds everything the frozen
+Spec cannot: resolved style, focus, hover, scroll offset, signal subscriptions,
+and the cached instance slice that makes repainting a clean subtree a memcpy.
+
+Elements are LayoutNode subclasses, so layout machinery -- constraints, relayout
+boundaries, caching -- comes from M1 unchanged. Concrete widgets in
+:mod:`pycopper.widgets` combine :class:`ElementMixin` with a layout algorithm.
+``ElementMixin`` deliberately declares no ``__slots__``: Python rejects an
+instance layout built from two bases that each carry NON-EMPTY slots, so the
+mixin supplies the ``__dict__`` and the layout node supplies the slots.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from ..layout import OFFSET_ZERO, Offset, Rect
+from ..paint import NO_TOKEN, DisplayList
+from ..runtime.signals import Effect
+from ..spec import StyleSpec, Template, WidgetSpec
+from ..theme import Palette
+
+if TYPE_CHECKING:
+    from ..layout import LayoutNode
+
+__all__ = ["ElementMixin", "PaintContext", "WidgetState"]
+
+_NO_CLIP = (0.0, 0.0, 0.0, 0.0)
+
+
+@dataclass(slots=True)
+class WidgetState:
+    """Runtime state. Survives hot reload; the Spec never holds any of this."""
+
+    hovered: bool = False
+    pressed: bool = False
+    focused: bool = False
+    scroll: Offset = OFFSET_ZERO
+    data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class PaintContext:
+    """Everything paint needs that is not on the element itself."""
+
+    display_list: DisplayList
+    palette: Palette
+    pixel_ratio: float = 1.0
+    clip: tuple[float, float, float, float] = _NO_CLIP
+    clip_radii: tuple[float, float, float, float] = _NO_CLIP
+
+
+class ElementMixin:
+    """Shared element behaviour. Combined with a layout algorithm by widgets."""
+
+    spec: WidgetSpec
+    parent: Any
+    children: Any
+    offset: Any
+    size: Any
+    state: WidgetState
+    handlers: dict[str, Callable[[Any], None]]
+    _effect: Effect | None
+    _text: str
+    _template: Template | None
+    _cached: np.ndarray | None
+    _cached_origin: Offset | None
+    _needs_paint: bool
+
+    def init_element(self, spec: WidgetSpec) -> None:
+        self.spec = spec
+        self.state = WidgetState()
+        self.handlers = {}
+        self._effect = None
+        self._template = spec.template()
+        self._text = spec.text or ""
+        self._cached = None
+        self._cached_origin = None
+        self._needs_paint = True
+
+    def update_spec(self, spec: WidgetSpec) -> None:
+        """Adopt a new spec, keeping all runtime state. The reconciler's core
+        operation -- this is why editing a view file does not lose focus."""
+        self.spec = spec
+        self._template = spec.template()
+        if self._template is None or self._template.is_static:
+            self._text = spec.text or ""
+        self.configure()
+        self.mark_needs_layout()
+
+    def configure(self) -> None:
+        """Push spec-derived values into layout parameters. Overridden by
+        widgets whose layout config is captured at construction."""
+
+    # ------------------------------------------------------------- identity
+
+    @property
+    def id(self) -> str:
+        return self.spec.id
+
+    @property
+    def style(self) -> StyleSpec:
+        return self.spec.style
+
+    @property
+    def text(self) -> str:
+        """Rendered text, after binding expressions have been evaluated."""
+        return self._text
+
+    # ----------------------------------------------------------- invalidation
+
+    @property
+    def needs_paint(self) -> bool:
+        return self._needs_paint
+
+    def mark_needs_paint(self) -> None:
+        """Visual-only invalidation: does NOT trigger layout.
+
+        This is the distinction a single global dirty flag cannot make, and the
+        reason a colour change costs almost nothing (ARCHITECTURE.md 5.2).
+        """
+        node = self
+        while isinstance(node, ElementMixin):
+            if node._needs_paint:
+                return
+            node._needs_paint = True
+            node._cached = None
+            node = node.parent
+
+    def mark_needs_layout(self) -> None:
+        self.mark_needs_paint()
+        super().mark_needs_layout()  # type: ignore[misc]
+
+    # -------------------------------------------------------------- bindings
+
+    def bind(self, context: dict[str, Any]) -> None:
+        """Subscribe to whatever the text template reads.
+
+        The Effect re-evaluates on change and marks only this element dirty --
+        the fine-grained half of fine-grained reactivity.
+        """
+        if self._template is None or self._template.is_static:
+            return
+        template = self._template
+
+        def refresh() -> None:
+            rendered = template.render(context)
+            if rendered != self._text:
+                self._text = rendered
+                self.mark_needs_layout()
+
+        self._effect = Effect(refresh)
+
+    def dispose(self) -> None:
+        """Release subscriptions. Called when reconciliation drops a node."""
+        if self._effect is not None:
+            self._effect.dispose()
+            self._effect = None
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.dispose()
+
+    # ------------------------------------------------------------------ paint
+
+    def paint(self, ctx: PaintContext, origin: Offset) -> None:
+        """Emit this subtree into the display list, back to front.
+
+        A clean subtree at an unchanged origin is spliced from its cached slice
+        -- 0.002 ms per 1000 instances versus 3.27 ms to rebuild (§12.1).
+        """
+        absolute = origin + self.offset
+
+        if not self._needs_paint and self._cached is not None and self._cached_origin == absolute:
+            ctx.display_list.extend(self._cached)
+            return
+
+        start = len(ctx.display_list)
+        self.paint_self(ctx, absolute)
+        child_ctx = self.child_paint_context(ctx, absolute)
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.paint(child_ctx, absolute)
+
+        self._cached = ctx.display_list.snapshot(start)
+        self._cached_origin = absolute
+        self._needs_paint = False
+
+    def child_paint_context(self, ctx: PaintContext, absolute: Offset) -> PaintContext:
+        """Override to introduce a clip for children (scroll views, cards)."""
+        return ctx
+
+    def paint_self(self, ctx: PaintContext, absolute: Offset) -> None:
+        """Emit this element's own primitives. Default: background, border, shadow."""
+        style = self.style
+        size = self.size
+        if size.is_empty:
+            return
+
+        dpr = ctx.pixel_ratio
+        x, y = absolute.x * dpr, absolute.y * dpr
+        w, h = size.width * dpr, size.height * dpr
+        radii = tuple(r * dpr for r in style.corner_radius)
+        dl = ctx.display_list
+
+        if style.shadow is not None and style.background is not None:
+            sh = style.shadow
+            dl.add_shadow(
+                x,
+                y,
+                w,
+                h,
+                blur=sh.blur * dpr,
+                offset=(sh.offset_x * dpr, sh.offset_y * dpr),
+                color=(0.0, 0.0, 0.0, sh.opacity),
+                radii=radii,  # type: ignore[arg-type]
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+
+        if style.background is None:
+            return
+
+        border = style.border
+        dl.add_box(
+            x,
+            y,
+            w,
+            h,
+            token=self._token(ctx, style.background),
+            color=(1.0, 1.0, 1.0, 1.0),
+            radii=radii,  # type: ignore[arg-type]
+            border_width=(border.width * dpr) if border else 0.0,
+            border_token=self._token(ctx, border.color) if border else NO_TOKEN,
+            border_color=(1.0, 1.0, 1.0, 1.0),
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
+            opacity=style.opacity,
+        )
+
+    @staticmethod
+    def _token(ctx: PaintContext, name: str) -> int:
+        return NO_TOKEN if name.startswith("#") else ctx.palette.index(name)
+
+    # ------------------------------------------------------------- hit testing
+
+    def absolute_rect(self, origin: Offset = OFFSET_ZERO) -> Rect:
+        return Rect.from_offset_size(origin + self.offset, self.size)
+
+    def hit_test(self, x: float, y: float, origin: Offset = OFFSET_ZERO) -> list[Any]:
+        """Topmost-first path of elements under the point.
+
+        Children are visited in REVERSE order because later siblings paint on
+        top; a naive forward walk would report the wrong target whenever
+        anything overlaps.
+        """
+        absolute = origin + self.offset
+        rect = Rect.from_offset_size(absolute, self.size)
+        if not rect.contains(x, y):
+            return []
+        for child in reversed(self.children):
+            if isinstance(child, ElementMixin):
+                found = child.hit_test(x, y, absolute)
+                if found:
+                    return [*found, self]
+        return [self]
+
+    def walk_elements(self) -> Iterator[Any]:
+        yield self
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                yield from child.walk_elements()
+
+    def find(self, widget_id: str) -> Any | None:
+        return next((e for e in self.walk_elements() if e.id == widget_id), None)
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__} {self.spec.id!r} size={self.size}>"
+
+
+def element_children(node: LayoutNode) -> list[Any]:
+    return [c for c in node.children if isinstance(c, ElementMixin)]

@@ -184,12 +184,14 @@ class WidgetSpec(BaseModel):
 Three deliberate choices:
 
 - **`extra="forbid"`.** A typo in a YAML key is a startup error with a line number, not a silently ignored style.
-- **`frozen=True`.** Spec nodes are hashable and safely shareable; the diff algorithm can compare by identity for untouched subtrees.
+- **`frozen=True`.** Spec nodes are immutable and safely shareable. Reconciliation compares them *structurally* (`==`) to skip untouched subtrees, and by identity as the fast path. They are deliberately not hashable — `handlers` is a mapping — and nothing requires them to be.
 - **`WidgetKind` is an enum, and `background` is a validated `TokenRef`.** The prior plan's `background: str` deferred the failure to render time; here an unknown token name fails at load, where the error is actionable.
 
 Note the **structural fix** to the prior `view.yaml`: `children` was nested under `style`. Children are structure, not styling; they belong on `WidgetSpec`.
 
-`spec/expressions.py` parses `{{ … }}` binding expressions into a small restricted AST — attribute access, indexing, comparison, arithmetic, and a whitelist of pure functions. **No `eval`.** View files are data.
+`spec/expressions.py` parses `{{ … }}` binding expressions with :mod:`ast` — which does not execute anything — then walks the result against a strict node whitelist: attribute access, indexing, comparison, arithmetic, conditionals, and a small table of pure functions. **`eval` is never used on view content.** View files are data.
+
+Rejected and covered by tests: `__import__`, `open`, `eval`, dunder and underscore-prefixed attributes, comprehensions, lambdas, and any method outside a short safe list. This matters because a view file is exactly the kind of artefact users copy from the internet.
 
 ### 5.2 Reactivity — `runtime/signals.py`
 
@@ -246,6 +248,10 @@ class Element:
 ```
 
 `tree/reconcile.py` implements keyed diffing. For each level, children are matched by `(id, widget)`. Matched nodes are updated in place and keep `state`; unmatched old nodes are disposed (subscriptions released); unmatched new nodes are constructed. Reordering is handled by index remapping rather than destroy-and-rebuild.
+
+Structurally identical subtrees are **skipped entirely** — if `old.spec == new.spec`, nothing below can differ either, so the whole branch is left alone. `ReconcileStats` reports `created`/`updated`/`reused`/`disposed`/`skipped`, and the tests assert on those counts rather than merely on the resulting tree, which is what catches an accidental rebuild.
+
+A widget kind change or an id change forces a rebuild: the old element is disposed and a fresh one constructed. Anything else would leave state attached to a node that no longer means the same thing.
 
 ### 5.4 Layout engine — `layout/`
 
@@ -529,6 +535,10 @@ This yields correctly antialiased **rounded** clipping — which scissor rects c
 Events arrive from `rendercanvas` callbacks and are pushed onto a queue drained once per frame (§6), so a burst of mouse-move events coalesces rather than triggering redundant work.
 
 **Hit testing walks the Element tree in reverse painter order** and returns the topmost hit path, respecting ancestor clip rects. A naive full-tree recursion that visits every node — as in the prior draft — both ignores z-order and cannot express "the panel above intercepted this click".
+
+The path is **the target followed by its ancestors**, not everything under the cursor. An occluded sibling that also contains the point is absent from it and receives nothing, which is the whole point of respecting paint order.
+
+The entire drain runs inside one signal `batch()`, so a handler writing several signals triggers dependent work once rather than once per write.
 
 Dispatch follows a **capture → target → bubble** path over that hit path, with `Event.stop_propagation()`. Beyond raw clicks the system provides:
 
@@ -832,7 +842,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M0** ✅ | `pyproject.toml`, package skeleton, CI matrix, `theme/` complete, a window that clears to an MD3 surface colour | **Done.** 33 tests green (5 on GPU), `ruff` clean, `mypy --strict` clean across 17 files |
 | **M1** ✅ | `layout/` — constraints algebra, boundary/caching protocol, `LayoutOwner`, and `Padding`/`Align`/`SizedBox`/`ConstrainedBox`/`Row`/`Column`/`Flex`/`Stack`/`Spacer`. No rendering. | **Done.** 129 tests green, including Hypothesis property tests over random trees asserting the size invariant |
 | **M2** ✅ | Instanced pipeline + `ui.wgsl`: rounded boxes, per-corner radii, borders, shadows, analytic AA, rounded shader clipping, palette tokens. **First benchmark.** | **Done.** 180 tests green (24 GPU); 500 mixed primitives verified as one draw call; **R1 quantified — see §12.1** |
-| **M3** | Spec → Element → reconcile; signals; events, hit testing, focus | The framework is interactive |
+| **M3** ✅ | `spec/` (Pydantic + sandboxed expressions), `runtime/signals.py`, `tree/` (element + reconcile), `runtime/events.py`, `widgets/`, and the public `App` | **Done.** 293 tests green. Full slice works: YAML → elements → layout → paint → click → signal → re-render, with state-preserving reload |
 | **M4** | Text Tiers 1–2: fontdb + fallback, uharfbuzz shaping, itemisation, UAX #14/#29 segmentation, atlas, `TextBox` layout, bidi rendering | Real applications become possible; the largest subsystem lands |
 | **M5** | Hot reload with state preservation; golden-image suite; `examples/gallery` | The authoring loop is pleasant |
 | **M6** | API freeze, docs, PyPI release | v1.0 |
