@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Environments
+.venv/
+venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Golden-image test failures (baselines ARE tracked)
+tests/golden/failures/
+
+# Editors / desktop
+.vscode/
+.cursor/
+.idea/
+.directory
+
+# MCP local config
+.mcp.json
+.mcp.json.mcpmux-bak
