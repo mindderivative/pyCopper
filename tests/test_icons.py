@@ -151,18 +151,18 @@ def test_icon_font_is_loaded_lazily() -> None:
 
 
 ICON_VIEW = {
-    "id": "root",
+    "name": "root",
     "widget": "Row",
     "style": {"background": "surface", "padding": 8, "spacing": 8, "height": 48},
     "children": [
         {
-            "id": "a",
+            "name": "a",
             "widget": "Icon",
             "text": "home",
             "style": {"color": "on_surface", "icon_size": 24},
         },
         {
-            "id": "b",
+            "name": "b",
             "widget": "Icon",
             "text": "{{ 'star' if on.get() else 'star_border' }}",
             "style": {"color": "primary", "icon_size": 32},
@@ -205,7 +205,12 @@ def test_unknown_icon_in_a_view_is_reported() -> None:
     bad = {
         **ICON_VIEW,
         "children": [
-            {"id": "x", "widget": "Icon", "text": "nope_not_real", "style": {"color": "on_surface"}}
+            {
+                "name": "x",
+                "widget": "Icon",
+                "text": "nope_not_real",
+                "style": {"color": "on_surface"},
+            }
         ],
     }
     app = App(bad, theme=Theme(dark=True))

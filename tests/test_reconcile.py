@@ -9,15 +9,15 @@ from pycopper.widgets import build_element
 
 
 def spec(**kw):
-    return parse_view({"id": "root", "widget": "Column", **kw}).root
+    return parse_view({"name": "root", "widget": "Column", **kw}).root
 
 
 def tree(**kw):
     return build_element(spec(**kw))
 
 
-CHILD_A = {"id": "a", "widget": "Container", "style": {"width": 10, "height": 10}}
-CHILD_B = {"id": "b", "widget": "Container", "style": {"width": 20, "height": 20}}
+CHILD_A = {"name": "a", "widget": "Container", "style": {"width": 10, "height": 10}}
+CHILD_B = {"name": "b", "widget": "Container", "style": {"width": 20, "height": 20}}
 
 
 # ------------------------------------------------------------ identity
@@ -73,7 +73,7 @@ def test_changed_widget_kind_forces_a_rebuild() -> None:
 
 def test_changed_id_forces_a_rebuild() -> None:
     root = tree(children=[CHILD_A])
-    result, stats = reconcile(root, spec(children=[{**CHILD_A, "id": "renamed"}]))
+    result, stats = reconcile(root, spec(children=[{**CHILD_A, "name": "renamed"}]))
     assert result.find("a") is None
     assert result.find("renamed") is not None
     assert stats.created >= 1
@@ -105,7 +105,7 @@ def test_reordering_preserves_identity_and_state() -> None:
     a, b = root.find("a"), root.find("b")
     a.state.data["keep"] = 1
     result, stats = reconcile(root, spec(children=[CHILD_B, CHILD_A]))
-    assert [c.id for c in result.children] == ["b", "a"]
+    assert [c.name for c in result.children] == ["b", "a"]
     assert result.find("a") is a
     assert result.find("b") is b
     assert result.find("a").state.data["keep"] == 1
@@ -115,16 +115,16 @@ def test_reordering_preserves_identity_and_state() -> None:
 
 def test_nested_subtrees_reconcile() -> None:
     nested = {
-        "id": "outer",
+        "name": "outer",
         "widget": "Column",
-        "children": [{"id": "inner", "widget": "Container", "style": {"width": 5, "height": 5}}],
+        "children": [{"name": "inner", "widget": "Container", "style": {"width": 5, "height": 5}}],
     }
     root = tree(children=[nested])
     inner = root.find("inner")
     inner.state.data["x"] = 1
     changed = {
         **nested,
-        "children": [{"id": "inner", "widget": "Container", "style": {"width": 77, "height": 5}}],
+        "children": [{"name": "inner", "widget": "Container", "style": {"width": 77, "height": 5}}],
     }
     result, _ = reconcile(root, spec(children=[changed]))
     assert result.find("inner") is inner
@@ -152,7 +152,7 @@ def test_disposal_releases_subscriptions() -> None:
 
     count = Signal(0)
     root = build_element(
-        spec(children=[{"id": "t", "widget": "Text", "text": "n={{ count.get() }}"}])
+        spec(children=[{"name": "t", "widget": "Text", "text": "n={{ count.get() }}"}])
     )
     ctx = {"count": count}
     for element in root.walk_elements():

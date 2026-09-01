@@ -14,7 +14,7 @@ LOOSE = Constraints.loose(Size(400, 400))
 
 
 def element(**spec):
-    return build_element(parse_view({"id": "w", **spec}).root)
+    return build_element(parse_view({"name": "w", **spec}).root)
 
 
 def laid_out(**spec):
@@ -27,10 +27,10 @@ def painted(theme: Theme | None = None, **spec) -> DisplayList:
     """Paint one widget through a real App so tokens resolve."""
     app = App(
         {
-            "id": "root",
+            "name": "root",
             "widget": "Column",
             "style": {"background": "surface"},
-            "children": [{"id": "w", **spec}],
+            "children": [{"name": "w", **spec}],
         },
         theme=theme or Theme(dark=True),
     )
@@ -50,7 +50,7 @@ def tokens_in(dl: DisplayList) -> set[int]:
 def test_every_kind_has_an_element() -> None:
     from pycopper.widgets.base import _REGISTRY, create_element
 
-    create_element(parse_view({"id": "x", "widget": "Card"}).root)  # force lazy load
+    create_element(parse_view({"name": "x", "widget": "Card"}).root)  # force lazy load
     assert set(_REGISTRY) == set(WidgetKind)
 
 
@@ -64,7 +64,7 @@ def test_kind_parses_and_builds(kind: str) -> None:
 
 def test_unknown_variant_is_rejected_at_load() -> None:
     with pytest.raises(SpecError):
-        parse_view({"id": "x", "widget": "Chip", "style": {"variant": "nope"}})
+        parse_view({"name": "x", "widget": "Chip", "style": {"variant": "nope"}})
 
 
 # ---------------------------------------------------- M3 dimensions (dp 1:1)
@@ -151,9 +151,9 @@ def test_checked_parses_truthiness(raw: str, expected: bool) -> None:
 
 def test_value_is_bindable_to_a_signal() -> None:
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
-        "children": [{"id": "cb", "widget": "Checkbox", "value": "{{ on.get() }}"}],
+        "children": [{"name": "cb", "widget": "Checkbox", "value": "{{ on.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))
     on = Signal(False)
@@ -166,9 +166,9 @@ def test_value_is_bindable_to_a_signal() -> None:
 
 def test_badge_count_is_bindable() -> None:
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
-        "children": [{"id": "b", "widget": "Badge", "value": "{{ n.get() }}"}],
+        "children": [{"name": "b", "widget": "Badge", "value": "{{ n.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))
     n = Signal(3)
@@ -277,10 +277,10 @@ def test_selected_filter_chip_is_wider() -> None:
 def test_hover_adds_a_state_layer(kind: str) -> None:
     """M3 §0: hover is an 8% overlay, not a different container colour."""
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
         "children": [
-            {"id": "w", "widget": kind, "text": "add" if kind in ("IconButton", "Fab") else None}
+            {"name": "w", "widget": kind, "text": "add" if kind in ("IconButton", "Fab") else None}
         ],
     }
     app = App(view, theme=Theme(dark=True))
@@ -297,7 +297,7 @@ def test_hover_adds_a_state_layer(kind: str) -> None:
 
 def test_hover_does_not_trigger_layout() -> None:
     app = App(
-        {"id": "root", "widget": "Column", "children": [{"id": "w", "widget": "Switch"}]},
+        {"name": "root", "widget": "Column", "children": [{"name": "w", "widget": "Switch"}]},
         theme=Theme(dark=True),
     )
     app.mount()

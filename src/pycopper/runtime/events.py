@@ -362,7 +362,8 @@ class EventDispatcher:
             for event_key, name in element.spec.handlers.items():
                 fn = registry.get(name)
                 if fn is None:
-                    missing.append(f"{element.spec.id}.{event_key} -> {name!r}")
+                    label = element.spec.name or element.spec.id
+                    missing.append(f"{label}.{event_key} -> {name!r}")
                 else:
                     element.handlers[event_key] = fn
         return missing

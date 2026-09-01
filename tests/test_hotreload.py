@@ -12,12 +12,12 @@ from pycopper import App, Theme
 from pycopper.runtime.hotreload import HotReloader
 
 BASE = {
-    "id": "root",
+    "name": "root",
     "widget": "Column",
     "style": {"background": "surface", "padding": 8},
     "children": [
         {
-            "id": "card",
+            "name": "card",
             "widget": "Container",
             "style": {"width": 100, "height": 40, "background": "primary"},
         }

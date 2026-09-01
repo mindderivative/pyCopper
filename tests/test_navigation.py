@@ -22,12 +22,12 @@ def laid_out(spec, width=600.0, height=400.0):
 
 def app_with(children, value=None, widget="Tabs", style=None):
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
         "style": {"background": "surface", "width": "expand"},
         "children": [
             {
-                "id": "c",
+                "name": "c",
                 "widget": widget,
                 "style": style or {},
                 **({"value": value} if value else {}),
@@ -52,11 +52,11 @@ def tokens(dl) -> set[int]:
 
 
 TABS = [
-    {"id": f"t{i}", "widget": "Tab", "text": n}
+    {"name": f"t{i}", "widget": "Tab", "text": n}
     for i, n in enumerate(("Overview", "Details", "History"))
 ]
 RAIL = [
-    {"id": f"r{i}", "widget": "NavItem", "text": ic, "supporting_text": lb}
+    {"name": f"r{i}", "widget": "NavItem", "text": ic, "supporting_text": lb}
     for i, (ic, lb) in enumerate([("home", "Home"), ("search", "Search"), ("settings", "Settings")])
 ]
 
@@ -80,13 +80,13 @@ RAIL = [
     ],
 )
 def test_kind_builds(kind: str) -> None:
-    assert laid_out({"id": "w", "widget": kind}) is not None
+    assert laid_out({"name": "w", "widget": kind}) is not None
 
 
 def test_every_kind_is_registered() -> None:
     from pycopper.widgets.base import _REGISTRY, create_element
 
-    create_element(parse_view({"id": "x", "widget": "Tabs"}).root)
+    create_element(parse_view({"name": "x", "widget": "Tabs"}).root)
     assert set(_REGISTRY) == set(WidgetKind)
 
 
@@ -95,19 +95,19 @@ def test_every_kind_is_registered() -> None:
 
 def test_rail_is_eighty_wide() -> None:
     """M3 4.5."""
-    e = laid_out({"id": "w", "widget": "NavigationRail", "children": RAIL})
+    e = laid_out({"name": "w", "widget": "NavigationRail", "children": RAIL})
     assert e.size.width == 80.0
 
 
 def test_top_app_bar_is_sixty_four_high() -> None:
     """M3 4.2 small / center-aligned."""
-    e = laid_out({"id": "w", "widget": "TopAppBar", "text": "Title"})
+    e = laid_out({"name": "w", "widget": "TopAppBar", "text": "Title"})
     assert e.size.height == 64.0
 
 
 def test_tabs_are_forty_eight_high() -> None:
     """M3 4.7."""
-    e = laid_out({"id": "w", "widget": "Tabs", "children": TABS})
+    e = laid_out({"name": "w", "widget": "Tabs", "children": TABS})
     assert e.size.height == 48.0
 
 
@@ -115,9 +115,9 @@ def test_segmented_button_is_forty_high() -> None:
     """M3 1.4."""
     e = laid_out(
         {
-            "id": "w",
+            "name": "w",
             "widget": "SegmentedButton",
-            "children": [{"id": "s", "widget": "Segment", "text": "A"}],
+            "children": [{"name": "s", "widget": "Segment", "text": "A"}],
         }
     )
     assert e.size.height == 40.0
@@ -125,7 +125,7 @@ def test_segmented_button_is_forty_high() -> None:
 
 def test_linear_progress_is_four_high() -> None:
     """M3 2.2."""
-    e = laid_out({"id": "w", "widget": "LinearProgress", "style": {"width": "expand"}})
+    e = laid_out({"name": "w", "widget": "LinearProgress", "style": {"width": "expand"}})
     assert e.size.height == 4.0
 
 
@@ -139,13 +139,13 @@ def test_linear_progress_is_four_high() -> None:
 )
 def test_list_item_heights(spec: dict, expected: float) -> None:
     """M3 3.7: 56 / 72 / 88dp."""
-    e = laid_out({"id": "w", "widget": "ListItem", **spec})
+    e = laid_out({"name": "w", "widget": "ListItem", **spec})
     assert e.size.height == expected
 
 
 def test_drawer_width_is_within_the_m3_range() -> None:
     """M3 4.4: 240-360dp."""
-    e = laid_out({"id": "w", "widget": "NavigationDrawer", "children": RAIL})
+    e = laid_out({"name": "w", "widget": "NavigationDrawer", "children": RAIL})
     assert 240.0 <= e.size.width <= 360.0
 
 
@@ -154,15 +154,15 @@ def test_drawer_width_is_within_the_m3_range() -> None:
 
 def test_container_marks_only_the_named_child() -> None:
     app = app_with(TABS, value="t1")
-    sel = [c.id for c in app.root.find("c").children if c.selected]
+    sel = [c.name for c in app.root.find("c").children if c.selected]
     assert sel == ["t1"]
 
 
 def test_selection_is_bindable() -> None:
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
-        "children": [{"id": "c", "widget": "Tabs", "value": "{{ t.get() }}", "children": TABS}],
+        "children": [{"name": "c", "widget": "Tabs", "value": "{{ t.get() }}", "children": TABS}],
     }
     a = App(view, theme=Theme(dark=True))
     t = Signal("t0")
@@ -229,7 +229,9 @@ def test_selected_nav_item_fills_its_icon() -> None:
 
 def test_selected_segment_shows_a_checkmark() -> None:
     """M3 1.4: the active segment includes an 18dp checkmark."""
-    segs = [{"id": f"s{i}", "widget": "Segment", "text": n} for i, n in enumerate(("Day", "Week"))]
+    segs = [
+        {"name": f"s{i}", "widget": "Segment", "text": n} for i, n in enumerate(("Day", "Week"))
+    ]
     sel = app_with(segs, value="s0", widget="SegmentedButton")
     unsel = app_with(segs, widget="SegmentedButton")
     glyphs = lambda dl: sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)  # noqa: E731
@@ -238,14 +240,14 @@ def test_selected_segment_shows_a_checkmark() -> None:
 
 def test_segmented_button_shrinks_to_content_by_default() -> None:
     """Otherwise the outline runs on past the last segment."""
-    segs = [{"id": f"s{i}", "widget": "Segment", "text": "X"} for i in range(3)]
+    segs = [{"name": f"s{i}", "widget": "Segment", "text": "X"} for i in range(3)]
     app = app_with(segs, widget="SegmentedButton")
     group = app.root.find("c")
     assert group.size.width == pytest.approx(sum(c.size.width for c in group.children))
 
 
 def test_segmented_button_divides_an_explicit_width_equally() -> None:
-    segs = [{"id": f"s{i}", "widget": "Segment", "text": "X"} for i in range(3)]
+    segs = [{"name": f"s{i}", "widget": "Segment", "text": "X"} for i in range(3)]
     app = app_with(segs, widget="SegmentedButton", style={"width": "expand"})
     widths = [c.size.width for c in app.root.find("c").children]
     assert max(widths) - min(widths) < 1.0
@@ -254,7 +256,7 @@ def test_segmented_button_divides_an_explicit_width_equally() -> None:
 def test_linear_progress_fills_proportionally() -> None:
     def filled(value: str) -> float:
         e = laid_out(
-            {"id": "w", "widget": "LinearProgress", "value": value, "style": {"width": "expand"}},
+            {"name": "w", "widget": "LinearProgress", "value": value, "style": {"width": "expand"}},
             width=200,
         )
         return e.progress
@@ -266,23 +268,25 @@ def test_linear_progress_fills_proportionally() -> None:
 
 def test_progress_is_clamped() -> None:
     e = laid_out(
-        {"id": "w", "widget": "LinearProgress", "value": "5", "style": {"width": "expand"}}
+        {"name": "w", "widget": "LinearProgress", "value": "5", "style": {"width": "expand"}}
     )
     assert e.progress == 1.0
 
 
 def test_list_item_renders_both_lines() -> None:
-    one = laid_out({"id": "w", "widget": "ListItem", "text": "Only"})
-    two = laid_out({"id": "w", "widget": "ListItem", "text": "Head", "supporting_text": "Support"})
+    one = laid_out({"name": "w", "widget": "ListItem", "text": "Only"})
+    two = laid_out(
+        {"name": "w", "widget": "ListItem", "text": "Head", "supporting_text": "Support"}
+    )
     assert two.size.height > one.size.height
 
 
 def test_supporting_text_is_bindable() -> None:
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
         "children": [
-            {"id": "li", "widget": "ListItem", "text": "H", "supporting_text": "{{ s.get() }}"}
+            {"name": "li", "widget": "ListItem", "text": "H", "supporting_text": "{{ s.get() }}"}
         ],
     }
     a = App(view, theme=Theme(dark=True))
@@ -297,12 +301,12 @@ def test_supporting_text_is_bindable() -> None:
 def test_centered_app_bar_title_differs_from_left_aligned() -> None:
     def first_glyph_x(variant: str) -> float:
         view = {
-            "id": "root",
+            "name": "root",
             "widget": "Column",
             "style": {"width": "expand", "background": "surface"},
             "children": [
                 {
-                    "id": "b",
+                    "name": "b",
                     "widget": "TopAppBar",
                     "text": "Title",
                     "style": {"variant": variant, "width": "expand"},

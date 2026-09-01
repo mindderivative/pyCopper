@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from .include import IncludeError, resolve_includes
 from .models import ViewSpec, WidgetSpec
 
-__all__ = ["SpecError", "load_view", "parse_view"]
+__all__ = ["SpecError", "assign_ids", "load_view", "parse_view"]
 
 
 class SpecError(ValueError):
@@ -30,6 +30,47 @@ def _format(exc: ValidationError, origin: str) -> str:
     return "\n".join(lines)
 
 
+def assign_ids(node: Any, path: str = "/") -> None:
+    """Give every node a positional id, derived from its path in the tree.
+
+    Authors never write ids. This exists so every node has *some* identity for
+    reconciliation; because it encodes position, it changes when a node moves
+    among its siblings -- which is exactly the semantics we want for an unnamed
+    node. ``/`` cannot appear in a `name`, so a positional id can never collide
+    with an authored one.
+    """
+    if isinstance(node, dict):
+        node["id"] = path
+        children = node.get("children")
+        if isinstance(children, list):
+            for index, child in enumerate(children):
+                assign_ids(child, f"{path}{index}/")
+
+
+def _check_unique_names(view: ViewSpec, origin: str) -> None:
+    """Reject duplicate ``name``s.
+
+    A name is a lookup key -- ``find()``, ``anchor:``, and the reconciliation
+    key all resolve through it -- so a duplicate does not fail loudly, it
+    silently resolves to whichever node was visited first. Caught at load time
+    with both positional ids, that is a one-line fix; caught at runtime it
+    looks like a widget mysteriously ignoring its handler.
+    """
+    seen: dict[str, str] = {}
+    stack: list[WidgetSpec] = [view.root, *view.overlays]
+    while stack:
+        node = stack.pop()
+        if node.name is not None:
+            first = seen.get(node.name)
+            if first is not None:
+                raise SpecError(
+                    f"{origin}: duplicate name {node.name!r} "
+                    f"(used at {first} and {node.id}); names must be unique"
+                )
+            seen[node.name] = node.id
+        stack.extend(node.children)
+
+
 def parse_view(data: Any, *, origin: str = "<string>") -> ViewSpec:
     """Validate an already-decoded mapping into a :class:`ViewSpec`."""
     if not isinstance(data, dict):
@@ -37,10 +78,16 @@ def parse_view(data: Any, *, origin: str = "<string>") -> ViewSpec:
     # A bare widget (no `version:`/`root:`) is accepted as the root, so trivial
     # view files stay trivial.
     payload = data if "root" in data else {"root": data}
+    if isinstance(payload.get("root"), dict):
+        assign_ids(payload["root"], "/")
+    for index, overlay in enumerate(payload.get("overlays") or []):
+        assign_ids(overlay, f"@{index}/")
     try:
-        return ViewSpec.model_validate(payload)
+        view = ViewSpec.model_validate(payload)
     except ValidationError as exc:
         raise SpecError(_format(exc, origin)) from exc
+    _check_unique_names(view, origin)
+    return view
 
 
 def load_view(path: str | Path, *, sources: set[Path] | None = None) -> ViewSpec:
@@ -71,4 +118,4 @@ def load_view(path: str | Path, *, sources: set[Path] | None = None) -> ViewSpec
 
 
 def find_by_id(root: WidgetSpec, widget_id: str) -> WidgetSpec | None:
-    return next((n for n in root.walk() if n.id == widget_id), None)
+    return next((n for n in root.walk() if n.name == widget_id), None)

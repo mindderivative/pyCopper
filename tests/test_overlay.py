@@ -16,14 +16,14 @@ PAL = Palette(Theme(dark=True))
 def make(overlays, root_children=None, **signals):
     view = {
         "root": {
-            "id": "root",
+            "name": "root",
             "widget": "Column",
             "style": {"background": "surface", "padding": 20, "spacing": 10},
             "children": root_children
             if root_children is not None
             else [
                 {
-                    "id": "btn",
+                    "name": "btn",
                     "widget": "Button",
                     "text": "Open",
                     "style": {"width": 150, "height": 40},
@@ -42,7 +42,7 @@ def make(overlays, root_children=None, **signals):
 def dialog(**style):
     base = {"width": 200, "height": 120, "placement": "center"}
     base.update(style)
-    return {"id": "dlg", "widget": "Card", "open": "{{ show.get() }}", "style": base}
+    return {"name": "dlg", "widget": "Card", "open": "{{ show.get() }}", "style": base}
 
 
 def paint(app) -> DisplayList:
@@ -57,7 +57,7 @@ def paint(app) -> DisplayList:
 def test_overlays_are_not_part_of_the_root_tree() -> None:
     """A dialog must not be laid out or clipped by whatever opened it."""
     app = make([dialog()], show=Signal(True))
-    assert "dlg" not in [e.id for e in app.root.walk_elements()]
+    assert "dlg" not in [e.name for e in app.root.walk_elements()]
     assert app.overlays.find("dlg") is not None
 
 
@@ -71,7 +71,7 @@ def test_open_binding_shows_it() -> None:
     app = make([dialog()], show=show)
     show.set(True)
     app.update()
-    assert [e.element.id for e in app.overlays.visible()] == ["dlg"]
+    assert [e.element.name for e in app.overlays.visible()] == ["dlg"]
 
 
 def test_overlay_contributes_nothing_to_root_layout() -> None:
@@ -173,7 +173,7 @@ def test_click_inside_an_overlay_hits_it() -> None:
     app = make([dialog(modal=True)], show=Signal(True))
     rect = app.overlays.visible()[0].rect()
     path = app.dispatcher.hit_path(rect.x + 10, rect.y + 10)
-    assert path and path[-1].id == "dlg"
+    assert path and path[-1].name == "dlg"
 
 
 def test_modal_blocks_the_tree_beneath() -> None:
@@ -258,19 +258,19 @@ def test_escape_dismisses_before_clearing_focus() -> None:
 
 
 def test_declaration_order_is_z_order() -> None:
-    a = {"id": "a", "widget": "Card", "open": "true", "style": {"width": 100, "height": 100}}
-    b = {"id": "b", "widget": "Card", "open": "true", "style": {"width": 100, "height": 100}}
+    a = {"name": "a", "widget": "Card", "open": "true", "style": {"width": 100, "height": 100}}
+    b = {"name": "b", "widget": "Card", "open": "true", "style": {"width": 100, "height": 100}}
     app = make([a, b])
-    assert [e.element.id for e in app.overlays.visible()] == ["a", "b"]
+    assert [e.element.name for e in app.overlays.visible()] == ["a", "b"]
 
 
 def test_topmost_overlay_wins_hit_testing() -> None:
-    a = {"id": "a", "widget": "Card", "open": "true", "style": {"width": 200, "height": 200}}
-    b = {"id": "b", "widget": "Card", "open": "true", "style": {"width": 200, "height": 200}}
+    a = {"name": "a", "widget": "Card", "open": "true", "style": {"width": 200, "height": 200}}
+    b = {"name": "b", "widget": "Card", "open": "true", "style": {"width": 200, "height": 200}}
     app = make([a, b])
     rect = app.overlays.visible()[0].rect()
     path = app.dispatcher.hit_path(rect.x + 10, rect.y + 10)
-    assert path[-1].id == "b"
+    assert path[-1].name == "b"
 
 
 # ----------------------------------------------------------------- handlers
@@ -279,16 +279,16 @@ def test_topmost_overlay_wins_hit_testing() -> None:
 def test_handlers_inside_an_overlay_resolve() -> None:
     calls: list[str] = []
     view = {
-        "root": {"id": "root", "widget": "Column", "children": []},
+        "root": {"name": "root", "widget": "Column", "children": []},
         "overlays": [
             {
-                "id": "dlg",
+                "name": "dlg",
                 "widget": "Card",
                 "open": "true",
                 "style": {"width": 200, "height": 100},
                 "children": [
                     {
-                        "id": "ok",
+                        "name": "ok",
                         "widget": "Button",
                         "text": "OK",
                         "style": {"width": 80, "height": 40},
@@ -322,15 +322,15 @@ def test_single_child_container_rejects_extra_children() -> None:
     with pytest.raises(ValueError, match="single child"):
         App(
             {
-                "id": "r",
+                "name": "r",
                 "widget": "Column",
                 "children": [
                     {
-                        "id": "c",
+                        "name": "c",
                         "widget": "Card",
                         "children": [
-                            {"id": "a", "widget": "Text", "text": "one"},
-                            {"id": "b", "widget": "Text", "text": "two"},
+                            {"name": "a", "widget": "Text", "text": "one"},
+                            {"name": "b", "widget": "Text", "text": "two"},
                         ],
                     }
                 ],
@@ -344,23 +344,23 @@ def test_column_sized_only_on_width_does_not_fill_vertically() -> None:
     menu stretch to the bottom of the window."""
     app = App(
         {
-            "id": "r",
+            "name": "r",
             "widget": "Column",
             "style": {"background": "surface"},
             "children": [
                 {
-                    "id": "c",
+                    "name": "c",
                     "widget": "Column",
                     "style": {"width": "expand"},
                     "children": [
                         {
-                            "id": "a",
+                            "name": "a",
                             "widget": "ListItem",
                             "text": "one",
                             "style": {"width": "expand"},
                         },
                         {
-                            "id": "b",
+                            "name": "b",
                             "widget": "ListItem",
                             "text": "two",
                             "style": {"width": "expand"},

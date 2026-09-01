@@ -164,7 +164,21 @@ class ElementMixin:
 
     @property
     def id(self) -> str:
+        """Positional identity, assigned by the loader. Internal."""
         return self.spec.id
+
+    @property
+    def name(self) -> str | None:
+        """The designer's handle, if this node was given one."""
+        return self.spec.name
+
+    @property
+    def classes(self) -> tuple[str, ...]:
+        """Categories for the theme engine and stylesheet to select on."""
+        return self.spec.classes
+
+    def has_class(self, name: str) -> bool:
+        return name in self.spec.classes
 
     @property
     def style(self) -> StyleSpec:
@@ -449,11 +463,18 @@ class ElementMixin:
             if isinstance(child, ElementMixin):
                 yield from child.walk_elements()
 
-    def find(self, widget_id: str) -> Any | None:
-        return next((e for e in self.walk_elements() if e.id == widget_id), None)
+    def find(self, name: str) -> Any | None:
+        """The element with this `name`. Names, not positional ids, are the
+        handle a designer writes and application code refers to."""
+        return next((e for e in self.walk_elements() if e.name == name), None)
+
+    def find_all(self, class_name: str) -> list[Any]:
+        """Every element carrying *class_name*. Classes repeat by design."""
+        return [e for e in self.walk_elements() if class_name in e.classes]
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} {self.spec.id!r} size={self.size}>"
+        label = self.spec.name or self.spec.id
+        return f"<{type(self).__name__} {label!r} size={self.size}>"
 
 
 def element_children(node: LayoutNode) -> list[Any]:

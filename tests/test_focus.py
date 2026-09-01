@@ -16,25 +16,25 @@ from pycopper.theme import Palette
 from pycopper.tree.element import FOCUS_RING_OFFSET, FOCUS_RING_TOKEN, FOCUS_RING_WIDTH
 
 VIEW = {
-    "id": "root",
+    "name": "root",
     "widget": "Column",
     "style": {"background": "surface", "padding": 10},
     "children": [
         {
-            "id": "row",
+            "name": "row",
             "widget": "Row",
             "style": {"height": 56, "spacing": 16, "cross_alignment": "center"},
             "children": [
                 {
-                    "id": "btn",
+                    "name": "btn",
                     "widget": "Button",
                     "text": "Go",
                     "style": {"width": 100, "height": 40},
                 },
-                {"id": "cb", "widget": "Checkbox"},
-                {"id": "rd", "widget": "Radio"},
-                {"id": "sw", "widget": "Switch"},
-                {"id": "label", "widget": "Text", "text": "not focusable"},
+                {"name": "cb", "widget": "Checkbox"},
+                {"name": "rd", "widget": "Radio"},
+                {"name": "sw", "widget": "Switch"},
+                {"name": "label", "widget": "Text", "text": "not focusable"},
             ],
         }
     ],
@@ -76,17 +76,17 @@ def paint(app) -> DisplayList:
 
 
 def test_tab_order_is_document_order(app) -> None:
-    assert [e.id for e in app.dispatcher.focus_order()] == ["btn", "cb", "rd", "sw"]
+    assert [e.name for e in app.dispatcher.focus_order()] == ["btn", "cb", "rd", "sw"]
 
 
 def test_text_is_not_focusable(app) -> None:
-    assert "label" not in [e.id for e in app.dispatcher.focus_order()]
+    assert "label" not in [e.name for e in app.dispatcher.focus_order()]
 
 
 def test_controls_are_focusable_without_handlers(app) -> None:
     """A user must be able to Tab to a checkbox whether or not the view wired
     an on_click."""
-    assert "cb" in [e.id for e in app.dispatcher.focus_order()]
+    assert "cb" in [e.name for e in app.dispatcher.focus_order()]
 
 
 def test_tab_moves_forward(app) -> None:
@@ -94,7 +94,7 @@ def test_tab_moves_forward(app) -> None:
     for expected in ("btn", "cb", "rd", "sw"):
         d.post(KeyEvent(EventType.KEY_DOWN, key="Tab"))
         d.drain()
-        assert d.focused.id == expected
+        assert d.focused.name == expected
 
 
 def test_tab_wraps(app) -> None:
@@ -102,7 +102,7 @@ def test_tab_wraps(app) -> None:
     for _ in range(5):
         d.post(KeyEvent(EventType.KEY_DOWN, key="Tab"))
         d.drain()
-    assert d.focused.id == "btn"
+    assert d.focused.name == "btn"
 
 
 def test_shift_tab_moves_backward(app) -> None:
@@ -110,10 +110,10 @@ def test_shift_tab_moves_backward(app) -> None:
     d.post(KeyEvent(EventType.KEY_DOWN, key="Tab"))
     d.post(KeyEvent(EventType.KEY_DOWN, key="Tab"))
     d.drain()
-    assert d.focused.id == "cb"
+    assert d.focused.name == "cb"
     d.post(KeyEvent(EventType.KEY_DOWN, key="Tab", modifiers=frozenset({"shift"})))
     d.drain()
-    assert d.focused.id == "btn"
+    assert d.focused.name == "btn"
 
 
 def test_tab_works_from_nothing_focused(app) -> None:
@@ -151,7 +151,7 @@ def test_clicking_focuses_without_a_ring(app) -> None:
     r = app.root.find("btn").absolute_rect()
     d.post(PointerEvent(EventType.POINTER_DOWN, x=r.x + 5, y=r.y + 5))
     d.drain()
-    assert d.focused.id == "btn"
+    assert d.focused.name == "btn"
     assert not d.focused.state.focus_visible
     assert rings(paint(app)) == []
 

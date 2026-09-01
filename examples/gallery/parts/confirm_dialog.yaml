@@ -5,7 +5,7 @@
 # be named here. That is the cost of having no merge rules, and the reason the
 # interface is explicit.
 params: [title, body, open]
-id: dialog
+name: dialog
 widget: Card
 open: "{{ open }}"
 style:
@@ -18,9 +18,9 @@ style:
   corner_radius: 28
   padding: 24
 children:
-  - id: col
+  - name: col
     widget: Column
     style: {spacing: 10}
     children:
-      - {id: heading, widget: Text, text: "{{ title }}", style: {font_size: 20}}
-      - {id: message, widget: Text, text: "{{ body }}", style: {color: on_surface_variant}}
+      - {name: heading, widget: Text, text: "{{ title }}", style: {font_size: 20}}
+      - {name: message, widget: Text, text: "{{ body }}", style: {color: on_surface_variant}}

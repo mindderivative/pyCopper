@@ -10,12 +10,12 @@ from pycopper.paint import DisplayList, Kind
 from pycopper.runtime.events import EventType, PointerEvent
 
 VIEW = {
-    "id": "root",
+    "name": "root",
     "widget": "Column",
     "style": {"padding": 16, "spacing": 12, "background": "surface"},
     "children": [
         {
-            "id": "card",
+            "name": "card",
             "widget": "Container",
             "style": {
                 "width": 300,
@@ -25,7 +25,7 @@ VIEW = {
             },
         },
         {
-            "id": "btn",
+            "name": "btn",
             "widget": "Button",
             "style": {
                 "width": 200,
@@ -69,7 +69,7 @@ def click(app, element) -> None:
 
 
 def test_view_builds_an_element_tree(app) -> None:
-    assert [e.id for e in app.root.walk_elements()] == ["root", "card", "btn"]
+    assert [e.name for e in app.root.walk_elements()] == ["root", "card", "btn"]
 
 
 def test_layout_applies_padding_and_spacing(app) -> None:
@@ -81,7 +81,7 @@ def test_layout_applies_padding_and_spacing(app) -> None:
 def test_unregistered_handler_fails_at_mount() -> None:
     bad = {
         **VIEW,
-        "children": [{"id": "x", "widget": "Button", "handlers": {"on_click": "nonexistent"}}],
+        "children": [{"name": "x", "widget": "Button", "handlers": {"on_click": "nonexistent"}}],
     }
     with pytest.raises(SpecError, match="not registered"):
         App(bad).mount()
@@ -148,7 +148,7 @@ def test_binding_re_renders_the_label(app) -> None:
 
 def test_click_focuses_the_button(app) -> None:
     click(app, app.root.find("btn"))
-    assert app.dispatcher.focused.id == "btn"
+    assert app.dispatcher.focused.name == "btn"
 
 
 def test_clicking_the_card_does_not_run_the_button_handler(app) -> None:

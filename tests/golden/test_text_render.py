@@ -130,12 +130,12 @@ def test_app_text_renders_through_the_element_tree(render_scene) -> None:
     from pycopper import App
 
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
         "style": {"background": "surface", "padding": 12},
         "children": [
             {
-                "id": "label",
+                "name": "label",
                 "widget": "Text",
                 "text": "Rendered",
                 "style": {"color": "on_surface", "font_size": 24},

@@ -10,13 +10,12 @@ supplies them with ``with:``::
 
     # dialogs/confirm.yaml
     params: [title]
-    id: dialog
     widget: Card
     children:
-      - {id: label, widget: Text, text: "{{ title }}"}
+      - {name: label, widget: Text, text: "{{ title }}"}
 
     # call site
-    - id: delete_confirm
+    - name: delete_confirm
       source: dialogs/confirm.yaml
       with: {title: "Delete file?"}
 
@@ -88,40 +87,40 @@ def _substitute(node: Any, values: dict[str, str]) -> Any:
     return node
 
 
-def _namespace_ids(node: Any, prefix: str, local: set[str]) -> Any:
-    """Qualify every id declared inside a fragment with the call-site id.
+def _namespace_names(node: Any, prefix: str, local: set[str]) -> Any:
+    """Qualify every `name` declared inside a fragment with the call-site name.
 
-    Reconciliation matches on ``(id, widget)``, so including the same fragment
-    twice would otherwise produce duplicate ids -- ``find()`` would return the
-    wrong element and hot reload's state preservation would silently break.
+    Positional ids are inherently scoped by path, so only names need this --
+    but they need it badly: including the same fragment twice would otherwise
+    give two nodes the same name, and ``find()`` would return the wrong one.
     """
     if isinstance(node, list):
-        return [_namespace_ids(v, prefix, local) for v in node]
+        return [_namespace_names(v, prefix, local) for v in node]
     if not isinstance(node, dict):
         return node
 
     out: dict[str, Any] = {}
     for key, value in node.items():
-        if key == "id" and isinstance(value, str):
+        if key == "name" and isinstance(value, str):
             out[key] = value if value == prefix else f"{prefix}.{value}"
         elif key == "anchor" and isinstance(value, str) and value in local:
             # An anchor naming a fragment-local id must follow it; one naming
             # an outer element is left alone.
             out[key] = f"{prefix}.{value}"
         else:
-            out[key] = _namespace_ids(value, prefix, local)
+            out[key] = _namespace_names(value, prefix, local)
     return out
 
 
-def _collect_ids(node: Any, into: set[str]) -> None:
+def _collect_names(node: Any, into: set[str]) -> None:
     if isinstance(node, dict):
-        if isinstance(node.get("id"), str):
-            into.add(node["id"])
+        if isinstance(node.get("name"), str):
+            into.add(node["name"])
         for value in node.values():
-            _collect_ids(value, into)
+            _collect_names(value, into)
     elif isinstance(node, list):
         for value in node:
-            _collect_ids(value, into)
+            _collect_names(value, into)
 
 
 def _load_fragment(path: Path, chain: tuple[Path, ...]) -> dict[str, Any]:
@@ -183,21 +182,21 @@ def _expand(
     resolved = _walk(fragment, path.parent, root, sources, (*chain, path))
     fragment = resolved if isinstance(resolved, dict) else fragment
 
-    call_id = node.get("id")
-    if isinstance(call_id, str):
+    call_name = node.get("name")
+    if isinstance(call_name, str):
         local: set[str] = set()
-        _collect_ids(fragment, local)
-        fragment = _namespace_ids(fragment, call_id, local)
-        fragment["id"] = call_id
+        _collect_names(fragment, local)
+        fragment = _namespace_names(fragment, call_name, local)
+        fragment["name"] = call_name
 
     # Anything else at the call site (open:, style:, ...) is not merged --
     # parameters are the interface. Carrying `id` across is the one exception.
-    for key in (SOURCE_KEY, WITH_KEY, "id"):
+    for key in (SOURCE_KEY, WITH_KEY, "name"):
         node.pop(key, None)
     if node:
         raise IncludeError(
-            f"{_chain_text((*chain, path))}: a `source:` node takes only `id:` and "
-            f"`with:`; got {sorted(node)}. Pass configuration as parameters."
+            f"{_chain_text((*chain, path))}: a `source:` node takes only `name:` "
+            f"and `with:`; got {sorted(node)}. Pass configuration as parameters."
         )
     return fragment
 

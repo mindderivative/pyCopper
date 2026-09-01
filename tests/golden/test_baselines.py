@@ -115,7 +115,7 @@ def test_wrapped_text_baseline(render_scene, assert_golden) -> None:
 def test_widget_tree_baseline(render_scene, assert_golden) -> None:
     """A real App through the full four-tree pipeline."""
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
         "style": {
             "background": "surface",
@@ -127,13 +127,13 @@ def test_widget_tree_baseline(render_scene, assert_golden) -> None:
         },
         "children": [
             {
-                "id": "title",
+                "name": "title",
                 "widget": "Text",
                 "text": "Gallery",
                 "style": {"color": "on_surface", "font_size": 20},
             },
             {
-                "id": "card",
+                "name": "card",
                 "widget": "Container",
                 "style": {
                     "height": 70,
@@ -145,7 +145,7 @@ def test_widget_tree_baseline(render_scene, assert_golden) -> None:
                 },
                 "children": [
                     {
-                        "id": "body",
+                        "name": "body",
                         "widget": "Text",
                         "text": "Elevated card",
                         "style": {"color": "on_surface_variant", "font_size": 14},
@@ -153,12 +153,12 @@ def test_widget_tree_baseline(render_scene, assert_golden) -> None:
                 ],
             },
             {
-                "id": "row",
+                "name": "row",
                 "widget": "Row",
                 "style": {"height": 44, "spacing": 10, "width": "expand"},
                 "children": [
                     {
-                        "id": "primary",
+                        "name": "primary",
                         "widget": "Button",
                         "text": "Confirm",
                         "style": {
@@ -170,7 +170,7 @@ def test_widget_tree_baseline(render_scene, assert_golden) -> None:
                         },
                     },
                     {
-                        "id": "tonal",
+                        "name": "tonal",
                         "widget": "Button",
                         "text": "Cancel",
                         "style": {
@@ -292,31 +292,31 @@ def test_focus_ring_baseline(render_scene, assert_golden) -> None:
     from pycopper.runtime.events import EventType, KeyEvent
 
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Column",
         "style": {"background": "surface", "padding": 16},
         "children": [
             {
-                "id": "row",
+                "name": "row",
                 "widget": "Row",
                 "style": {"height": 56, "spacing": 20, "cross_alignment": "center"},
                 "children": [
                     {
-                        "id": "btn",
+                        "name": "btn",
                         "widget": "Button",
                         "text": "Filled",
                         "style": {"width": 110, "height": 40, "variant": "filled"},
                     },
-                    {"id": "cb", "widget": "Checkbox", "value": "true"},
-                    {"id": "rd", "widget": "Radio", "value": "true"},
-                    {"id": "sw", "widget": "Switch", "value": "false"},
+                    {"name": "cb", "widget": "Checkbox", "value": "true"},
+                    {"name": "rd", "widget": "Radio", "value": "true"},
+                    {"name": "sw", "widget": "Switch", "value": "false"},
                     {
-                        "id": "ib",
+                        "name": "ib",
                         "widget": "IconButton",
                         "text": "favorite",
                         "style": {"variant": "filled_tonal"},
                     },
-                    {"id": "fab", "widget": "Fab", "text": "add", "style": {"variant": "small"}},
+                    {"name": "fab", "widget": "Fab", "text": "add", "style": {"variant": "small"}},
                 ],
             }
         ],
@@ -340,30 +340,30 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
     from pycopper import Signal
 
     view = {
-        "id": "root",
+        "name": "root",
         "widget": "Row",
         "style": {"background": "surface", "width": "expand", "height": "expand"},
         "children": [
             {
-                "id": "rail",
+                "name": "rail",
                 "widget": "NavigationRail",
                 "value": "{{ dest.get() }}",
                 "style": {"spacing": 8, "padding": [0, 12]},
                 "children": [
                     {
-                        "id": "r_home",
+                        "name": "r_home",
                         "widget": "NavItem",
                         "text": "home",
                         "supporting_text": "Home",
                     },
                     {
-                        "id": "r_search",
+                        "name": "r_search",
                         "widget": "NavItem",
                         "text": "search",
                         "supporting_text": "Search",
                     },
                     {
-                        "id": "r_set",
+                        "name": "r_set",
                         "widget": "NavItem",
                         "text": "settings",
                         "supporting_text": "Settings",
@@ -371,57 +371,57 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
                 ],
             },
             {
-                "id": "main",
+                "name": "main",
                 "widget": "Column",
                 "style": {"width": "expand"},
                 "children": [
                     {
-                        "id": "bar",
+                        "name": "bar",
                         "widget": "TopAppBar",
                         "text": "Wave 2",
                         "style": {"width": "expand"},
                     },
                     {
-                        "id": "tabs",
+                        "name": "tabs",
                         "widget": "Tabs",
                         "value": "{{ tab.get() }}",
                         "style": {"width": "expand"},
                         "children": [
-                            {"id": "t1", "widget": "Tab", "text": "Overview"},
-                            {"id": "t2", "widget": "Tab", "text": "Details"},
-                            {"id": "t3", "widget": "Tab", "text": "History"},
+                            {"name": "t1", "widget": "Tab", "text": "Overview"},
+                            {"name": "t2", "widget": "Tab", "text": "Details"},
+                            {"name": "t3", "widget": "Tab", "text": "History"},
                         ],
                     },
                     {
-                        "id": "prog",
+                        "name": "prog",
                         "widget": "LinearProgress",
                         "value": "0.62",
                         "style": {"width": "expand"},
                     },
                     {
-                        "id": "body",
+                        "name": "body",
                         "widget": "Column",
                         "style": {"padding": 16, "spacing": 14, "width": "expand"},
                         "children": [
                             {
-                                "id": "seg",
+                                "name": "seg",
                                 "widget": "SegmentedButton",
                                 "value": "{{ seg.get() }}",
                                 "children": [
-                                    {"id": "s1", "widget": "Segment", "text": "Day"},
-                                    {"id": "s2", "widget": "Segment", "text": "Week"},
-                                    {"id": "s3", "widget": "Segment", "text": "Month"},
+                                    {"name": "s1", "widget": "Segment", "text": "Day"},
+                                    {"name": "s2", "widget": "Segment", "text": "Week"},
+                                    {"name": "s3", "widget": "Segment", "text": "Month"},
                                 ],
                             },
                             {
-                                "id": "li1",
+                                "name": "li1",
                                 "widget": "ListItem",
                                 "text": "Single line item",
                                 "style": {"width": "expand"},
                             },
-                            {"id": "dv", "widget": "Divider", "style": {"width": "expand"}},
+                            {"name": "dv", "widget": "Divider", "style": {"width": "expand"}},
                             {
-                                "id": "li2",
+                                "name": "li2",
                                 "widget": "ListItem",
                                 "text": "Two line item",
                                 "supporting_text": "With supporting text beneath",
@@ -449,24 +449,24 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
 
     view = {
         "root": {
-            "id": "root",
+            "name": "root",
             "widget": "Column",
             "style": {"background": "surface", "padding": 20, "spacing": 12},
             "children": [
                 {
-                    "id": "open_btn",
+                    "name": "open_btn",
                     "widget": "Button",
                     "text": "Open dialog",
                     "style": {"width": 170, "height": 40},
                 },
                 {
-                    "id": "menu_btn",
+                    "name": "menu_btn",
                     "widget": "Button",
                     "text": "Menu",
                     "style": {"width": 120, "height": 40, "variant": "outlined"},
                 },
                 {
-                    "id": "li",
+                    "name": "li",
                     "widget": "ListItem",
                     "text": "Background content",
                     "supporting_text": "Dimmed by the scrim",
@@ -476,7 +476,7 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
         },
         "overlays": [
             {
-                "id": "menu",
+                "name": "menu",
                 "widget": "Card",
                 "open": "true",
                 "style": {
@@ -489,18 +489,18 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
                 },
                 "children": [
                     {
-                        "id": "mcol",
+                        "name": "mcol",
                         "widget": "Column",
                         "style": {"width": "expand"},
                         "children": [
                             {
-                                "id": "m1",
+                                "name": "m1",
                                 "widget": "ListItem",
                                 "text": "Rename",
                                 "style": {"width": "expand"},
                             },
                             {
-                                "id": "m2",
+                                "name": "m2",
                                 "widget": "ListItem",
                                 "text": "Duplicate",
                                 "style": {"width": "expand"},
@@ -510,7 +510,7 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
                 ],
             },
             {
-                "id": "dlg",
+                "name": "dlg",
                 "widget": "Card",
                 "open": "{{ show.get() }}",
                 "style": {
@@ -525,7 +525,7 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
                 },
                 "children": [
                     {
-                        "id": "dt",
+                        "name": "dt",
                         "widget": "Text",
                         "text": "Modal dialog",
                         "style": {"font_size": 20},

@@ -1,4 +1,4 @@
-id: root
+name: root
 widget: Column
 style:
   background: surface
@@ -8,12 +8,12 @@ style:
   height: expand
   cross_alignment: stretch
 children:
-  - id: heading
+  - name: heading
     widget: Text
     text: "pyCopper counter"
     style: {color: on_surface, font_size: 22}
 
-  - id: card
+  - name: card
     widget: Container
     style:
       height: 96
@@ -23,22 +23,22 @@ children:
       border: {width: 1, color: outline_variant}
       shadow: {blur: 14, offset_y: 4}
     children:
-      - id: readout
+      - name: readout
         widget: Text
         text: "You have clicked {{ count.get() }} times"
         style: {color: on_surface_variant, font_size: 16}
 
-  - id: actions
+  - name: actions
     widget: Row
     style: {height: 48, spacing: 12, width: expand}
     children:
-      - id: inc
+      - name: inc
         widget: Button
         style: {width: 200, height: 48, background: primary,
                 color: on_primary, corner_radius: 24}
         text: "Increment"
         handlers: {on_click: increment}
-      - id: clear
+      - name: clear
         widget: Button
         style: {width: 140, height: 48, background: secondary_container,
                 color: on_secondary_container, corner_radius: 24}

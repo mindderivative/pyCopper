@@ -11,6 +11,7 @@ Element tree (ARCHITECTURE.md 4).
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -31,6 +32,8 @@ __all__ = [
 ]
 
 SCHEMA_VERSION = 1
+
+_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 
 
 class WidgetKind(StrEnum):
@@ -158,10 +161,32 @@ def _validate_token(raw: Any) -> str:
     return raw
 
 
+def _parse_classes(raw: Any) -> tuple[str, ...]:
+    """``"a b"`` or ``[a, b]`` -> ``("a", "b")``."""
+    if raw is None:
+        return ()
+    if isinstance(raw, str):
+        parts = raw.split()
+    elif isinstance(raw, list | tuple):
+        parts = [str(v) for v in raw]
+    else:
+        raise ValueError(f"invalid class list {raw!r}; expected a string or a list")
+    for part in parts:
+        if not _IDENT_RE.fullmatch(part):
+            raise ValueError(f"invalid class name {part!r}; use letters, digits, _ and -")
+    return tuple(parts)
+
+
 Size = Annotated[SizeSpec, BeforeValidator(SizeSpec.parse)]
 Edges = Annotated[EdgeInsets, BeforeValidator(_parse_edges)]
 Corners = Annotated[tuple[float, float, float, float], BeforeValidator(_parse_corners)]
 TokenRef = Annotated[str, BeforeValidator(_validate_token)]
+
+#: A dot separates include scopes: a fragment pulled in as `delete_confirm`
+#: has its inner `heading` become `delete_confirm.heading`, so the same
+#: fragment can be included twice without its names colliding.
+Identifier = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$")]
+Classes = Annotated[tuple[str, ...], BeforeValidator(_parse_classes)]
 
 
 class _Frozen(BaseModel):
@@ -249,7 +274,7 @@ class StyleSpec(_Frozen):
     # overlays (see runtime/overlay.py)
     #: Where an overlay sits. `anchor` positions it against another element.
     placement: Literal["center", "anchor", "top", "bottom", "left", "right"] = "center"
-    #: Id of the element an anchored overlay attaches to.
+    #: `name` of the element an anchored overlay attaches to.
     anchor: str | None = None
     #: A modal overlay blocks input to everything beneath it.
     modal: bool = False
@@ -278,11 +303,19 @@ class StyleSpec(_Frozen):
 
 
 class WidgetSpec(_Frozen):
-    #: A dot separates include scopes: a fragment pulled in as `delete_confirm`
-    #: has its inner `heading` become `delete_confirm.heading`, so the same
-    #: fragment can be included twice without colliding.
-    id: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$")
+    #: Positional identity, assigned by the loader from the node's path. Never
+    #: written by an author -- it exists so every node has *some* identity for
+    #: reconciliation, and it changes when the node moves among its siblings.
+    id: str = ""
     widget: WidgetKind
+    #: The designer's handle: unique, optional, and stable across a reorder.
+    #: Referenced by `find()`, `anchor:`, and a selection container's `value:`,
+    #: and used as the reconciliation key when present.
+    name: Identifier | None = None
+    #: Categories, for the theme engine and stylesheet to select on. Repeatable
+    #: by design -- unlike `name`, several nodes may share one. Accepts a list
+    #: or a space-separated string, and normalises to a tuple.
+    classes: Classes = ()
     style: StyleSpec = StyleSpec()
     text: str | None = None
     #: A bound value: selection for Checkbox/Radio/Switch/Chip, count for

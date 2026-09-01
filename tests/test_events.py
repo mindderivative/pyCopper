@@ -16,13 +16,13 @@ from pycopper.spec import parse_view
 from pycopper.widgets import build_element
 
 VIEW = {
-    "id": "root",
+    "name": "root",
     "widget": "Stack",
     "style": {"width": 200, "height": 200},
     "children": [
-        {"id": "under", "widget": "Container", "style": {"width": 200, "height": 200}},
+        {"name": "under", "widget": "Container", "style": {"width": 200, "height": 200}},
         {
-            "id": "over",
+            "name": "over",
             "widget": "Button",
             "style": {"width": 100, "height": 100},
             "handlers": {"on_click": "go"},
@@ -46,16 +46,16 @@ def dispatcher():
 def test_hit_path_is_target_then_ancestors(dispatcher) -> None:
     """The path is the target and its ANCESTORS. An occluded sibling that also
     contains the point ('under') is not in it -- it did not receive the event."""
-    assert [e.id for e in dispatcher.hit_path(50, 50)] == ["over", "root"]
+    assert [e.name for e in dispatcher.hit_path(50, 50)] == ["over", "root"]
 
 
 def test_overlapping_siblings_resolve_to_the_last_painted(dispatcher) -> None:
     """A forward walk would report 'under'; paint order says 'over' won."""
-    assert dispatcher.hit_path(50, 50)[0].id == "over"
+    assert dispatcher.hit_path(50, 50)[0].name == "over"
 
 
 def test_point_outside_the_top_child_falls_through(dispatcher) -> None:
-    assert [e.id for e in dispatcher.hit_path(150, 150)] == ["under", "root"]
+    assert [e.name for e in dispatcher.hit_path(150, 150)] == ["under", "root"]
 
 
 def test_point_outside_everything_is_empty(dispatcher) -> None:
@@ -88,7 +88,7 @@ def test_phases_run_capture_then_target_then_bubble(dispatcher) -> None:
     root = dispatcher.root
     for element in root.walk_elements():
         element.handlers = {
-            "on_pointer_down": (lambda e, el=element: seen.append((el.id, e.phase)))
+            "on_pointer_down": (lambda e, el=element: seen.append((el.name, e.phase)))
         }
     dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=50, y=50))
     dispatcher.drain()
@@ -103,10 +103,10 @@ def test_stop_propagation_during_capture_prevents_the_target(dispatcher) -> None
     """An ancestor can intercept before the target ever sees the event."""
     seen: list[str] = []
     for element in dispatcher.root.walk_elements():
-        if element.id == "root":
+        if element.name == "root":
             element.handlers = {"on_pointer_down": lambda e: e.stop_propagation()}
         else:
-            element.handlers = {"on_pointer_down": (lambda e, el=element: seen.append(el.id))}
+            element.handlers = {"on_pointer_down": (lambda e, el=element: seen.append(el.name))}
     dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=50, y=50))
     dispatcher.drain()
     assert seen == [], "target ran despite an ancestor stopping capture"
@@ -182,7 +182,7 @@ def test_pressing_a_focusable_element_focuses_it(dispatcher) -> None:
     dispatcher.bind_handlers({"go": lambda e: None})
     dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=50, y=50))
     dispatcher.drain()
-    assert dispatcher.focused.id == "over"
+    assert dispatcher.focused.name == "over"
 
 
 def test_focus_moves_and_clears_state(dispatcher) -> None:
@@ -198,9 +198,9 @@ def test_focus_moves_and_clears_state(dispatcher) -> None:
 def test_focus_next_cycles(dispatcher) -> None:
     dispatcher.bind_handlers({"go": lambda e: None})
     order = dispatcher.focus_order()
-    assert [e.id for e in order] == ["over"]
-    assert dispatcher.focus_next().id == "over"
-    assert dispatcher.focus_next().id == "over"
+    assert [e.name for e in order] == ["over"]
+    assert dispatcher.focus_next().name == "over"
+    assert dispatcher.focus_next().name == "over"
 
 
 def test_keys_go_to_the_focused_element(dispatcher) -> None:

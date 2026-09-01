@@ -36,9 +36,19 @@ class ReconcileStats:
         )
 
 
+def _identity(spec: WidgetSpec) -> str:
+    """A node's reconciliation key.
+
+    A `name` is stable across a reorder, so a named node keeps its state when
+    it moves. An unnamed node falls back to its positional id and is rebuilt
+    instead -- which is the honest outcome, since nothing distinguished it.
+    """
+    return spec.name or spec.id
+
+
 def _compatible(element: Any, spec: WidgetSpec) -> bool:
     """Same identity and same widget kind -- otherwise the node is rebuilt."""
-    return bool(element.spec.id == spec.id and element.spec.widget == spec.widget)
+    return bool(_identity(element.spec) == _identity(spec) and element.spec.widget == spec.widget)
 
 
 def reconcile(element: Any, spec: WidgetSpec, stats: ReconcileStats | None = None) -> Any:
@@ -69,11 +79,13 @@ def _reconcile(element: Any, spec: WidgetSpec, stats: ReconcileStats) -> Any:
 
 def _reconcile_children(element: Any, spec: WidgetSpec, stats: ReconcileStats) -> None:
     old_children = [c for c in element.children if isinstance(c, ElementMixin)]
-    by_key: dict[tuple[str, str], Any] = {(c.spec.id, str(c.spec.widget)): c for c in old_children}
+    by_key: dict[tuple[str, str], Any] = {
+        (_identity(c.spec), str(c.spec.widget)): c for c in old_children
+    }
 
     matched: list[Any] = []
     for child_spec in spec.children:
-        key = (child_spec.id, str(child_spec.widget))
+        key = (_identity(child_spec), str(child_spec.widget))
         existing = by_key.pop(key, None)
         if existing is not None:
             stats.reused += 1

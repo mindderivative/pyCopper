@@ -16,7 +16,7 @@ def views(tmp_path):
     (tmp_path / "row.yaml").write_text(
         textwrap.dedent("""
         params: [label]
-        id: item
+        name: item
         widget: ListItem
         text: "{{ label }}"
         style: {width: expand}
@@ -25,11 +25,11 @@ def views(tmp_path):
     (tmp_path / "card.yaml").write_text(
         textwrap.dedent("""
         params: [title]
-        id: card
+        name: card
         widget: Card
         style: {width: 200, height: 100}
         children:
-          - {id: heading, widget: Text, text: "{{ title }}"}
+          - {name: heading, widget: Text, text: "{{ title }}"}
     """)
     )
     return tmp_path
@@ -56,10 +56,10 @@ def test_include_expands_into_the_tree(views) -> None:
         views,
         """
         root:
-          id: root
+          name: root
           widget: Column
           children:
-            - {id: r1, source: row.yaml, with: {label: "Hello"}}
+            - {name: r1, source: row.yaml, with: {label: "Hello"}}
     """,
     )
     assert app.root.find("r1").text == "Hello"
@@ -70,16 +70,16 @@ def test_a_resolved_include_is_indistinguishable_from_inline(views) -> None:
     included = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: r, source: row.yaml, with: {label: "X"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: r, source: row.yaml, with: {label: "X"}}]}
     """,
     )
     inline = App(
         {
-            "id": "root",
+            "name": "root",
             "widget": "Column",
             "children": [
-                {"id": "r", "widget": "ListItem", "text": "X", "style": {"width": "expand"}}
+                {"name": "r", "widget": "ListItem", "text": "X", "style": {"width": "expand"}}
             ],
         },
         theme=Theme(dark=True),
@@ -94,9 +94,9 @@ def test_overlays_can_be_included(views) -> None:
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: []}
+        root: {name: root, widget: Column, children: []}
         overlays:
-          - {id: dlg, source: card.yaml, with: {title: "Confirm"}}
+          - {name: dlg, source: card.yaml, with: {title: "Confirm"}}
     """,
     )
     assert app.overlays.find("dlg") is not None
@@ -107,17 +107,17 @@ def test_fragments_nest(views) -> None:
     (views / "outer.yaml").write_text(
         textwrap.dedent("""
         params: [name]
-        id: outer
+        name: outer
         widget: Column
         children:
-          - {id: inner, source: row.yaml, with: {label: "{{ name }}"}}
+          - {name: inner, source: row.yaml, with: {label: "{{ name }}"}}
     """)
     )
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: o, source: outer.yaml, with: {name: "nested"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: o, source: outer.yaml, with: {name: "nested"}}]}
     """,
     )
     assert app.root.find("o.inner").text == "nested"
@@ -130,8 +130,8 @@ def test_plain_parameter_becomes_static_text(views) -> None:
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: r, source: row.yaml, with: {label: "Static"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: r, source: row.yaml, with: {label: "Static"}}]}
     """,
     )
     assert app.root.find("r").text == "Static"
@@ -144,8 +144,8 @@ def test_a_binding_passed_as_a_parameter_stays_reactive(views) -> None:
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: r, source: row.yaml, with: {label: "{{ live.get() }}"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: r, source: row.yaml, with: {label: "{{ live.get() }}"}}]}
     """,
         live=live,
     )
@@ -159,8 +159,8 @@ def test_missing_parameter_is_reported(views) -> None:
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: r, source: row.yaml}]}
+            root: {name: root, widget: Column, children: [
+              {name: r, source: row.yaml}]}
         """,
         )
 
@@ -171,20 +171,20 @@ def test_unknown_parameter_is_reported(views) -> None:
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: r, source: row.yaml, with: {label: a, labl: b}}]}
+            root: {name: root, widget: Column, children: [
+              {name: r, source: row.yaml, with: {label: a, labl: b}}]}
         """,
         )
 
 
 def test_call_site_may_not_carry_other_keys(views) -> None:
     """Parameters are the interface; merging would need murky precedence rules."""
-    with pytest.raises(SpecError, match="only `id:` and `with:`"):
+    with pytest.raises(SpecError, match="only `name:` and `with:`"):
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: r, source: row.yaml, with: {label: a}, style: {width: 10}}]}
+            root: {name: root, widget: Column, children: [
+              {name: r, source: row.yaml, with: {label: a}, style: {width: 10}}]}
         """,
         )
 
@@ -198,25 +198,25 @@ def test_the_same_fragment_included_twice_does_not_collide(views) -> None:
         views,
         """
         root:
-          id: root
+          name: root
           widget: Column
           children:
-            - {id: a, source: card.yaml, with: {title: "A"}}
-            - {id: b, source: card.yaml, with: {title: "B"}}
+            - {name: a, source: card.yaml, with: {title: "A"}}
+            - {name: b, source: card.yaml, with: {title: "B"}}
     """,
     )
-    ids = [e.id for e in app.root.walk_elements()]
+    ids = [e.name for e in app.root.walk_elements()]
     assert len(ids) == len(set(ids))
     assert app.root.find("a.heading").text == "A"
     assert app.root.find("b.heading").text == "B"
 
 
-def test_call_site_id_names_the_fragment_root(views) -> None:
+def test_call_site_name_names_the_fragment_root(views) -> None:
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: mycard, source: card.yaml, with: {title: "T"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: mycard, source: card.yaml, with: {title: "T"}}]}
     """,
     )
     assert app.root.find("mycard") is not None
@@ -227,8 +227,8 @@ def test_state_survives_a_reload_of_an_included_tree(views) -> None:
     path = write(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: a, source: card.yaml, with: {title: "A"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: a, source: card.yaml, with: {title: "A"}}]}
     """,
     )
     app = App(path, theme=Theme(dark=True))
@@ -245,13 +245,13 @@ def test_state_survives_a_reload_of_an_included_tree(views) -> None:
 
 
 def test_cycles_are_reported_with_the_chain(views) -> None:
-    (views / "a.yaml").write_text("id: a\nwidget: Column\nchildren: [{id: b, source: b.yaml}]")
-    (views / "b.yaml").write_text("id: b\nwidget: Column\nchildren: [{id: c, source: a.yaml}]")
+    (views / "a.yaml").write_text("name: a\nwidget: Column\nchildren: [{name: b, source: b.yaml}]")
+    (views / "b.yaml").write_text("name: b\nwidget: Column\nchildren: [{name: c, source: a.yaml}]")
     with pytest.raises(SpecError, match="include cycle"):
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [{id: x, source: a.yaml}]}
+            root: {name: root, widget: Column, children: [{name: x, source: a.yaml}]}
         """,
         )
 
@@ -262,8 +262,8 @@ def test_includes_may_not_escape_the_view_directory(views) -> None:
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: x, source: ../../../etc/passwd}]}
+            root: {name: root, widget: Column, children: [
+              {name: x, source: ../../../etc/passwd}]}
         """,
         )
 
@@ -273,8 +273,8 @@ def test_missing_file_is_reported(views) -> None:
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: x, source: nope.yaml, with: {}}]}
+            root: {name: root, widget: Column, children: [
+              {name: x, source: nope.yaml, with: {}}]}
         """,
         )
 
@@ -285,20 +285,20 @@ def test_a_fragment_must_be_a_mapping(views) -> None:
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: x, source: list.yaml, with: {}}]}
+            root: {name: root, widget: Column, children: [
+              {name: x, source: list.yaml, with: {}}]}
         """,
         )
 
 
 def test_validation_errors_name_the_entry_file(views) -> None:
-    (views / "bad.yaml").write_text("id: b\nwidget: Card\nstyle: {background: not_a_token}\n")
+    (views / "bad.yaml").write_text("name: b\nwidget: Card\nstyle: {background: not_a_token}\n")
     with pytest.raises(SpecError, match="unknown MD3 token"):
         app_for(
             views,
             """
-            root: {id: root, widget: Column, children: [
-              {id: x, source: bad.yaml, with: {}}]}
+            root: {name: root, widget: Column, children: [
+              {name: x, source: bad.yaml, with: {}}]}
         """,
         )
 
@@ -310,9 +310,9 @@ def test_every_included_file_is_tracked(views) -> None:
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: r, source: row.yaml, with: {label: "x"}},
-          {id: c, source: card.yaml, with: {title: "y"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: r, source: row.yaml, with: {label: "x"}},
+          {name: c, source: card.yaml, with: {title: "y"}}]}
     """,
     )
     assert {p.name for p in app.sources} == {"view.yaml", "row.yaml", "card.yaml"}
@@ -324,8 +324,8 @@ def test_hot_reload_watches_the_whole_graph(views) -> None:
     path = write(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: r, source: row.yaml, with: {label: "before"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: r, source: row.yaml, with: {label: "before"}}]}
     """,
     )
     app = App(path, theme=Theme(dark=True))
@@ -353,7 +353,7 @@ def test_hot_reload_watches_the_whole_graph(views) -> None:
 
 
 def test_dict_views_have_no_sources() -> None:
-    app = App({"id": "r", "widget": "Column"}, theme=Theme(dark=True))
+    app = App({"name": "r", "widget": "Column"}, theme=Theme(dark=True))
     assert app.sources == set()
 
 
@@ -361,8 +361,8 @@ def test_load_view_reports_sources(views) -> None:
     path = write(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: r, source: row.yaml, with: {label: "x"}}]}
+        root: {name: root, widget: Column, children: [
+          {name: r, source: row.yaml, with: {label: "x"}}]}
     """,
     )
     seen: set = set()
@@ -374,8 +374,8 @@ def test_a_view_without_includes_still_works(views) -> None:
     app = app_for(
         views,
         """
-        root: {id: root, widget: Column, children: [
-          {id: t, widget: Text, text: "plain"}]}
+        root: {name: root, widget: Column, children: [
+          {name: t, widget: Text, text: "plain"}]}
     """,
     )
     assert app.root.find("t").text == "plain"

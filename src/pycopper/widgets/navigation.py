@@ -68,7 +68,7 @@ class _SelectionContainer(_StyledMixin, Flex):
         active = self._value.strip()
         for child in self.children:
             if hasattr(child, "set_selected"):
-                child.set_selected(bool(active) and child.id == active)
+                child.set_selected(bool(active) and child.name == active)
 
     def perform_layout(self, constraints: Constraints) -> Size:
         self.apply_selection()

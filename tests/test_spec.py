@@ -7,7 +7,9 @@ import pytest
 from pycopper.spec import SpecError, WidgetKind, parse_view
 from pycopper.spec.expressions import Expression, ExpressionError, Template
 
-MINIMAL = {"id": "root", "widget": "Container"}
+MINIMAL = {"name": "root", "widget": "Container"}
+#: A second node for nesting tests -- a distinct name, since names are unique.
+CHILD = {"name": "child", "widget": "Container"}
 
 
 def view(**overrides):
@@ -19,12 +21,12 @@ def view(**overrides):
 
 def test_minimal_view_parses() -> None:
     v = view()
-    assert v.root.id == "root"
+    assert v.root.name == "root"
     assert v.root.widget is WidgetKind.CONTAINER
 
 
 def test_bare_widget_is_accepted_as_the_root() -> None:
-    assert parse_view(MINIMAL).root.id == "root"
+    assert parse_view(MINIMAL).root.name == "root"
 
 
 def test_unknown_style_key_is_rejected() -> None:
@@ -35,7 +37,7 @@ def test_unknown_style_key_is_rejected() -> None:
 
 def test_unknown_widget_kind_is_rejected() -> None:
     with pytest.raises(SpecError):
-        parse_view({"id": "x", "widget": "Blender"})
+        parse_view({"name": "x", "widget": "Blender"})
 
 
 def test_unknown_md3_token_is_rejected_at_load() -> None:
@@ -54,7 +56,7 @@ def test_handler_keys_must_start_with_on() -> None:
 
 def test_invalid_id_is_rejected() -> None:
     with pytest.raises(SpecError):
-        parse_view({"id": "3 bad id", "widget": "Container"})
+        parse_view({"name": "3 bad id", "widget": "Container"})
 
 
 def test_future_schema_version_is_rejected() -> None:
@@ -66,9 +68,9 @@ def test_errors_name_the_failing_path() -> None:
     with pytest.raises(SpecError) as exc:
         parse_view(
             {
-                "id": "r",
+                "name": "r",
                 "widget": "Container",
-                "children": [{"id": "c", "widget": "Container", "style": {"background": "nope"}}],
+                "children": [{"name": "c", "widget": "Container", "style": {"background": "nope"}}],
             }
         )
     assert "children.0.style.background" in str(exc.value)
@@ -114,8 +116,8 @@ def test_corner_shorthand() -> None:
 def test_children_are_structure_not_style() -> None:
     """A prior draft nested children under `style:`. They are not styling."""
     with pytest.raises(SpecError):
-        view(style={"children": [MINIMAL]})
-    assert len(view(children=[MINIMAL]).root.children) == 1
+        view(style={"children": [CHILD]})
+    assert len(view(children=[CHILD]).root.children) == 1
 
 
 def test_spec_is_frozen() -> None:
@@ -123,7 +125,7 @@ def test_spec_is_frozen() -> None:
 
     root = view().root
     with pytest.raises(ValidationError):
-        root.id = "other"
+        root.name = "other"
 
 
 def test_equal_specs_compare_equal() -> None:

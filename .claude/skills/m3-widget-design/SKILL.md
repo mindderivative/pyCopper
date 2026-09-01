@@ -183,6 +183,16 @@ widget must do: add its kind to `FOCUSABLE_KINDS` in `runtime/events.py` if it
 is interactive, and override `effective_radii` if it computes its own corner
 radius at paint time, or the ring will be the wrong shape.
 
+**Nodes have three identity fields, and they are not interchangeable.** `id` is
+positional and assigned by the loader — never author one. `name` is optional,
+unique, and the handle for `find()`, `anchor:`, and a selection `value:`; it is
+also the reconciliation key, so a named node keeps its state across a reorder
+and an unnamed one keeps state by *position*. `classes` is optional and
+repeatable, reserved for the coming theme engine. Only name what something
+references; a handler names a *function*, not the node, so a button with an
+`on_click` needs no name. Names must be unique within a view and the
+loader enforces it. See ARCHITECTURE.md §5.1.0.
+
 **Views compose across files.** A `source:` key pulls a subtree in from another
 file; the fragment declares `params:` and the call site passes `with:`. A
 `source:` node accepts only `id:` and `with:` — there is no key merging, so

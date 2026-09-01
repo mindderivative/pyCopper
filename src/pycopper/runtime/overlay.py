@@ -62,6 +62,13 @@ class OverlayEntry:
     def dismissable(self) -> bool:
         return bool(self.element.style.dismissable)
 
+    @property
+    def key(self) -> str:
+        """Stable handle for dismissal tracking: the name if given, else the
+        positional id."""
+        key: str = self.element.name or self.element.id
+        return key
+
     def rect(self) -> Rect:
         return Rect.from_offset_size(self.origin, self.element.size)
 
@@ -99,9 +106,11 @@ class OverlayHost:
         """Every element in every overlay, for handler resolution."""
         return [e for entry in self.entries for e in entry.element.walk_elements()]
 
-    def find(self, widget_id: str) -> Any | None:
+    def find(self, name: str) -> Any | None:
         for entry in self.entries:
-            found = entry.element.find(widget_id)
+            if entry.element.name == name:
+                return entry.element
+            found = entry.element.find(name)
             if found is not None:
                 return found
         return None
@@ -110,7 +119,7 @@ class OverlayHost:
 
     def visible(self) -> list[OverlayEntry]:
         """Visible overlays, bottom to top. Declaration order is z-order."""
-        return [e for e in self.entries if e.visible and e.element.id not in self._dismissed]
+        return [e for e in self.entries if e.visible and e.key not in self._dismissed]
 
     @property
     def has_modal(self) -> bool:
@@ -118,7 +127,7 @@ class OverlayHost:
 
     def dismiss(self, entry: OverlayEntry) -> None:
         if entry.dismissable:
-            self._dismissed.add(entry.element.id)
+            self._dismissed.add(entry.key)
             entry.element.mark_needs_paint()
 
     def dismiss_top(self) -> bool:
@@ -130,7 +139,7 @@ class OverlayHost:
         return False
 
     def reopen(self, entry: OverlayEntry) -> None:
-        self._dismissed.discard(entry.element.id)
+        self._dismissed.discard(entry.key)
 
     def sync_dismissals(self) -> None:
         """Forget dismissals for overlays the application has closed itself.
@@ -138,7 +147,7 @@ class OverlayHost:
         Without this, an overlay closed by clicking outside could never be
         reopened by its signal: the dismissal would outlive the state change.
         """
-        self._dismissed &= {e.element.id for e in self.entries if e.visible}
+        self._dismissed &= {e.key for e in self.entries if e.visible}
 
     # ------------------------------------------------------------------ layout
 

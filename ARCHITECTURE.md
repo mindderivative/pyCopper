@@ -713,6 +713,48 @@ nothing-focused state an application starts in. Focus order is document order,
 and `FOCUSABLE_KINDS` makes every interactive control reachable whether or not
 the view file wired a handler.
 
+### 5.1.0 Node identity: `id`, `name`, and `classes`
+
+Three separate concerns that were once a single overloaded `id` field:
+
+| Field | Written by | Cardinality | Purpose |
+|---|---|---|---|
+| `id` | **the loader** | unique | Positional identity, derived from the node's path (`/0/1/`). Never authored. |
+| `name` | the designer, optionally | unique | The handle: `find()`, `anchor:`, a selection `value:`, and the reconciliation key. |
+| `classes` | the designer, optionally | **repeatable** | Categories for the theme engine and stylesheet to select on. |
+
+**Why the split.** Requiring an `id` on every node meant naming things nobody
+referenced — the gallery declared 58 ids and referenced none of them by
+`anchor:` or `find()`. Meanwhile a *category* (several buttons that should
+style alike) and an *identity* (this specific button) are genuinely different
+needs, and one field cannot be both: a repeatable value cannot be a lookup key.
+
+**The reconciliation rule follows from it, in one line:**
+
+> A **named** node has stable identity and keeps its state across a reorder.
+> An **unnamed** node has positional identity: its state stays with the *slot*,
+> not with the content that moved.
+
+That second half is the honest cost, and it is precise — an unnamed node is not
+rebuilt on a reorder, it is reused in place and handed the other node's spec.
+For a `Divider` that is meaningless; for anything holding focus, scroll, or
+text, it is exactly why you give it a name.
+
+Positional ids use `/` as a separator, which the `name` pattern forbids, so an
+authored name and a generated id can never collide.
+
+**Uniqueness is enforced at load**, not merely documented. A duplicate name does
+not fail loudly on its own — `find()` just returns whichever node was reached
+first — so the loader walks the validated tree and rejects a collision with both
+positional ids in the message (`duplicate name 'badge' (used at /6/1/ and
+/8/8/)`). The gallery had exactly this bug: a `Badge` widget and an unrelated
+`Container` both named `badge`. At load it is a one-line fix; at runtime it
+looks like a widget mysteriously ignoring its handler.
+
+`classes` has no consumer yet — the theme engine and stylesheet are future work.
+It is in the format now deliberately, because retrofitting a selector target
+into a shipped view language is far more expensive than reserving it.
+
 ### 5.1.1 View composition — `spec/include.py`
 
 A `source:` key pulls a subtree in from another file:
@@ -752,12 +794,11 @@ application context. No separate reactive path exists or is needed.
 
 Four things this had to get right:
 
-- **Id namespacing.** Reconciliation matches on `(id, widget)`, so including a
-  fragment twice would otherwise produce duplicate ids — `find()` would return
-  the wrong element and hot reload's state preservation would silently break.
-  Ids inside a fragment are qualified with the call-site id
-  (`delete_confirm.heading`), and `.` is reserved in the id pattern for exactly
-  this.
+- **Name namespacing.** Positional ids are inherently scoped by path, but
+  `name`s are not: including a fragment twice would give two nodes the same
+  name, and `find()` would return the wrong one. Names inside a fragment are
+  qualified with the call-site name (`delete_confirm.heading`), and `.` is
+  reserved in the name pattern for exactly this.
 - **Hot reload watches the whole graph.** `App.sources` records every file
   touched, and **a change to any of them reloads the entry view** — not the
   file that changed, which is not a view on its own and would fail on its
