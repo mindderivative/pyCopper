@@ -37,3 +37,12 @@ explicit ask — this instruction doesn't authorize that.
 - Call **`create_entities`** to generate new nodes for previously unknown organizations, people, and significant events.
 - Call **`create_relations`** to establish the directed edges (relationships) linking the newly extracted entities to `default_user` or other existing entities in the graph.
 - Call **`add_observations`** to append specific contextual facts, behaviors, and preferences directly to their corresponding entity nodes.
+
+5. **Two Stores — Which One Is Canonical:**
+- The MCP knowledge graph is **canonical**. It holds the full detail, is not scoped to one project, and carries all entities and relations. **When the two stores disagree, the graph wins.**
+- The file-based memory at `~/.claude/projects/-home-phil-pyDev-projects-pyCopper/memory/` is the **project-scoped summary**, loaded automatically into context each session. It keeps working agreements in full and reduces project detail to short pointers naming the relevant graph entity.
+- New project detail goes into the **graph first** (`add_observations`, or `create_entities` for something genuinely new). Only edit a file in the summary when the summary itself has become wrong, or a new working agreement is established. **Do not mirror full detail back into it** — two complete copies drift, which is what this split exists to prevent.
+
+6. **If Memory Writes Fail:**
+- See the `claude-memory-mcp` entry in the file-based memory for the full diagnostic. In short: the server reads the `MEMORY_FILE_PATH` **environment variable**, not a `--memory-path` flag; a config edit needs a **full restart** because Claude Code caches MCP config at session start; and **killing stale server processes does not help** — they are respawned from the same cached config.
+- Do not silently fall back to answering without memory. Say plainly that the graph is unavailable.
