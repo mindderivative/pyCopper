@@ -132,6 +132,11 @@ class CardElement(_StyledMixin, Padding):
         "outlined": "surface",
     }
 
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        radii = self.style.corner_radius
+        return radii if any(radii) else (self.RADIUS,) * 4
+
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, self._insets(spec.style))
         self.init_element(spec)
@@ -224,6 +229,10 @@ class CheckboxElement(_StyledMixin, Padding):
     BOX: Final = 18.0
     RADIUS: Final = 2.0
 
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self.RADIUS,) * 4
+
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
@@ -272,6 +281,10 @@ class RadioElement(_StyledMixin, Padding):
 
     OUTER: Final = 20.0
     INNER: Final = 10.0
+
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self.OUTER / 2,) * 4
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -324,6 +337,10 @@ class SwitchElement(_StyledMixin, Padding):
     THUMB_OFF: Final = 16.0
     THUMB_ON: Final = 24.0
 
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self.TRACK_H / 2,) * 4
+
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
@@ -373,6 +390,10 @@ class ChipElement(_StyledMixin, Padding):
     ICON: Final = 18.0
     GAP: Final = 6.0
     PAD_X: Final = 12.0
+
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self.RADIUS,) * 4
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -455,6 +476,10 @@ class IconButtonElement(_StyledMixin, Padding):
         "outlined": (None, "on_surface_variant"),
     }
 
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self.size.height / 2,) * 4
+
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
@@ -526,6 +551,10 @@ class FabElement(_StyledMixin, Padding):
         "medium": (80.0, 20.0, 28.0),
         "large": (96.0, 28.0, 36.0),
     }
+
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self._geometry()[1],) * 4
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -599,6 +628,10 @@ class BadgeElement(_StyledMixin, Padding):
     HEIGHT: Final = 16.0
     PAD_X: Final = 4.0
     LABEL_SIZE: Final = 11.0
+
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        return (self.size.height / 2,) * 4
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())

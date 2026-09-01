@@ -237,6 +237,11 @@ class ButtonElement(ContainerElement):
         "text": (None, "primary", False, False),
     }
 
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        radii = self.style.corner_radius
+        return radii if any(radii) else (self.size.height / 2,) * 4
+
     def _variant(self) -> tuple[str | None, str, bool, bool]:
         return self.VARIANTS.get(self.style.variant, self.VARIANTS["filled"])
 

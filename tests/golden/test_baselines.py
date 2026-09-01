@@ -284,3 +284,52 @@ def test_icons_baseline(render_scene, assert_golden) -> None:
     engine.painter = paint
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("icons", np.asarray(engine.canvas.draw()))
+
+
+def test_focus_ring_baseline(render_scene, assert_golden) -> None:
+    """The ring must follow each control's shape -- a rectangle around a circle
+    reads as a bug, and only a rendered image catches that."""
+    from pycopper.runtime.events import EventType, KeyEvent
+
+    view = {
+        "id": "root",
+        "widget": "Column",
+        "style": {"background": "surface", "padding": 16},
+        "children": [
+            {
+                "id": "row",
+                "widget": "Row",
+                "style": {"height": 56, "spacing": 20, "cross_alignment": "center"},
+                "children": [
+                    {
+                        "id": "btn",
+                        "widget": "Button",
+                        "text": "Filled",
+                        "style": {"width": 110, "height": 40, "variant": "filled"},
+                    },
+                    {"id": "cb", "widget": "Checkbox", "value": "true"},
+                    {"id": "rd", "widget": "Radio", "value": "true"},
+                    {"id": "sw", "widget": "Switch", "value": "false"},
+                    {
+                        "id": "ib",
+                        "widget": "IconButton",
+                        "text": "favorite",
+                        "style": {"variant": "filled_tonal"},
+                    },
+                    {"id": "fab", "widget": "Fab", "text": "add", "style": {"variant": "small"}},
+                ],
+            }
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=520, height=88, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.update()
+    # Tab three times: focus lands on the radio, whose ring must be circular.
+    for _ in range(3):
+        app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Tab"))
+    app.dispatcher.drain()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("focus_ring", np.asarray(engine.canvas.draw()))

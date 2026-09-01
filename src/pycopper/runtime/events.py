@@ -94,6 +94,14 @@ HANDLER_KEYS = {
 }
 
 
+#: Widget kinds that take keyboard focus even without an explicit handler.
+#: These are interactive controls: a user must be able to Tab to a checkbox
+#: whether or not the view file wired an on_click.
+FOCUSABLE_KINDS: frozenset[str] = frozenset(
+    {"Button", "Checkbox", "Radio", "Switch", "Chip", "IconButton", "Fab"}
+)
+
+
 class EventDispatcher:
     """Owns the event queue, hover/press/focus state, and dispatch."""
 
@@ -207,6 +215,16 @@ class EventDispatcher:
         self._hover_path = path
 
     def _dispatch_to_focused(self, event: Event) -> None:
+        # Tab traversal is handled before delivery: it must work even when
+        # nothing is focused yet, which is the state an app starts in.
+        if isinstance(event, KeyEvent) and event.type is EventType.KEY_DOWN:
+            if event.key in ("Tab", "tab"):
+                self.focus_next(backwards="shift" in event.modifiers)
+                return
+            if event.key in ("Escape", "escape") and self._focused is not None:
+                self.focus(None)
+                return
+
         if self._focused is None:
             return
         path: list[Any] = []
@@ -244,18 +262,27 @@ class EventDispatcher:
 
     @staticmethod
     def _focusable(element: Any) -> bool:
-        return bool(element.handlers) or element.spec.widget == "Button"
+        return bool(element.handlers) or str(element.spec.widget) in FOCUSABLE_KINDS
 
-    def focus(self, element: Any) -> None:
+    def focus(self, element: Any, *, keyboard: bool = False) -> None:
+        """Move focus. ``keyboard=True`` also shows the focus ring.
+
+        Desktop convention: clicking focuses silently, Tab shows the indicator.
+        """
         if element is self._focused:
+            if element is not None and element.state.focus_visible != keyboard:
+                element.state.focus_visible = keyboard
+                element.mark_needs_paint()
             return
         if self._focused is not None:
             self._focused.state.focused = False
+            self._focused.state.focus_visible = False
             self._focused.mark_needs_paint()
             self._propagate([self._focused], Event(EventType.BLUR))
         self._focused = element
         if element is not None:
             element.state.focused = True
+            element.state.focus_visible = keyboard
             element.mark_needs_paint()
             self._propagate([element], Event(EventType.FOCUS))
 
@@ -266,14 +293,15 @@ class EventDispatcher:
         return [e for e in self.root.walk_elements() if self._focusable(e)]
 
     def focus_next(self, backwards: bool = False) -> Any:
+        """Move focus along the Tab order. Always shows the ring."""
         order = self.focus_order()
         if not order:
             return None
         if self._focused is None or self._focused not in order:
-            self.focus(order[-1] if backwards else order[0])
+            self.focus(order[-1] if backwards else order[0], keyboard=True)
             return self._focused
         index = order.index(self._focused)
-        self.focus(order[(index + (-1 if backwards else 1)) % len(order)])
+        self.focus(order[(index + (-1 if backwards else 1)) % len(order)], keyboard=True)
         return self._focused
 
     def bind_handlers(self, registry: dict[str, Callable[[Any], None]]) -> list[str]:

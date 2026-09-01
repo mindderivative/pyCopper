@@ -177,6 +177,12 @@ bundled (`pycopper.assets`), so M3's `label-large` medium weight is available.
 Measure with `TextEngine.measure` / `measure_text`, paint with `paint_text` --
 both take `font_size` in logical px, matching M3's `sp`/`dp` figures 1:1.
 
+**Focus rings are automatic.** `ElementMixin.paint()` draws M3's 2dp indicator
+for any focused widget -- do not implement one per component. Two things a new
+widget must do: add its kind to `FOCUSABLE_KINDS` in `runtime/events.py` if it
+is interactive, and override `effective_radii` if it computes its own corner
+radius at paint time, or the ring will be the wrong shape.
+
 **Widgets today:** primitives — Container, Row, Column, Stack, Spacer, Text,
 Icon. M3 components — Card, Divider, Checkbox, Radio, Switch, Chip, IconButton,
 Fab, Badge, and Button with its five variants.
@@ -232,9 +238,6 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   nothing consumes it.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
-- **Focus ring rendering.** Focus is tracked and dispatched, but nothing draws
-  M3's 2dp high-contrast indicator. On desktop this is a *significant* gap, not
-  a cosmetic one -- keyboard traversal is a primary input path.
 - **Motion.** No animation or transition system; every state change is instant
   — a Switch thumb jumps rather than sliding.
 - **An overlay/portal layer.** Dialog, Menu, Tooltip, Snackbar and both Sheet

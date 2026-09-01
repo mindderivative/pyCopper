@@ -34,6 +34,14 @@ __all__ = ["ElementMixin", "PaintContext", "WidgetState"]
 
 _NO_CLIP = (0.0, 0.0, 0.0, 0.0)
 
+#: M3 accessibility: a focused element renders a high-visibility 2dp stroke
+#: around its boundary. The reference says "high contrast colour" without
+#: naming a token; `secondary` is M3 Web's choice and contrasts with the
+#: primary-coloured components it most often surrounds.
+FOCUS_RING_WIDTH = 2.0
+FOCUS_RING_OFFSET = 2.0
+FOCUS_RING_TOKEN = "secondary"
+
 _DEFAULT_TEXT: TextEngine | None = None
 
 
@@ -56,6 +64,10 @@ class WidgetState:
     hovered: bool = False
     pressed: bool = False
     focused: bool = False
+    #: True only when focus arrived via the keyboard. Desktop convention: a
+    #: mouse click focuses without showing a ring, Tab shows one. Without this
+    #: split every click leaves a ring behind, which reads as a bug.
+    focus_visible: bool = False
     scroll: Offset = OFFSET_ZERO
     data: dict[str, Any] = field(default_factory=dict)
 
@@ -253,9 +265,51 @@ class ElementMixin:
             if isinstance(child, ElementMixin):
                 child.paint(child_ctx, absolute)
 
+        self.paint_focus_ring(ctx, absolute)
         self._cached = ctx.display_list.snapshot(start)
         self._cached_origin = absolute
         self._needs_paint = False
+
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        """Corner radii this element actually paints with.
+
+        Distinct from ``style.corner_radius`` because several components
+        compute their own -- a Button is a pill at height/2 when the view sets
+        no radius. The focus ring follows this, or it would draw a rectangle
+        around a rounded control.
+        """
+        return self.style.corner_radius
+
+    def paint_focus_ring(self, ctx: PaintContext, absolute: Offset) -> None:
+        """Draw the M3 focus indicator, on top of this element's whole subtree.
+
+        Implemented once here rather than per widget, so every focusable
+        component gets a correct ring without opting in. Only drawn for
+        keyboard focus (see WidgetState.focus_visible).
+        """
+        if not (self.state.focused and self.state.focus_visible):
+            return
+        size = self.size
+        if size.is_empty:
+            return
+        dpr = ctx.pixel_ratio
+        offset = FOCUS_RING_OFFSET
+        radii = tuple((r + offset) if r > 0 else 0.0 for r in self.effective_radii)
+        ctx.display_list.add_box(
+            (absolute.x - offset) * dpr,
+            (absolute.y - offset) * dpr,
+            (size.width + offset * 2) * dpr,
+            (size.height + offset * 2) * dpr,
+            token=ctx.palette.index(FOCUS_RING_TOKEN),
+            color=(1.0, 1.0, 1.0, 0.0),  # ring only, no fill
+            radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+            border_width=FOCUS_RING_WIDTH * dpr,
+            border_token=ctx.palette.index(FOCUS_RING_TOKEN),
+            border_color=(1.0, 1.0, 1.0, 1.0),
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
+        )
 
     def child_paint_context(self, ctx: PaintContext, absolute: Offset) -> PaintContext:
         """Override to introduce a clip for children (scroll views, cards)."""

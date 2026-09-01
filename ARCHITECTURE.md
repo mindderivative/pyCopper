@@ -687,6 +687,32 @@ The engine then: re-reads and re-validates the Spec tree; **on validation failur
 
 Handler *bindings* are re-resolved, but handler *bodies* are not reloaded — that is Python-level reload and is out of scope (§1.2).
 
+### 5.11.1 Focus rings and keyboard traversal
+
+M3 requires a focused element to render a **2dp high-visibility stroke around
+its boundary**. On a pointer-and-keyboard framework this is not cosmetic:
+keyboard traversal is a primary input path, so an invisible focus state is a
+defect (§1.2.1).
+
+Three decisions:
+
+- **Drawn once, centrally.** `ElementMixin.paint()` emits the ring after the
+  element's own subtree, so it lands on top and every focusable widget gets a
+  correct ring without opting in.
+- **`focus_visible` is separate from `focused`.** A mouse click focuses
+  *silently*; Tab shows the ring. This is standard desktop behaviour, and
+  without the split every click leaves a ring behind, which reads as a bug.
+- **The ring follows the control's shape**, via `Element.effective_radii`.
+  `style.corner_radius` is not enough: several components compute their own
+  radius at paint time — a Button is a pill at height/2 when the view sets
+  none — so a ring keyed on the raw style draws a rectangle around a circle.
+
+`Tab` and `Shift+Tab` traverse the focus order, and `Escape` clears focus. Tab
+is handled before delivery to the focused element, so it works from the
+nothing-focused state an application starts in. Focus order is document order,
+and `FOCUSABLE_KINDS` makes every interactive control reachable whether or not
+the view file wired a handler.
+
 ### 5.12 Material Design 3 components — `widgets/material.py`
 
 Nine components translated from their M3 specs. Dimensions are M3's own dp
