@@ -273,7 +273,17 @@ def layout(self, c: Constraints) -> Size:
 
 The final clause is the invariant that makes the whole thing work: a node's size depends only on its constraints and its children, never on its position or siblings. That is what permits subtree-local relayout.
 
-**Relayout boundaries.** A node is a boundary if the constraints it received are *tight* — its parent has fixed its size, so no change beneath it can alter its own size, and dirt cannot propagate upward past it. Marking a node `needs_layout` walks up to the nearest boundary and schedules layout from there. In a typical application this means a text change inside a sized card relayouts a handful of nodes, not thousands.
+**Relayout boundaries.** A node is a boundary when nothing beneath it can change its size, so dirt cannot propagate upward past it. There are **two independent conditions**, and the implementation found the second to be the more valuable one:
+
+1. **Tight constraints** — the parent has already fixed the child's size.
+2. **`parent_uses_size=False`** — the parent does not read the child's size at all, so it cannot care if it changes. This is strictly cheaper: it applies even under loose constraints, and it is the common case for `Align`, `Stack`, and any container that fills its own constraints.
+
+`layout()` computes the boundary; subclasses implement `perform_layout()` and never call it directly. Marking `needs_layout` walks up only to the nearest boundary and schedules it on a `LayoutOwner`, which flushes dirty boundaries in **depth order** so a parent never relayouts a child twice.
+
+Two consequences worth stating, both surfaced by tests:
+
+- A fixed-size box containing padding makes **every** descendant a boundary, because deflating a tight constraint leaves it tight. This is the cheapest possible arrangement — dirt cannot escape the leaf at all.
+- Relayout of a boundary uses `_layout_without_resize()`: its size provably cannot change, so the parent is never notified. That is precisely what makes subtree-local layout valid rather than merely an optimisation.
 
 **Intrinsic sizing** (`get_min_intrinsic_width` etc.) is supported but explicitly opt-in and memoised per layout pass, because it is the one construct in this model that can go quadratic.
 
@@ -733,7 +743,7 @@ The architecture was shaped partly by testability; this is the payoff.
 
 | Layer | Approach | GPU? |
 |---|---|---|
-| Layout | Direct `Constraints` in, `Size` out. Property tests over random trees asserting the invariant *a node's size depends only on its constraints and children*. | No |
+| Layout | Direct `Constraints` in, `Size` out. **Hypothesis** property tests over randomly generated trees (avg ~10 nodes, up to 49, depth 5) assert the invariant *a node's size depends only on its constraints and children* — by moving every node and re-laying out, then requiring identical sizes. Also: every layout result satisfies its constraints, layout is deterministic, and flex distribution sums exactly. | No |
 | Signals | Assert exact invalidation sets: which Elements dirtied, and with which flag. Catches over-invalidation, which is silent but is the main performance risk. | No |
 | Reconciliation | Reload a mutated Spec; assert scroll/focus/text state survived. | No |
 | Spec validation | Malformed YAML corpus; assert error type, key path, and line number. | No |
@@ -795,7 +805,7 @@ A benchmark harness (`tests/bench/`) tracks steady-state idle cost, single-prope
 | M | Deliverable | Proves |
 |---|---|---|
 | **M0** ✅ | `pyproject.toml`, package skeleton, CI matrix, `theme/` complete, a window that clears to an MD3 surface colour | **Done.** 33 tests green (5 on GPU), `ruff` clean, `mypy --strict` clean across 17 files |
-| **M1** | `layout/` complete with full unit-test suite. No rendering. | The hardest subsystem, validated in isolation |
+| **M1** ✅ | `layout/` — constraints algebra, boundary/caching protocol, `LayoutOwner`, and `Padding`/`Align`/`SizedBox`/`ConstrainedBox`/`Row`/`Column`/`Flex`/`Stack`/`Spacer`. No rendering. | **Done.** 129 tests green, including Hypothesis property tests over random trees asserting the size invariant |
 | **M2** | Instanced pipeline + `ui.wgsl`: rounded boxes, borders, shadows, analytic AA, shader clipping. Static tree. **First benchmark.** | One draw call is real; R1 is quantified |
 | **M3** | Spec → Element → reconcile; signals; events, hit testing, focus | The framework is interactive |
 | **M4** | Text Tiers 1–2: fontdb + fallback, uharfbuzz shaping, itemisation, UAX #14/#29 segmentation, atlas, `TextBox` layout, bidi rendering | Real applications become possible; the largest subsystem lands |
