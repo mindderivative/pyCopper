@@ -476,6 +476,8 @@ One pipeline. One render pass. One instanced draw call per frame.
 
 **Geometry.** A 4-vertex unit quad in a static vertex buffer, `triangle_strip`. Per-instance data arrives as a second vertex buffer with `step_mode="instance"`, chosen over a storage buffer for maximum backend portability.
 
+**Colour resolution happens in the fragment stage, not the vertex stage.** The palette is a storage buffer, and storage-buffer visibility in the vertex stage is not guaranteed across backends (it is zero in some compatibility profiles). Resolving per-fragment costs nothing measurable and removes the portability risk entirely.
+
 **Bind group 0** (bound once per frame):
 
 | Binding | Resource |
@@ -514,7 +516,11 @@ alpha *= 1.0 - smoothstep(-fwidth(dc), fwidth(dc), dc);
 
 This yields correctly antialiased **rounded** clipping — which scissor rects cannot express at all — while preserving one draw call.
 
-**Borders** are a second SDF evaluation inset by `border_width`; **shadows** approximate a Gaussian by `smoothstep` over the offset distance field. Both stay within the same fragment shader branch.
+**Borders** are a second SDF evaluation inset by `border_width`. The ring is the *difference* of the two coverages, so fill and border occupy disjoint regions and can simply be summed — they never double-composite, which a naive over-blend would do at every rounded corner.
+
+**Shadows are a separate instance** (`kind = 3`) emitted *before* the box they sit behind, rather than a second pass inside the box's own fragment. This keeps the shader branch flat and lets a shadow be positioned, blurred, and clipped independently. The Gaussian is approximated by `smoothstep` across the blur radius over the offset distance field.
+
+**`flags.z` and `flags.w` carry palette token indices** for fill and border, with `0xFFFFFFFF` meaning "use the literal colour in the instance". This is what makes a theme switch a single buffer upload while still allowing authored hex colours.
 
 **Buffer strategy.** A ring of three instance buffers, rotated per frame so the CPU never writes a buffer the GPU may still be reading. Buffers grow by doubling and never shrink within a session. Upload is a single `queue.write_buffer` of a contiguous numpy slice.
 
@@ -781,6 +787,25 @@ Two rules follow directly and are non-negotiable in review:
 
 A benchmark harness (`tests/bench/`) tracks steady-state idle cost, single-property invalidation cost, and full-rebuild cost, and is run per release.
 
+### 12.1 First measurements (M2)
+
+Measured on the reference machine, 1000 instances, integrated GPU over Vulkan:
+
+| Path | Median | vs 2 ms paint budget |
+|---|---|---|
+| Scalar emit — per-widget Python loop | **3.27 ms** | ❌ **over budget** |
+| Vectorised emit — numpy bulk write | **0.020 ms** | ✅ 165× faster |
+| Cached subtree splice — memcpy | **0.002 ms** | ✅ 1451× faster |
+| Full frame, 1000 instances, one draw call | 0.47 ms | includes upload + readback |
+| Full frame, 0 instances (clear only) | 0.30 ms | — |
+
+**R1 is confirmed, and the mitigations work.** Two conclusions follow, and neither is now a matter of opinion:
+
+1. **The GPU is nearly free; Python is the whole cost.** Drawing 1000 instances costs roughly **0.17 ms** of GPU time (0.47 minus the 0.30 ms clear baseline). The Python that *assembles* those same instances costs **3.27 ms** — about **19× more than the work it feeds**. Every future performance decision should start from this ratio.
+2. **The naive path genuinely does not fit.** Scalar per-widget emission exhausts the entire 2 ms paint budget at roughly **610 instances** — well below a realistic interface. This is precisely why §12 rule 2 is written as a hard rule rather than advice, and why display-list assembly is specified as numpy from the start.
+
+The subtree cache is the strongest lever available: reusing a clean subtree's instance slice is a `memcpy` at 0.002 ms, three orders of magnitude cheaper than rebuilding it. That validates the four-tree model's cached `instances` field (§4) as a performance necessity, not a convenience.
+
 ---
 
 ## 13. Risks and Open Questions
@@ -806,7 +831,7 @@ A benchmark harness (`tests/bench/`) tracks steady-state idle cost, single-prope
 |---|---|---|
 | **M0** ✅ | `pyproject.toml`, package skeleton, CI matrix, `theme/` complete, a window that clears to an MD3 surface colour | **Done.** 33 tests green (5 on GPU), `ruff` clean, `mypy --strict` clean across 17 files |
 | **M1** ✅ | `layout/` — constraints algebra, boundary/caching protocol, `LayoutOwner`, and `Padding`/`Align`/`SizedBox`/`ConstrainedBox`/`Row`/`Column`/`Flex`/`Stack`/`Spacer`. No rendering. | **Done.** 129 tests green, including Hypothesis property tests over random trees asserting the size invariant |
-| **M2** | Instanced pipeline + `ui.wgsl`: rounded boxes, borders, shadows, analytic AA, shader clipping. Static tree. **First benchmark.** | One draw call is real; R1 is quantified |
+| **M2** ✅ | Instanced pipeline + `ui.wgsl`: rounded boxes, per-corner radii, borders, shadows, analytic AA, rounded shader clipping, palette tokens. **First benchmark.** | **Done.** 180 tests green (24 GPU); 500 mixed primitives verified as one draw call; **R1 quantified — see §12.1** |
 | **M3** | Spec → Element → reconcile; signals; events, hit testing, focus | The framework is interactive |
 | **M4** | Text Tiers 1–2: fontdb + fallback, uharfbuzz shaping, itemisation, UAX #14/#29 segmentation, atlas, `TextBox` layout, bidi rendering | Real applications become possible; the largest subsystem lands |
 | **M5** | Hot reload with state preservation; golden-image suite; `examples/gallery` | The authoring loop is pleasant |

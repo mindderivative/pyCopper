@@ -1,8 +1,8 @@
 """Engine: owns the canvas, the wgpu device, and the frame pipeline.
 
-M0 scope -- acquires the device and clears to an MD3 surface colour. The frame
-pipeline described in ARCHITECTURE.md 6 lands incrementally across M1-M5; the
-hooks are named here so later milestones extend rather than restructure.
+M2 scope -- acquires the device, clears to an MD3 surface colour, and issues the
+frame's single instanced draw over the display list. Steps 1-5 of the frame
+lifecycle (events, build, layout) arrive with the element tree in M3.
 
 Note what this class does NOT contain: an event loop. rendercanvas owns the
 scheduler (ARCHITECTURE.md 5.10) and its 'ondemand' update mode is the dirty
@@ -11,15 +11,15 @@ flag. Polling GLFW here would double-pump the event queue.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import Any
 
 import wgpu
 
 from ..config import Settings
+from ..paint import DisplayList
+from ..render import UIPipeline
 from ..theme import Palette, Theme
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 __all__ = ["Engine"]
 
@@ -44,7 +44,15 @@ class Engine:
         self.format = self.context.get_preferred_format(self.adapter)
         self.context.configure(device=self.device, format=self.format)
 
+        self.pipeline = UIPipeline(self.device, self.format)
+        self.display_list = DisplayList()
+
+        #: Fills the display list each frame. M3 replaces this with a walk of
+        #: the element tree; until then it is the way to draw anything.
+        self.painter: Callable[[DisplayList], None] | None = None
+
         self._frame_count = 0
+        self._instance_count = 0
 
     def _make_canvas(self) -> Any:
         from rendercanvas.glfw import RenderCanvas
@@ -69,6 +77,11 @@ class Engine:
     def frame_count(self) -> int:
         return self._frame_count
 
+    @property
+    def instance_count(self) -> int:
+        """Instances drawn in the last frame -- all in one draw call."""
+        return self._instance_count
+
     def set_theme(self, theme: Theme) -> None:
         """Swap the theme. One buffer upload -- no relayout, no display-list rebuild."""
         self.palette.rebuild(theme)
@@ -80,7 +93,10 @@ class Engine:
     # ---------------------------------------------------------------- frame
 
     def draw_frame(self) -> None:
-        """One frame. Steps 7-9 of ARCHITECTURE.md 6; 1-6 arrive in M1-M4."""
+        """One frame. Steps 6-9 of ARCHITECTURE.md 6; 1-5 arrive in M3."""
+        self.display_list.clear()
+        if self.painter is not None:
+            self.painter(self.display_list)
         self._upload()
         encoder = self.device.create_command_encoder()
         render_pass = encoder.begin_render_pass(
@@ -100,13 +116,17 @@ class Engine:
         self._frame_count += 1
 
     def _upload(self) -> None:
-        """Palette / atlas / instance uploads. M2 fills this in."""
+        """Palette, globals, and instance uploads (step 7)."""
         if self.palette.dirty:
-            # M2: queue.write_buffer into the palette storage buffer.
+            self.pipeline.upload_palette(self.palette.data)
             self.palette.mark_uploaded()
 
+        width, height = self.canvas.get_physical_size()
+        self.pipeline.upload_globals(width, height, self.pixel_ratio)
+
     def _draw_ui(self, render_pass: Any) -> None:
-        """M2: bind pipeline + group 0, quad VB + instance VB, one instanced draw."""
+        """Step 8: the frame's single instanced draw."""
+        self._instance_count = self.pipeline.draw(render_pass, self.display_list)
 
     # ---------------------------------------------------------------- lifecycle
 
