@@ -233,7 +233,7 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
         sys.path.remove(str(gallery))
 
     _, engine = render_scene(
-        lambda dl: None, width=560, height=460, theme=Theme(seed=SEED, dark=True)
+        lambda dl: None, width=620, height=720, theme=Theme(seed=SEED, dark=True)
     )
     demo.app.attach(engine)
     demo.clicks.set(3)

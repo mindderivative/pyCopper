@@ -154,7 +154,7 @@ what to close before implementing.
 
 ## Current framework state
 
-*Last updated: after the icon milestone (post-M5). Update this section whenever a milestone changes it.*
+*Last updated: after M3 component wave 1 (post-M5). Update this section whenever a milestone changes it.*
 
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
@@ -171,7 +171,25 @@ bundled (`pycopper.assets`), so M3's `label-large` medium weight is available.
 Measure with `TextEngine.measure` / `measure_text`, paint with `paint_text` --
 both take `font_size` in logical px, matching M3's `sp`/`dp` figures 1:1.
 
-**Widgets today:** Container, Row, Column, Stack, Button, Text, Spacer, Icon.
+**Widgets today:** primitives — Container, Row, Column, Stack, Spacer, Text,
+Icon. M3 components — Card, Divider, Checkbox, Radio, Switch, Chip, IconButton,
+Fab, Badge, and Button with its five variants.
+
+**Before adding a component, check `widgets/material.py`** — it has nine worked
+examples and the shared helpers (`_emit_state_layer`, `_box`, `content_token`)
+that a new one should reuse rather than reimplement.
+
+**Selection is a binding, not style.** Controls read the `value:` spec field,
+templated like `text:` — `value: "{{ on.get() }}"`. Use `element.checked` /
+`element.number`. Do not add a style property for what is application state.
+
+**`style.color` defaults to None**, meaning "use this component's M3 default
+for its variant". Resolve it with `content_token(ctx, style, "your_default")`
+so an explicit token still wins.
+
+**Variants go in the `variant` style property**, validated centrally by the
+`Variant` literal in `spec/models.py`. M3 usually describes variants as one
+component in several configurations, so prefer that over new widget kinds.
 
 **Icons are available.** Material Symbols ships as a 218-icon subset with the
 `FILL` (0-1) and `wght` (100-700) axes live. Use the `Icon` widget with the
@@ -207,10 +225,17 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 - **Scrolling / viewports.** No scroll element; `state.scroll` exists but
   nothing consumes it.
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target on a
-  smaller visible container cannot be expressed.
+  smaller visible container cannot be expressed. Checkbox (18dp) and Radio
+  (20dp) are hit-tested at their visual size; see `MIN_TOUCH_TARGET`.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
 - **Focus ring rendering.** Focus is tracked and dispatched, but nothing draws
   M3's 2dp high-contrast indicator.
-- **Motion.** No animation or transition system; every state change is instant.
+- **Motion.** No animation or transition system; every state change is instant
+  — a Switch thumb jumps rather than sliding.
+- **An overlay/portal layer.** Dialog, Menu, Tooltip, Snackbar and both Sheet
+  types must render above the tree, outside their parent's layout and clip.
+  Six components are blocked on this one feature.
+- **Arc/stroke rendering.** The SDF shader draws rounded boxes, so a circular
+  progress indicator cannot be expressed. Linear progress is fine.
 - **Tonal elevation.** Shadows only (see Step 2).

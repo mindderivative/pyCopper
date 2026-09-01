@@ -656,6 +656,50 @@ The engine then: re-reads and re-validates the Spec tree; **on validation failur
 
 Handler *bindings* are re-resolved, but handler *bodies* are not reloaded — that is Python-level reload and is out of scope (§1.2).
 
+### 5.12 Material Design 3 components — `widgets/material.py`
+
+Nine components translated from their M3 specs. Dimensions are M3's own dp
+figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
+
+| Widget | M3 spec | Notes |
+|---|---|---|
+| `Card` | 12dp radius, 16dp padding | `elevated` / `filled` / `outlined` |
+| `Divider` | 1dp, `outline_variant` | `full_bleed` / `inset` |
+| `Checkbox` | 18dp box, 2dp radius | checkmark glyph when selected |
+| `Radio` | 20dp outer, 10dp dot | a circle is a rounded box at radius = side/2 |
+| `Switch` | 52×32dp track, 16/24dp thumb | thumb grows when selected |
+| `Chip` | 32dp high, 8dp radius, 18dp icon | filter variant shows a leading checkmark |
+| `IconButton` | 40dp container, 24dp icon | `standard` / `filled` / `filled_tonal` / `outlined` |
+| `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3 |
+| `Badge` | 6dp dot, or 16dp-high pill | `value:` carries the count |
+
+`Button` gained the same treatment: M3 describes its five variants as **one
+component in five configurations**, so they are one widget with a `variant`,
+not five widget kinds.
+
+**Selection is a binding, not style.** `Checkbox`, `Radio`, `Switch`, and the
+filter `Chip` read a new `value:` field on the spec, templated exactly like
+`text:` — so `value: "{{ checked.get() }}"` tracks a signal. `Element.checked`
+and `Element.number` parse it. Style describes appearance; what a control *is*
+is application state.
+
+**Colour defaults live with the widget.** `style.color` is now `None` by
+default, meaning "use this component's M3 default for its variant". An explicit
+token always wins. Without this a global default would silently override every
+variant's correct content colour.
+
+**State layers are shared.** `_emit_state_layer` applies M3's 8% hover / 10%
+focus / 10% press overlay above the container and below the content, so every
+interactive component behaves identically rather than each reimplementing it.
+
+Two gaps these components inherit, both stated rather than approximated:
+
+- **The 48dp minimum touch target cannot be expressed.** M3 requires it for
+  every interactive control, but pyCopper has no way to make a hit rect larger
+  than the painted rect, so an 18dp checkbox is hit-tested at 18dp. Recorded as
+  `MIN_TOUCH_TARGET` in the module.
+- **No motion.** A switch thumb jumps between positions; M3 animates it.
+
 ---
 
 ## 6. Frame Lifecycle

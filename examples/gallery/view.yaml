@@ -52,6 +52,15 @@ children:
         text: "Shaped text with real kerning and ligatures: fi fl ffi. This line wraps at the container width."
         style: {color: on_surface_variant, font_size: 14}
 
+  # --- card variants ---
+  - id: cards
+    widget: Row
+    style: {height: 56, spacing: 10, width: expand}
+    children:
+      - {id: card_e, widget: Card, style: {width: 150, variant: elevated}}
+      - {id: card_f, widget: Card, style: {width: 150, variant: filled}}
+      - {id: card_o, widget: Card, style: {width: 150, variant: outlined}}
+
   # --- tonal swatches ---
   - id: swatches
     widget: Row
@@ -91,6 +100,38 @@ children:
         widget: Container
         style: {width: 28, height: 28, background: error, corner_radius: 14}
 
+  - id: div1
+    widget: Divider
+    style: {width: expand}
+
+  # --- selection controls, driven by the `value:` binding ---
+  - id: controls
+    widget: Row
+    style: {height: 40, spacing: 16, width: expand, cross_alignment: center}
+    children:
+      - {id: cb_on,  widget: Checkbox, value: "{{ clicks.get() }}"}
+      - {id: cb_off, widget: Checkbox, value: "false"}
+      - {id: rd_on,  widget: Radio,    value: "true"}
+      - {id: rd_off, widget: Radio,    value: "false"}
+      - {id: sw,     widget: Switch,   value: "{{ dark.get() }}"}
+      - {id: chip_f, widget: Chip, text: "Filter", style: {variant: filter}, value: "{{ clicks.get() }}"}
+      - {id: chip_a, widget: Chip, text: "Assist", style: {variant: assist}}
+      - {id: ctl_gap, widget: Spacer, style: {width: expand}}
+      - {id: badge,  widget: Badge, value: "{{ clicks.get() }}"}
+
+  # --- icon buttons and FABs ---
+  - id: fabs
+    widget: Row
+    style: {height: 56, spacing: 12, width: expand, cross_alignment: center}
+    children:
+      - {id: ib_std,   widget: IconButton, text: favorite, style: {variant: standard}}
+      - {id: ib_fill,  widget: IconButton, text: star,     style: {variant: filled}}
+      - {id: ib_tonal, widget: IconButton, text: share,    style: {variant: filled_tonal}}
+      - {id: ib_out,   widget: IconButton, text: settings, style: {variant: outlined}}
+      - {id: fab_gap,  widget: Spacer, style: {width: expand}}
+      - {id: fab_sm,   widget: Fab, text: add,  style: {variant: small}}
+      - {id: fab_std,  widget: Fab, text: edit, style: {variant: standard}}
+
   # --- action row ---
   - id: actions
     widget: Row
@@ -106,10 +147,10 @@ children:
       - id: reset_btn
         widget: Button
         text: "Reset"
-        style: {width: 100, height: 44, background: surface_container_highest, color: on_surface, corner_radius: 22}
+        style: {width: 100, height: 40, variant: outlined}
         handlers: {on_click: reset}
       - id: confirm_btn
         widget: Button
         text: "Confirm"
-        style: {width: 130, height: 44, background: primary, color: on_primary, corner_radius: 22}
+        style: {width: 130, height: 40, variant: filled}
         handlers: {on_click: confirm}

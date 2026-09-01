@@ -17,7 +17,7 @@ SEED = "#6750A4"
 app = App(
     VIEW,
     theme=Theme(seed=SEED, dark=True),
-    settings=Settings(title="pyCopper gallery", width=560, height=460, hot_reload=True),
+    settings=Settings(title="pyCopper gallery", width=620, height=720, hot_reload=True),
 )
 
 clicks = Signal(0, name="clicks")

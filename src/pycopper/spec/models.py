@@ -44,6 +44,16 @@ class WidgetKind(StrEnum):
     BUTTON = "Button"
     SPACER = "Spacer"
     ICON = "Icon"
+    # Material Design 3 components
+    CARD = "Card"
+    DIVIDER = "Divider"
+    CHECKBOX = "Checkbox"
+    RADIO = "Radio"
+    SWITCH = "Switch"
+    CHIP = "Chip"
+    ICON_BUTTON = "IconButton"
+    FAB = "Fab"
+    BADGE = "Badge"
 
 
 class SizeSpec:
@@ -161,6 +171,35 @@ class ShadowSpec(_Frozen):
     opacity: float = Field(default=0.35, ge=0, le=1)
 
 
+#: Every variant name any component accepts. A widget validates that the one it
+#: was given is meaningful for it; declaring them centrally catches typos at
+#: load, where the error names the path.
+Variant = Literal[
+    # buttons and cards
+    "filled",
+    "filled_tonal",
+    "outlined",
+    "elevated",
+    "text",
+    # sizes (FAB, icon button)
+    "standard",
+    "small",
+    "medium",
+    "large",
+    # chips
+    "assist",
+    "filter",
+    "input",
+    "suggestion",
+    # badges
+    "dot",
+    "numbered",
+    # dividers
+    "full_bleed",
+    "inset",
+]
+
+
 class StyleSpec(_Frozen):
     """Visual and geometric properties. Note that `children` is NOT here --
     children are structure, and belong on the widget."""
@@ -171,7 +210,9 @@ class StyleSpec(_Frozen):
     margin: Edges = EdgeInsets()
 
     background: TokenRef | None = None
-    color: TokenRef = "on_surface"
+    #: None means "use this widget's own M3 default for its variant". An
+    #: explicit token always wins.
+    color: TokenRef | None = None
     corner_radius: Corners = (0.0, 0.0, 0.0, 0.0)
     border: BorderSpec | None = None
     shadow: ShadowSpec | None = None
@@ -189,6 +230,12 @@ class StyleSpec(_Frozen):
     # text
     font_size: float = Field(default=14.0, gt=0)
 
+    #: Which M3 variant of the component to render.
+    variant: Variant = "filled"
+    #: Divider thickness and inset, in logical px.
+    thickness: float = Field(default=1.0, gt=0)
+    inset: float = Field(default=0.0, ge=0)
+
     # icons. `text:` carries the icon name, so a binding expression can switch
     # icons at runtime -- e.g. text: "{{ 'star' if saved.get() else 'star_border' }}"
     icon_size: float = Field(default=24.0, gt=0)
@@ -202,6 +249,10 @@ class WidgetSpec(_Frozen):
     widget: WidgetKind
     style: StyleSpec = StyleSpec()
     text: str | None = None
+    #: A bound value: selection for Checkbox/Radio/Switch/Chip, count for
+    #: Badge, progress for indicators. Templated like `text`, so
+    #: `value: "{{ checked.get() }}"` tracks a signal.
+    value: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
     children: tuple[WidgetSpec, ...] = ()
 
@@ -216,6 +267,9 @@ class WidgetSpec(_Frozen):
     def template(self) -> Template | None:
         """Compiled text template, or None for a widget with no text."""
         return Template(self.text) if self.text is not None else None
+
+    def value_template(self) -> Template | None:
+        return Template(self.value) if self.value is not None else None
 
     def walk(self) -> Any:
         yield self

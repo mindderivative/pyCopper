@@ -8,7 +8,7 @@ slotted layout base and the mixin coexist without an instance-layout conflict.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from ..layout import (
     Alignment,
@@ -23,8 +23,9 @@ from ..layout import (
     Size,
     Stack,
 )
+from ..paint import NO_TOKEN
 from ..spec import StyleSpec, WidgetKind, WidgetSpec
-from ..text import FontRequest, TextEngine
+from ..text import TextEngine
 from ..text.layout import Alignment as TextAlignment
 from ..tree.element import ElementMixin, PaintContext, default_text_engine
 
@@ -38,6 +39,7 @@ __all__ = [
     "StackElement",
     "TextElement",
     "build_element",
+    "content_token",
     "create_element",
     "measure_text",
     "paint_text",
@@ -70,6 +72,15 @@ def _resolve_axis(spec_size: Any, available: float) -> float | None:
             return available * float(spec_size.value)
         case _:
             return None
+
+
+def content_token(ctx: PaintContext, style: StyleSpec, default: str) -> int:
+    """Palette index for a widget's content colour.
+
+    `style.color` of None means "use this widget's M3 default for its variant",
+    so each component supplies its own rather than inheriting a global one.
+    """
+    return ctx.palette.index(style.color or default)
 
 
 class _StyledMixin(ElementMixin):
@@ -207,37 +218,106 @@ def paint_text(
 
 
 class ButtonElement(ContainerElement):
-    """A container that reacts to pointer state and centres its own label."""
+    """M3 Common Button: 40dp high, full radius, five variants.
+
+    M3 describes these as one component in five configurations, so they are one
+    widget with a `variant`, not five widget kinds. Container and content
+    tokens come from the variant unless the view sets them explicitly.
+    """
+
+    HEIGHT: Final = 40.0
+    MIN_WIDTH: Final = 64.0
+
+    #: variant -> (container token or None, content token, outlined, elevated)
+    VARIANTS: Final = {
+        "filled": ("primary", "on_primary", False, False),
+        "filled_tonal": ("secondary_container", "on_secondary_container", False, False),
+        "outlined": (None, "primary", True, False),
+        "elevated": ("surface_container_low", "primary", False, True),
+        "text": (None, "primary", False, False),
+    }
+
+    def _variant(self) -> tuple[str | None, str, bool, bool]:
+        return self.VARIANTS.get(self.style.variant, self.VARIANTS["filled"])
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
-        super().paint_self(ctx, absolute)
-        dpr = ctx.pixel_ratio
+        style = self.style
+        container, content, outlined, elevated = self._variant()
         size = self.size
-        token = ctx.palette.index(self.style.color)
-        radii = tuple(r * dpr for r in self.style.corner_radius)
+        dpr = ctx.pixel_ratio
+        radii = style.corner_radius
+        if not any(radii):
+            radii = (size.height / 2,) * 4
+        token = content_token(ctx, style, content)
 
-        # MD3 state layer: over the container surface, under the label.
-        if self.state.pressed or self.state.hovered:
+        if elevated:
+            ctx.display_list.add_shadow(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                size.width * dpr,
+                size.height * dpr,
+                blur=5.0 * dpr,
+                offset=(0.0, 1.0 * dpr),
+                color=(0.0, 0.0, 0.0, 0.30),
+                radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+
+        fill = style.background or container
+        if fill is not None:
+            ctx.display_list.add_box(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                size.width * dpr,
+                size.height * dpr,
+                token=ctx.palette.index(fill),
+                color=(1.0, 1.0, 1.0, style.opacity),
+                radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+                border_width=1.0 * dpr if outlined else 0.0,
+                border_token=ctx.palette.index("outline") if outlined else NO_TOKEN,
+                border_color=(1.0, 1.0, 1.0, 1.0),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+        elif outlined:
+            ctx.display_list.add_box(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                size.width * dpr,
+                size.height * dpr,
+                token=ctx.palette.index("outline"),
+                color=(1.0, 1.0, 1.0, 0.0),
+                radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+                border_width=1.0 * dpr,
+                border_token=ctx.palette.index("outline"),
+                border_color=(1.0, 1.0, 1.0, 1.0),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+
+        # MD3 state layer: over the container, under the label.
+        if self.state.pressed or self.state.hovered or self.state.focused:
+            alpha = 0.10 if (self.state.pressed or self.state.focused) else 0.08
             ctx.display_list.add_box(
                 absolute.x * dpr,
                 absolute.y * dpr,
                 size.width * dpr,
                 size.height * dpr,
                 token=token,
-                color=(1.0, 1.0, 1.0, 0.16 if self.state.pressed else 0.08),
-                radii=radii,  # type: ignore[arg-type]
+                color=(1.0, 1.0, 1.0, alpha),
+                radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
 
         if self._text.strip():
-            font = self.style.font_size
+            font = style.font_size
             label = measure_text(self._text, font, engine=self.text_engine)
-            metrics = self.text_engine.db.face_for(FontRequest()).metrics(font)
             paint_text(
                 ctx,
                 absolute.x + (size.width - label.width) / 2,
-                absolute.y + (size.height - metrics.line_height) / 2,
+                absolute.y + (size.height - label.height) / 2,
                 self._text,
                 font,
                 token,
@@ -286,7 +366,7 @@ class TextElement(_StyledMixin, Padding):
             absolute.y + self._padding.top,
             self._text,
             self.style.font_size,
-            ctx.palette.index(self.style.color),
+            content_token(ctx, self.style, "on_surface"),
             max_width=max(0.0, self.size.width - self._padding.horizontal) or None,
         )
 
@@ -329,7 +409,7 @@ class IconElement(_StyledMixin, Padding):
             fill=style.icon_fill,
             weight=style.icon_weight,
             pixel_ratio=ctx.pixel_ratio,
-            token=ctx.palette.index(style.color),
+            token=content_token(ctx, style, "on_surface"),
             clip=ctx.clip,
             clip_radii=ctx.clip_radii,
         )
@@ -345,6 +425,23 @@ class SpacerElement(_StyledMixin, Padding):
         return outer.constrain(outer.smallest)
 
 
+def _material_registry() -> dict[WidgetKind, type]:
+    """Imported lazily: material.py imports helpers from this module."""
+    from . import material as m
+
+    return {
+        WidgetKind.CARD: m.CardElement,
+        WidgetKind.DIVIDER: m.DividerElement,
+        WidgetKind.CHECKBOX: m.CheckboxElement,
+        WidgetKind.RADIO: m.RadioElement,
+        WidgetKind.SWITCH: m.SwitchElement,
+        WidgetKind.CHIP: m.ChipElement,
+        WidgetKind.ICON_BUTTON: m.IconButtonElement,
+        WidgetKind.FAB: m.FabElement,
+        WidgetKind.BADGE: m.BadgeElement,
+    }
+
+
 _REGISTRY: dict[WidgetKind, type] = {
     WidgetKind.CONTAINER: ContainerElement,
     WidgetKind.ROW: RowElement,
@@ -356,9 +453,14 @@ _REGISTRY: dict[WidgetKind, type] = {
     WidgetKind.ICON: IconElement,
 }
 
+_REGISTRY_COMPLETE = False
+
 
 def create_element(spec: WidgetSpec) -> Any:
     """Construct the element for one spec node (no children)."""
+    if not _REGISTRY_COMPLETE:
+        _REGISTRY.update(_material_registry())
+        globals()["_REGISTRY_COMPLETE"] = True
     return _REGISTRY[spec.widget](spec)
 
 

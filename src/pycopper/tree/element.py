@@ -85,6 +85,8 @@ class ElementMixin:
     _effect: Effect | None
     _text: str
     _template: Template | None
+    _value_template: Template | None
+    _value: str
     _cached: np.ndarray | None
     _cached_origin: Offset | None
     _needs_paint: bool
@@ -97,6 +99,8 @@ class ElementMixin:
         self._effect = None
         self._template = spec.template()
         self._text = spec.text or ""
+        self._value_template = spec.value_template()
+        self._value = spec.value or ""
         self._cached = None
         self._cached_origin = None
         self._needs_paint = True
@@ -109,6 +113,9 @@ class ElementMixin:
         self._template = spec.template()
         if self._template is None or self._template.is_static:
             self._text = spec.text or ""
+        self._value_template = spec.value_template()
+        if self._value_template is None or self._value_template.is_static:
+            self._value = spec.value or ""
         self.configure()
         self.mark_needs_layout()
 
@@ -142,6 +149,24 @@ class ElementMixin:
         """Rendered text, after binding expressions have been evaluated."""
         return self._text
 
+    @property
+    def value(self) -> str:
+        """Rendered `value:` binding -- selection, count, or progress."""
+        return self._value
+
+    @property
+    def checked(self) -> bool:
+        """`value` as a boolean. Empty, "false", "0" and "none" are all false."""
+        return self._value.strip().lower() not in ("", "false", "0", "none", "no")
+
+    @property
+    def number(self) -> float:
+        """`value` as a number, or 0.0 when it is not one."""
+        try:
+            return float(self._value)
+        except ValueError:
+            return 0.0
+
     # ----------------------------------------------------------- invalidation
 
     @property
@@ -174,14 +199,26 @@ class ElementMixin:
         The Effect re-evaluates on change and marks only this element dirty --
         the fine-grained half of fine-grained reactivity.
         """
-        if self._template is None or self._template.is_static:
+        text_t = self._template
+        value_t = self._value_template
+        dynamic_text = text_t is not None and not text_t.is_static
+        dynamic_value = value_t is not None and not value_t.is_static
+        if not (dynamic_text or dynamic_value):
             return
-        template = self._template
 
         def refresh() -> None:
-            rendered = template.render(context)
-            if rendered != self._text:
-                self._text = rendered
+            changed = False
+            if dynamic_text and text_t is not None:
+                rendered = text_t.render(context)
+                if rendered != self._text:
+                    self._text = rendered
+                    changed = True
+            if dynamic_value and value_t is not None:
+                rendered = value_t.render(context)
+                if rendered != self._value:
+                    self._value = rendered
+                    changed = True
+            if changed:
                 self.mark_needs_layout()
 
         self._effect = Effect(refresh)
