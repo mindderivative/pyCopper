@@ -32,6 +32,7 @@ __all__ = [
     "ButtonElement",
     "ColumnElement",
     "ContainerElement",
+    "IconElement",
     "RowElement",
     "SpacerElement",
     "StackElement",
@@ -290,6 +291,50 @@ class TextElement(_StyledMixin, Padding):
         )
 
 
+class IconElement(_StyledMixin, Padding):
+    """A Material Symbols icon.
+
+    The icon name comes from `text:`, so binding expressions work on it -- an
+    icon can switch with state exactly the way a label can.
+    """
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, spec.style.padding)
+        self.init_element(spec)
+
+    def configure(self) -> None:
+        self._padding = self.style.padding
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        style = self.style
+        outer = self.sized(constraints, style)
+        natural = Size(style.icon_size, style.icon_size).inflate(self._padding)
+        return outer.constrain(natural)
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        super().paint_self(ctx, absolute)
+        name = self._text.strip()
+        if not name:
+            return
+        style = self.style
+        size = style.icon_size
+        # Centre the glyph box within whatever the element was given, so an
+        # icon in a fixed-size button sits correctly rather than at its corner.
+        ctx.text.emit_icon(
+            ctx.display_list,
+            name,
+            x=absolute.x + (self.size.width - size) / 2,
+            y=absolute.y + (self.size.height - size) / 2,
+            size=size,
+            fill=style.icon_fill,
+            weight=style.icon_weight,
+            pixel_ratio=ctx.pixel_ratio,
+            token=ctx.palette.index(style.color),
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
+        )
+
+
 class SpacerElement(_StyledMixin, Padding):
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -308,6 +353,7 @@ _REGISTRY: dict[WidgetKind, type] = {
     WidgetKind.BUTTON: ButtonElement,
     WidgetKind.TEXT: TextElement,
     WidgetKind.SPACER: SpacerElement,
+    WidgetKind.ICON: IconElement,
 }
 
 

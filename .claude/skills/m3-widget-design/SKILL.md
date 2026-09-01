@@ -154,7 +154,7 @@ what to close before implementing.
 
 ## Current framework state
 
-*Last updated: end of M5. Update this section whenever a milestone changes it.*
+*Last updated: after the icon milestone (post-M5). Update this section whenever a milestone changes it.*
 
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
@@ -171,7 +171,16 @@ bundled (`pycopper.assets`), so M3's `label-large` medium weight is available.
 Measure with `TextEngine.measure` / `measure_text`, paint with `paint_text` --
 both take `font_size` in logical px, matching M3's `sp`/`dp` figures 1:1.
 
-**Widgets today:** Container, Row, Column, Stack, Button, Text, Spacer.
+**Widgets today:** Container, Row, Column, Stack, Button, Text, Spacer, Icon.
+
+**Icons are available.** Material Symbols ships as a 218-icon subset with the
+`FILL` (0-1) and `wght` (100-700) axes live. Use the `Icon` widget with the
+name in `text:` and `icon_size` / `icon_fill` / `icon_weight` in style. FILL is
+how M3 expresses selected vs unselected on nav items and toggles -- reach for
+it rather than swapping to a different icon name. Default size is 24 (M3's
+standard), and weights below 200 are lifted automatically at that size per M3's
+guidance. An unknown icon name raises; check membership with
+`TextEngine.icons`.
 
 **Sizing inside a Row or Column:** a child styled `width: expand` (or `flex:n`)
 along the main axis is flexible and shares the free space; anything else is
@@ -194,10 +203,7 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 - **RTL text.** Direction and run ordering work, but the bundled fonts carry no
   Arabic or Hebrew glyphs, and caret/selection across a direction boundary is
   unimplemented (risk R9).
-- **Icons.** No icon pipeline. The image atlas and `Kind.IMAGE` exist in the
-  shader, and the glyph atlas now proves the packing path works, but nothing
-  loads or packs icons yet. Most M3 components assume a 24dp icon, so this
-  blocks faithful FABs, icon buttons, chips, and nav items.
+
 - **Scrolling / viewports.** No scroll element; `state.scroll` exists but
   nothing consumes it.
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target on a

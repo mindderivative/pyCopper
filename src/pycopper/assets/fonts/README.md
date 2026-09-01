@@ -20,7 +20,28 @@ deliberately: the same page states it "isn't yet part of the M3 typescale".
 | `Roboto-Medium.ttf` | 154 KB | 500 | 927 | `label-large` and other medium-weight type-scale roles |
 | `NotoSans-Regular.ttf` | 612 KB | 400 | 3094 | Fallback tier |
 
-Total ≈ 920 KB.
+| `MaterialSymbolsOutlined-Subset.ttf` | 102 KB | variable | 218 icons | Material Symbols |
+
+Total ≈ 1.0 MB.
+
+## Icons
+
+Material Symbols is a **variable icon font**, so icons render through the same
+glyph pipeline as text (ARCHITECTURE.md §5.7.8). The full outlined font is
+10.6 MB for ~4,275 icons; this is a `fontTools` subset of a curated 218-icon
+core set covering the M3 component catalogue, with `GRAD` and `opsz` pinned and
+`FILL` (0–1) and `wght` (100–700) kept live — 102 KB, a 102× reduction.
+
+Source:
+
+```
+https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsOutlined[FILL,GRAD,opsz,wght].ttf
+```
+
+It is licensed **Apache-2.0**, not OFL, and embeds no licence name record — its
+terms come from that repository's `LICENSE`, vendored here as
+`LICENSE-MaterialSymbols.txt`. `material_symbols.json` maps icon names to
+codepoints.
 
 Noto Sans adds 2,187 codepoints beyond Roboto — 841 extended Latin, 289 Greek,
 533 combining marks and modifiers, 129 Devanagari, 115 Cyrillic. It is the

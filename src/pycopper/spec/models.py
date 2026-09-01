@@ -43,6 +43,7 @@ class WidgetKind(StrEnum):
     TEXT = "Text"
     BUTTON = "Button"
     SPACER = "Spacer"
+    ICON = "Icon"
 
 
 class SizeSpec:
@@ -187,6 +188,13 @@ class StyleSpec(_Frozen):
 
     # text
     font_size: float = Field(default=14.0, gt=0)
+
+    # icons. `text:` carries the icon name, so a binding expression can switch
+    # icons at runtime -- e.g. text: "{{ 'star' if saved.get() else 'star_border' }}"
+    icon_size: float = Field(default=24.0, gt=0)
+    #: 0 = outlined, 1 = filled. M3 uses this for selected/unselected states.
+    icon_fill: float = Field(default=0.0, ge=0, le=1)
+    icon_weight: float = Field(default=400.0, ge=100, le=700)
 
 
 class WidgetSpec(_Frozen):

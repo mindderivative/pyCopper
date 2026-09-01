@@ -16,12 +16,14 @@ from ..paint import NO_TOKEN, DisplayList
 from ..render.atlas import GlyphAtlas
 from .font import SUBPIXEL_BUCKETS, Face, FontMetrics, GlyphBitmap
 from .fontdb import FontDB, FontRequest
+from .icons import DEFAULT_ICON_SIZE, IconSet
 from .itemize import Direction, ItemRun, itemize
 from .layout import Alignment, GlyphPlacement, Paragraph, TextLine, layout_text
 from .segment import break_opportunities, cluster_boundaries, clusters
 from .shaping import ShapeCache, ShapedRun, shape_run
 
 __all__ = [
+    "DEFAULT_ICON_SIZE",
     "SUBPIXEL_BUCKETS",
     "Alignment",
     "Direction",
@@ -31,6 +33,7 @@ __all__ = [
     "FontRequest",
     "GlyphBitmap",
     "GlyphPlacement",
+    "IconSet",
     "ItemRun",
     "Paragraph",
     "ShapeCache",
@@ -51,13 +54,62 @@ _NO_CLIP = (0.0, 0.0, 0.0, 0.0)
 class TextEngine:
     """Owns fonts, caches, and the glyph atlas for one application."""
 
-    __slots__ = ("_layouts", "atlas", "db", "shaper")
+    __slots__ = ("_icons", "_layouts", "atlas", "db", "shaper")
 
     def __init__(self, device: Any = None, *, atlas_size: int = 1024) -> None:
         self.db = FontDB()
         self.shaper = ShapeCache()
         self.atlas = GlyphAtlas(device, size=atlas_size)
         self._layouts: dict[tuple[Any, ...], Paragraph] = {}
+        self._icons: IconSet | None = None
+
+    @property
+    def icons(self) -> IconSet:
+        """Material Symbols, loaded on first use -- an app with no icons pays
+        nothing for the font."""
+        if self._icons is None:
+            self._icons = IconSet.bundled()
+        return self._icons
+
+    def emit_icon(
+        self,
+        display_list: DisplayList,
+        name: str,
+        *,
+        x: float,
+        y: float,
+        size: float = DEFAULT_ICON_SIZE,
+        fill: float = 0.0,
+        weight: float = 400.0,
+        pixel_ratio: float = 1.0,
+        token: int = NO_TOKEN,
+        color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
+        clip: tuple[float, float, float, float] = _NO_CLIP,
+        clip_radii: tuple[float, float, float, float] = _NO_CLIP,
+    ) -> bool:
+        """Emit one icon at logical ``(x, y)``. Returns whether it drew anything.
+
+        An icon is a glyph, so this reuses the atlas and the same GLYPH
+        instance kind -- it costs no extra draw call.
+        """
+        icons = self.icons
+        gid = icons.glyph(name)
+        coords = icons.coords(fill=fill, weight=icons.suggested_weight(size, weight))
+        entry = self.atlas.get(icons.face, gid, size * pixel_ratio, 0, coords)
+        if entry.is_blank:
+            return False
+        display_list.add_glyph(
+            x * pixel_ratio + entry.left,
+            (y + size) * pixel_ratio - entry.top,
+            float(entry.width),
+            float(entry.height),
+            uv=entry.uv(self.atlas.size),
+            color=color,
+            token=token,
+            clip=clip,
+            clip_radii=clip_radii,
+        )
+        return True
 
     def attach_device(self, device: Any) -> None:
         """Promote a CPU-only engine to a GPU-backed one."""

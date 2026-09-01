@@ -239,3 +239,48 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
     demo.clicks.set(3)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("gallery", np.asarray(engine.canvas.draw()))
+
+
+def test_icons_baseline(render_scene, assert_golden) -> None:
+    """Material Symbols through the glyph atlas, across both live axes."""
+    _, engine = render_scene(
+        lambda dl: None, width=420, height=170, theme=Theme(seed=SEED, dark=True)
+    )
+
+    def paint(dl: DisplayList) -> None:
+        on_surface = engine.palette.index("on_surface")
+        primary = engine.palette.index("primary")
+        row = [
+            "home",
+            "search",
+            "settings",
+            "person",
+            "favorite",
+            "star",
+            "check_circle",
+            "delete",
+            "share",
+            "menu",
+        ]
+        for i, name in enumerate(row):
+            engine.text.emit_icon(dl, name, x=14 + i * 38, y=16, size=24, token=on_surface)
+        # FILL 0 -> 1
+        for i in range(5):
+            engine.text.emit_icon(
+                dl, "favorite", x=14 + i * 44, y=62, size=32, fill=i / 4, token=primary
+            )
+        # weight 200 -> 700
+        for i, w in enumerate((200, 300, 400, 500, 700)):
+            engine.text.emit_icon(
+                dl,
+                "bolt",
+                x=14 + i * 44,
+                y=112,
+                size=32,
+                weight=w,
+                token=engine.palette.index("tertiary"),
+            )
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("icons", np.asarray(engine.canvas.draw()))

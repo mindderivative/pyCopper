@@ -63,6 +63,22 @@ children:
       - {id: sw_error,     widget: Container, style: {width: 56, height: 56, background: error, corner_radius: 12}}
       - {id: sw_outline,   widget: Container, style: {width: 56, height: 56, background: surface_container_highest, corner_radius: 12, border: {width: 2, color: outline}}}
 
+  # --- icons: Material Symbols, with the FILL axis driving selected state ---
+  - id: icons
+    widget: Row
+    style: {height: 40, spacing: 14, width: expand, cross_alignment: center}
+    children:
+      - {id: ic_home,   widget: Icon, text: home,     style: {color: on_surface, icon_size: 24}}
+      - {id: ic_search, widget: Icon, text: search,   style: {color: on_surface, icon_size: 24}}
+      - {id: ic_set,    widget: Icon, text: settings, style: {color: on_surface_variant, icon_size: 24}}
+      - id: ic_fav
+        widget: Icon
+        text: "{{ 'favorite' if clicks.get() else 'favorite_border' }}"
+        style: {color: error, icon_size: 28, icon_fill: 1.0}
+      - {id: ic_heavy,  widget: Icon, text: bolt, style: {color: tertiary, icon_size: 24, icon_weight: 700}}
+      - {id: ic_gap,    widget: Spacer, style: {width: expand}}
+      - {id: ic_check,  widget: Icon, text: check_circle, style: {color: primary, icon_size: 24, icon_fill: 1.0}}
+
   # --- stack: a badge overlaid on a surface ---
   - id: stacked
     widget: Stack

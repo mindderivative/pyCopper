@@ -45,14 +45,57 @@ def test_font_metadata(path, family: str, weight: int) -> None:
     tt.close()
 
 
-def test_fonts_are_openly_licensed() -> None:
+#: Each bundled font: the licence it is distributed under, and the string its
+#: embedded name record must contain (None when the font declares no licence
+#: record, as Material Symbols does -- its terms come from the repo LICENSE).
+EXPECTED_LICENCES = {
+    "Roboto-Regular.ttf": ("OFL 1.1", "Open Font License"),
+    "Roboto-Medium.ttf": ("OFL 1.1", "Open Font License"),
+    "NotoSans-Regular.ttf": ("OFL 1.1", "Open Font License"),
+    "MaterialSymbolsOutlined-Subset.ttf": ("Apache-2.0", None),
+}
+
+#: Licence text that must ship for each font, since both OFL and Apache-2.0
+#: require redistribution of the licence.
+LICENCE_FILES = {
+    "Roboto-Regular.ttf": "LICENSE-Roboto.txt",
+    "Roboto-Medium.ttf": "LICENSE-Roboto.txt",
+    "NotoSans-Regular.ttf": "LICENSE-NotoSans.txt",
+    "MaterialSymbolsOutlined-Subset.ttf": "LICENSE-MaterialSymbols.txt",
+}
+
+
+def test_every_bundled_font_is_accounted_for() -> None:
+    """A new font must be added here deliberately, with its licence recorded."""
+    shipped = {p.name for p in FONT_DIR.glob("*.ttf")}
+    assert shipped == set(EXPECTED_LICENCES)
+    assert shipped == set(LICENCE_FILES)
+
+
+def test_embedded_licence_records_match() -> None:
     for path in FONT_DIR.glob("*.ttf"):
+        _, expected = EXPECTED_LICENCES[path.name]
         tt = TTFont(path, lazy=True)
-        licence = next(
-            (str(r) for r in tt["name"].names if r.nameID == 13 and r.platformID == 3), ""
+        record = next(
+            (str(r) for r in tt["name"].names if r.nameID == 13 and r.platformID == 3),
+            None,
         )
         tt.close()
-        assert "Open Font License" in licence, f"{path.name}: {licence[:60]!r}"
+        if expected is None:
+            continue  # declares none; covered by the licence-file test below
+        assert record and expected in record, f"{path.name}: {str(record)[:60]!r}"
+
+
+def test_licence_texts_ship_alongside_the_fonts() -> None:
+    """Both OFL and Apache-2.0 require the licence to be redistributed.
+
+    This is the only licence guarantee for Material Symbols, which embeds no
+    licence record of its own.
+    """
+    for font, licence in LICENCE_FILES.items():
+        path = FONT_DIR / licence
+        assert path.is_file(), f"{font} ships no licence text ({licence})"
+        assert path.read_text(encoding="utf-8").strip(), f"{licence} is empty"
 
 
 def test_fallback_widens_coverage() -> None:

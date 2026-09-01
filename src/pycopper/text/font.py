@@ -79,6 +79,7 @@ class Face:
         "_hb_face",
         "_hb_font",
         "_size_key",
+        "axes",
         "family",
         "path",
         "subfamily",
@@ -100,9 +101,17 @@ class Face:
         self._hb_font.scale = (self.units_per_em, self.units_per_em)
 
         self._ft = freetype.Face(str(self.path))
-        self._size_key: tuple[int, int] | None = None
+        self._size_key: tuple[int, int, tuple[float, ...]] | None = None
+
+        #: Variable axes as ``tag -> (min, default, max)``, in fvar order.
+        #: Empty for a static face. Material Symbols exposes FILL and wght.
+        self.axes: dict[str, tuple[float, float, float]] = {}
 
         tt = TTFont(self.path, lazy=True)
+        if "fvar" in tt:
+            self.axes = {
+                a.axisTag: (a.minValue, a.defaultValue, a.maxValue) for a in tt["fvar"].axes
+            }
         names = {r.nameID: str(r) for r in tt["name"].names if r.platformID == 3}
         self.family = names.get(16) or names.get(1) or self.path.stem
         self.subfamily = names.get(17) or names.get(2) or "Regular"
@@ -153,23 +162,50 @@ class Face:
 
     # -------------------------------------------------------- rasterisation
 
-    def _activate(self, px: float, subpixel: int = 0) -> None:
-        """Configure freetype for a size and horizontal subpixel offset."""
-        key = (round(px * 64), subpixel % SUBPIXEL_BUCKETS)
+    @property
+    def is_variable(self) -> bool:
+        return bool(self.axes)
+
+    def clamp_coords(self, **values: float) -> tuple[float, ...]:
+        """Axis values as a tuple in fvar order, clamped to each axis range.
+
+        Unspecified axes take their default, so ``clamp_coords(FILL=1)`` on
+        Material Symbols yields ``(1.0, 400.0)``.
+        """
+        out = []
+        for tag, (lo, default, hi) in self.axes.items():
+            value = float(values.get(tag, default))
+            out.append(min(hi, max(lo, value)))
+        return tuple(out)
+
+    def _activate(self, px: float, subpixel: int = 0, coords: tuple[float, ...] = ()) -> None:
+        """Configure freetype for a size, subpixel offset, and axis position."""
+        key = (round(px * 64), subpixel % SUBPIXEL_BUCKETS, coords)
         if key == self._size_key:
             return
         self._ft.set_char_size(key[0])
+        if coords and self.axes:
+            # freetype-py takes PLAIN DESIGN VALUES here, not 16.16 fixed
+            # point. Passing scaled values silently clamps every axis to its
+            # maximum, which looks like "the axis does nothing".
+            self._ft.set_var_design_coords(list(coords))
         offset = round(key[1] * 64 / SUBPIXEL_BUCKETS)
         self._ft.set_transform(freetype.Matrix(0x10000, 0, 0, 0x10000), freetype.Vector(offset, 0))
         self._size_key = key
 
-    def rasterize(self, gid: int, px: float, subpixel: int = 0) -> GlyphBitmap:
+    def rasterize(
+        self,
+        gid: int,
+        px: float,
+        subpixel: int = 0,
+        coords: tuple[float, ...] = (),
+    ) -> GlyphBitmap:
         """Render *gid* to an 8-bit coverage bitmap.
 
         Whitespace and other blank glyphs come back empty rather than as a
         zero-filled array -- the atlas must not allocate space for them.
         """
-        self._activate(px, subpixel)
+        self._activate(px, subpixel, coords)
         self._ft.load_glyph(gid, freetype.FT_LOAD_RENDER)
         slot = self._ft.glyph
         bitmap = slot.bitmap

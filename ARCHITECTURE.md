@@ -423,8 +423,9 @@ Material Design 3 names **Roboto** as the default typeface of its type scale and
 | `Roboto-Regular.ttf` | 154 KB | 400 | 927 | Default face |
 | `Roboto-Medium.ttf` | 154 KB | 500 | 927 | `label-large` and other medium-weight roles |
 | `NotoSans-Regular.ttf` | 612 KB | 400 | 3,094 | Fallback tier |
+| `MaterialSymbolsOutlined-Subset.ttf` | 102 KB | variable | 218 icons | Icons (§5.7.8) |
 
-**≈920 KB total**, exposed through `pycopper.assets` (`DEFAULT_FONT`, `MEDIUM_FONT`, `FALLBACK_CHAIN`).
+**≈1.0 MB total** (620 KB compressed in the wheel), exposed through `pycopper.assets` (`DEFAULT_FONT`, `MEDIUM_FONT`, `FALLBACK_CHAIN`) and `pycopper.text.icons`.
 
 Three decisions worth recording:
 
@@ -482,6 +483,45 @@ Each claim below was executed against the installed stack, not inferred from doc
 | UAX #14 line breaking | `"can't"` kept intact; break offered after `dog-` |
 | UAX #29 grapheme clusters | 13 code points → 6 clusters; `👩‍👩‍👧` and `🇯🇵` each one cluster |
 | Coverage query | DejaVu Sans covers `A` and `ا`, not `你` or `🙂` |
+
+#### 5.7.8 Icons
+
+**M3's icon set is a variable icon font**, which is the single most useful fact
+about it: an icon is a *glyph*, so icons need no rendering path of their own.
+They flow through `FontDB`, the freetype rasteriser, the glyph atlas, and the
+`GLYPH` instance kind unchanged — an icon costs **no extra draw call**.
+
+Material Symbols exposes four axes; the bundle keeps two:
+
+| Axis | Range | Kept | Why |
+|---|---|---|---|
+| `FILL` | 0–1 | ✅ | Load-bearing, not decorative — M3 uses it for the selected/unselected transition on navigation items and toggles |
+| `wght` | 100–700 | ✅ | Pairs icon stroke weight with typography |
+| `GRAD` | −50–200 | pinned | Fine-tuning |
+| `opsz` | 20–48 | pinned | Fine-tuning |
+
+**The bundle is a subset.** The full outlined variable font is **10.6 MB** for
+~4,275 icons. Subsetting with `fontTools` to a curated 218-icon core set —
+covering every component in the M3 catalogue — and pinning `GRAD`/`opsz` yields
+**102 KB**, a 102× reduction. An icon outside the set raises a `KeyError`
+naming the problem rather than silently rendering `.notdef`.
+
+**Axis coordinates are part of the atlas key.** A filled and an unfilled icon
+are the same glyph id at the same size, and would otherwise collide.
+
+Two facts worth recording, both found by measurement:
+
+- **`freetype-py`'s `set_var_design_coords` takes plain design values, not
+  16.16 fixed point.** Passing scaled values silently clamps every axis to its
+  maximum, which presents as "the axis does nothing" rather than as an error.
+- **Material Symbols embeds no licence name record.** Its terms — Apache-2.0,
+  unlike the OFL text faces — come from the repository `LICENSE`, vendored
+  alongside it. The licence test therefore asserts per font rather than
+  assuming one licence across the bundle.
+
+The `Icon` widget takes its name from `text:`, so binding expressions work on
+it: `text: "{{ 'star' if saved.get() else 'star_border' }}"` switches the icon
+with state exactly the way a label does.
 
 #### 5.7.7 Scope tiers
 

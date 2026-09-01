@@ -18,7 +18,10 @@ import numpy as np
 
 from ..text.font import Face, GlyphBitmap
 
-__all__ = ["AtlasEntry", "AtlasFullError", "GlyphAtlas", "SkylinePacker"]
+__all__ = ["AtlasEntry", "AtlasFullError", "AtlasKey", "GlyphAtlas", "SkylinePacker"]
+
+#: (font path, quarter-pixel size, glyph id, subpixel bucket, axis coords)
+AtlasKey = tuple[Path, int, int, int, tuple[float, ...]]
 
 #: One transparent pixel between glyphs. Without it, linear filtering samples a
 #: neighbour's coverage along shared edges and glyphs grow faint halos.
@@ -164,7 +167,7 @@ class GlyphAtlas:
         self.size = size
         self._packer = SkylinePacker(size, size)
         self._pixels = np.zeros((size, size), dtype=np.uint8)
-        self._cache: dict[tuple[Path, int, int, int], AtlasEntry] = {}
+        self._cache: dict[AtlasKey, AtlasEntry] = {}
         self._generation = 0
         self._resets = 0
         self._dirty = True
@@ -202,7 +205,7 @@ class GlyphAtlas:
         self._resets += 1
         self._dirty = True
 
-    def add(self, key: tuple[Path, int, int, int], bitmap: GlyphBitmap) -> AtlasEntry:
+    def add(self, key: AtlasKey, bitmap: GlyphBitmap) -> AtlasEntry:
         if bitmap.is_blank:
             entry = AtlasEntry(0, 0, 0, 0, bitmap.left, bitmap.top, self._generation)
             self._cache[key] = entry
@@ -221,13 +224,24 @@ class GlyphAtlas:
         self._dirty = True
         return entry
 
-    def get(self, face: Face, gid: int, px: float, subpixel: int = 0) -> AtlasEntry:
-        """Entry for a glyph, rasterising and packing it on first use."""
-        key = (face.path, round(px * 4), int(gid), subpixel)
+    def get(
+        self,
+        face: Face,
+        gid: int,
+        px: float,
+        subpixel: int = 0,
+        coords: tuple[float, ...] = (),
+    ) -> AtlasEntry:
+        """Entry for a glyph, rasterising and packing it on first use.
+
+        ``coords`` is part of the key: a filled and an unfilled icon are the
+        same glyph id at the same size, and would otherwise collide.
+        """
+        key = (face.path, round(px * 4), int(gid), subpixel, coords)
         entry = self._cache.get(key)
         if entry is not None and entry.generation == self._generation:
             return entry
-        return self.add(key, face.rasterize(gid, px, subpixel))
+        return self.add(key, face.rasterize(gid, px, subpixel, coords))
 
     # ------------------------------------------------------------ GPU side
 
