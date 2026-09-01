@@ -101,6 +101,8 @@ class ElementMixin:
     _value: str
     _supporting_template: Template | None
     _supporting: str
+    _open_template: Template | None
+    _open: str
     _cached: np.ndarray | None
     _cached_origin: Offset | None
     _needs_paint: bool
@@ -117,6 +119,8 @@ class ElementMixin:
         self._value = spec.value or ""
         self._supporting_template = spec.supporting_template()
         self._supporting = spec.supporting_text or ""
+        self._open_template = spec.open_template()
+        self._open = spec.open or ""
         self._cached = None
         self._cached_origin = None
         self._needs_paint = True
@@ -135,6 +139,9 @@ class ElementMixin:
         self._supporting_template = spec.supporting_template()
         if self._supporting_template is None or self._supporting_template.is_static:
             self._supporting = spec.supporting_text or ""
+        self._open_template = spec.open_template()
+        if self._open_template is None or self._open_template.is_static:
+            self._open = spec.open or ""
         self.configure()
         self.mark_needs_layout()
 
@@ -172,6 +179,11 @@ class ElementMixin:
     def value(self) -> str:
         """Rendered `value:` binding -- selection, count, or progress."""
         return self._value
+
+    @property
+    def is_open(self) -> bool:
+        """Whether an overlay is showing. False when `open:` was not given."""
+        return self._open.strip().lower() not in ("", "false", "0", "none", "no")
 
     @property
     def supporting(self) -> str:
@@ -244,6 +256,7 @@ class ElementMixin:
                 ("_text", self._template),
                 ("_value", self._value_template),
                 ("_supporting", self._supporting_template),
+                ("_open", self._open_template),
             )
             if tpl is not None and not tpl.is_static
         ]

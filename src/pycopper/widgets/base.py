@@ -108,6 +108,16 @@ class ContainerElement(_StyledMixin, Padding):
         return outer.constrain(inner)
 
 
+def _main_size_for(axis: Axis, style: StyleSpec) -> MainAxisSize:
+    """Fill the main axis only when the view sized THAT axis.
+
+    The main axis of a Column is its HEIGHT. Keying this off `width` made a
+    Column with `width: expand` greedily fill vertically as well.
+    """
+    sized = style.width if axis is Axis.HORIZONTAL else style.height
+    return MainAxisSize.MAX if sized.kind != "auto" else MainAxisSize.MIN
+
+
 class _FlexElement(_StyledMixin, Flex):
     axis: Axis = Axis.HORIZONTAL
 
@@ -118,7 +128,7 @@ class _FlexElement(_StyledMixin, Flex):
             axis=self.axis,
             main_alignment=_MAIN[style.main_alignment],
             cross_alignment=_CROSS[style.cross_alignment],
-            main_size=MainAxisSize.MAX if style.width.kind != "auto" else MainAxisSize.MIN,
+            main_size=_main_size_for(self.axis, style),
             spacing=style.spacing,
         )
         self._padding = style.padding
@@ -145,7 +155,7 @@ class _FlexElement(_StyledMixin, Flex):
         self._main_alignment = _MAIN[style.main_alignment]
         self._cross_alignment = _CROSS[style.cross_alignment]
         self._spacing = style.spacing
-        self._main_size = MainAxisSize.MAX if style.width.kind != "auto" else MainAxisSize.MIN
+        self._main_size = _main_size_for(self.axis, style)
         self._padding = style.padding
 
     def perform_layout(self, constraints: Constraints) -> Size:

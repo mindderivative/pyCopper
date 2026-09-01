@@ -246,6 +246,20 @@ class StyleSpec(_Frozen):
     align_x: float = Field(default=0.0, ge=0, le=1)
     align_y: float = Field(default=0.0, ge=0, le=1)
 
+    # overlays (see runtime/overlay.py)
+    #: Where an overlay sits. `anchor` positions it against another element.
+    placement: Literal["center", "anchor", "top", "bottom", "left", "right"] = "center"
+    #: Id of the element an anchored overlay attaches to.
+    anchor: str | None = None
+    #: A modal overlay blocks input to everything beneath it.
+    modal: bool = False
+    #: Draw M3's 32% scrim behind this overlay.
+    scrim: bool = False
+    #: Dismiss on a click outside, or on Escape.
+    dismissable: bool = True
+    #: Gap between an anchored overlay and its anchor, in logical px.
+    offset: float = Field(default=4.0, ge=0)
+
     # text
     font_size: float = Field(default=14.0, gt=0)
 
@@ -274,6 +288,9 @@ class WidgetSpec(_Frozen):
     value: str | None = None
     #: A ListItem's second line. Content, not style, and templated like `text`.
     supporting_text: str | None = None
+    #: Whether an overlay is showing. Templated: `open: "{{ show.get() }}"`.
+    #: Meaningless outside the `overlays:` list.
+    open: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
     children: tuple[WidgetSpec, ...] = ()
 
@@ -292,6 +309,9 @@ class WidgetSpec(_Frozen):
     def value_template(self) -> Template | None:
         return Template(self.value) if self.value is not None else None
 
+    def open_template(self) -> Template | None:
+        return Template(self.open) if self.open is not None else None
+
     def supporting_template(self) -> Template | None:
         return Template(self.supporting_text) if self.supporting_text is not None else None
 
@@ -306,6 +326,10 @@ class ViewSpec(_Frozen):
 
     version: int = SCHEMA_VERSION
     root: WidgetSpec
+    #: Overlays live OUTSIDE the root tree, not hoisted out of it. A dialog is
+    #: not laid out or clipped by whatever opened it, so declaring it as a
+    #: child would be a lie about the geometry.
+    overlays: tuple[WidgetSpec, ...] = ()
 
     @field_validator("version")
     @classmethod

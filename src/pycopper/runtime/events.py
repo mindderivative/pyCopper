@@ -119,6 +119,8 @@ class EventDispatcher:
 
     def __init__(self) -> None:
         self.root: Any = None
+        #: The overlay layer, consulted before the tree because it is on top.
+        self.overlays: Any = None
         self._queue: deque[Event] = deque()
         self._hover_path: list[Any] = []
         self._pressed: Any = None
@@ -158,7 +160,18 @@ class EventDispatcher:
     # ------------------------------------------------------------ hit testing
 
     def hit_path(self, x: float, y: float) -> list[Any]:
-        """Topmost-first list of elements under the point."""
+        """Topmost-first list of elements under the point.
+
+        The overlay layer is checked first because it renders above the tree,
+        and a modal overlay swallows everything beneath it -- otherwise a click
+        on a scrim would fall through to the blocked interface.
+        """
+        if self.overlays is not None:
+            found: list[Any] = list(self.overlays.hit_path(x, y))
+            if found:
+                return found
+            if self.overlays.has_modal:
+                return []
         if self.root is None:
             return []
         return list(self.root.hit_test(x, y, OFFSET_ZERO))
@@ -183,6 +196,16 @@ class EventDispatcher:
         # A captured pointer keeps receiving events outside its own bounds,
         # which is what makes dragging work.
         path = [self._captured] if self._captured is not None else self.hit_path(event.x, event.y)
+
+        # A press outside a modal dismisses it and goes no further.
+        if (
+            event.type is EventType.POINTER_DOWN
+            and self.overlays is not None
+            and self._captured is None
+            and self.overlays.handle_press(event.x, event.y)
+            and not path
+        ):
+            return
 
         match event.type:
             case EventType.POINTER_MOVE:
@@ -233,9 +256,13 @@ class EventDispatcher:
             if event.key in ("Tab", "tab"):
                 self.focus_next(backwards="shift" in event.modifiers)
                 return
-            if event.key in ("Escape", "escape") and self._focused is not None:
-                self.focus(None)
-                return
+            if event.key in ("Escape", "escape"):
+                # Escape closes the topmost overlay before it clears focus.
+                if self.overlays is not None and self.overlays.dismiss_top():
+                    return
+                if self._focused is not None:
+                    self.focus(None)
+                    return
 
         if self._focused is None:
             return
@@ -316,7 +343,11 @@ class EventDispatcher:
         self.focus(order[(index + (-1 if backwards else 1)) % len(order)], keyboard=True)
         return self._focused
 
-    def bind_handlers(self, registry: dict[str, Callable[[Any], None]]) -> list[str]:
+    def bind_handlers(
+        self,
+        registry: dict[str, Callable[[Any], None]],
+        extra: list[Any] | None = None,
+    ) -> list[str]:
         """Resolve handler names from view files against *registry*.
 
         Returns the names that could not be resolved, so the caller can fail at
@@ -325,7 +356,8 @@ class EventDispatcher:
         missing: list[str] = []
         if self.root is None:
             return missing
-        for element in self.root.walk_elements():
+        targets = list(self.root.walk_elements()) + list(extra or [])
+        for element in targets:
             element.handlers = {}
             for event_key, name in element.spec.handlers.items():
                 fn = registry.get(name)

@@ -441,3 +441,104 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
     app.attach(engine)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("navigation", np.asarray(engine.canvas.draw()))
+
+
+def test_overlay_baseline(render_scene, assert_golden) -> None:
+    """A modal dialog over a 32% scrim, and an anchored menu beside it."""
+    from pycopper import Signal
+
+    view = {
+        "root": {
+            "id": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 20, "spacing": 12},
+            "children": [
+                {
+                    "id": "open_btn",
+                    "widget": "Button",
+                    "text": "Open dialog",
+                    "style": {"width": 170, "height": 40},
+                },
+                {
+                    "id": "menu_btn",
+                    "widget": "Button",
+                    "text": "Menu",
+                    "style": {"width": 120, "height": 40, "variant": "outlined"},
+                },
+                {
+                    "id": "li",
+                    "widget": "ListItem",
+                    "text": "Background content",
+                    "supporting_text": "Dimmed by the scrim",
+                    "style": {"width": "expand"},
+                },
+            ],
+        },
+        "overlays": [
+            {
+                "id": "menu",
+                "widget": "Card",
+                "open": "true",
+                "style": {
+                    "width": 190,
+                    "placement": "anchor",
+                    "anchor": "menu_btn",
+                    "variant": "filled",
+                    "corner_radius": 4,
+                    "padding": 0,
+                },
+                "children": [
+                    {
+                        "id": "mcol",
+                        "widget": "Column",
+                        "style": {"width": "expand"},
+                        "children": [
+                            {
+                                "id": "m1",
+                                "widget": "ListItem",
+                                "text": "Rename",
+                                "style": {"width": "expand"},
+                            },
+                            {
+                                "id": "m2",
+                                "widget": "ListItem",
+                                "text": "Duplicate",
+                                "style": {"width": "expand"},
+                            },
+                        ],
+                    }
+                ],
+            },
+            {
+                "id": "dlg",
+                "widget": "Card",
+                "open": "{{ show.get() }}",
+                "style": {
+                    "width": 280,
+                    "height": 140,
+                    "placement": "center",
+                    "modal": True,
+                    "scrim": True,
+                    "variant": "elevated",
+                    "corner_radius": 28,
+                    "padding": 24,
+                },
+                "children": [
+                    {
+                        "id": "dt",
+                        "widget": "Text",
+                        "text": "Modal dialog",
+                        "style": {"font_size": 20},
+                    }
+                ],
+            },
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=470, height=280, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(show=Signal(True))
+    app.attach(engine)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("overlay", np.asarray(engine.canvas.draw()))

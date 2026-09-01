@@ -16,6 +16,7 @@ from .paint import DisplayList
 from .runtime.engine import Engine
 from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent
 from .runtime.hotreload import HotReloader
+from .runtime.overlay import OverlayHost
 from .runtime.signals import batch, bind_thread
 from .spec import SpecError, ViewSpec, load_view, parse_view
 from .text import TextEngine
@@ -56,8 +57,12 @@ class App:
         self.text = TextEngine()
         self.root.set_text_engine(self.text)
 
+        self.overlays = OverlayHost()
+        self.overlays.build(self.view.overlays, text_engine=self.text)
+
         self.dispatcher = EventDispatcher()
         self.dispatcher.root = self.root
+        self.dispatcher.overlays = self.overlays
 
         self.context: dict[str, Any] = {}
         self._handlers: dict[str, Callable[[Any], None]] = {}
@@ -87,13 +92,14 @@ class App:
 
     def mount(self) -> None:
         """Resolve handlers and subscribe bindings. Idempotent."""
-        missing = self.dispatcher.bind_handlers(self._handlers)
+        missing = self.dispatcher.bind_handlers(self._handlers, extra=self.overlays.elements())
         if missing:
             raise SpecError(
                 "view references handlers that are not registered:\n  " + "\n  ".join(missing)
             )
         for element in self.root.walk_elements():
             element.bind(self.context)
+        self.overlays.bind(self.context)
         self._mounted = True
 
     # ------------------------------------------------------------ hot reload
@@ -164,7 +170,9 @@ class App:
         self.poll_reload()
         self.dispatcher.drain()
         self.layout_owner.flush()
-        self.root.layout(Constraints.tight(self.logical_size()))
+        size = self.logical_size()
+        self.root.layout(Constraints.tight(size))
+        self.overlays.layout(size, self.root)
 
     def paint(self, display_list: DisplayList) -> None:
         """Frame step 6: walk the element tree into the display list."""
@@ -176,6 +184,7 @@ class App:
             pixel_ratio=self.engine.pixel_ratio if self.engine else 1.0,
         )
         self.root.paint(ctx, OFFSET_ZERO)
+        self.overlays.paint(ctx, self.palette, self.logical_size())
 
     def set_theme(self, theme: Theme) -> None:
         """One palette upload. No relayout, no display-list rebuild."""

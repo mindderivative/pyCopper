@@ -713,6 +713,53 @@ nothing-focused state an application starts in. Focus order is document order,
 and `FOCUSABLE_KINDS` makes every interactive control reachable whether or not
 the view file wired a handler.
 
+### 5.13 The overlay layer — `runtime/overlay.py`
+
+Six M3 components — Dialog, Menu, Tooltip, Snackbar, and both Sheet types —
+share one requirement the four-tree model cannot otherwise express: they render
+**above** everything, positioned independently of whatever opened them and
+clipped by nothing.
+
+**Overlays are declared in a top-level `overlays:` list, not hoisted out of the
+tree.** A dialog is not laid out or clipped by the button that opened it, so
+declaring it as that button's child would be a lie about the geometry — and
+would leave the parent's Flex reserving space for something that floats.
+
+```yaml
+root: { ... }
+overlays:
+  - id: confirm
+    widget: Card
+    open: "{{ show.get() }}"          # templated, like text: and value:
+    style: { placement: center, modal: true, scrim: true }
+```
+
+The host runs its own layout and paint pass after the main tree's, and is
+consulted **first** during hit testing because it is on top.
+
+| Concern | Behaviour |
+|---|---|
+| Placement | `center`, `anchor` (to another element's id), or an edge |
+| Anchoring | placed below the anchor, **flipping above** when it would overflow |
+| Scrim | M3's 32% `scrim` token, sized to the window |
+| Modality | a modal swallows every press outside itself; the tree beneath is unreachable |
+| Dismissal | Escape closes the topmost overlay *before* clearing focus; a press outside closes a modal |
+| Z-order | declaration order — a later overlay's scrim dims an earlier one |
+
+Dismissals are tracked separately from the `open:` binding and reconciled each
+frame, so an overlay closed by clicking outside can still be reopened by its
+signal — otherwise the dismissal would outlive the state change.
+
+Two bugs this work surfaced, both pre-existing and both now fixed:
+
+- **A single-child container silently dropped extra children.** `Padding`-based
+  widgets lay out `children[0]` only, but paint walks all of them — so a Card
+  with two children rendered them unpositioned on top of each other with no
+  error. Adding a second child now raises, naming the fix.
+- **A Column sized only on `width` filled vertically.** `main_size` was chosen
+  from `style.width` regardless of axis, and a Column's main axis is its
+  *height*. An anchored menu stretched to the bottom of the window.
+
 ### 5.12 Material Design 3 components — `widgets/material.py`
 
 Nine components translated from their M3 specs. Dimensions are M3's own dp

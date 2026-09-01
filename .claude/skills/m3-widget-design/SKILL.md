@@ -183,6 +183,16 @@ widget must do: add its kind to `FOCUSABLE_KINDS` in `runtime/events.py` if it
 is interactive, and override `effective_radii` if it computes its own corner
 radius at paint time, or the ring will be the wrong shape.
 
+**Overlays are available.** Anything that must float above the tree —  dialog,
+menu, tooltip, snackbar, sheet — is declared in the view's top-level
+`overlays:` list, never as a child of what opens it. `open:` is a templated
+binding; `placement` is `center`, `anchor` (with `anchor: <id>`), or an edge;
+`modal`, `scrim`, and `dismissable` are style flags. See ARCHITECTURE.md §5.13.
+
+**Single-child containers reject a second child.** Container, Card, Text, Icon
+and the selection controls are `Padding`-based and take one child — wrap
+several in a Row or Column.
+
 **Widgets today (27 kinds):** primitives — Container, Row, Column, Stack,
 Spacer, Text, Icon. M3 components — Button (5 variants), Card, Divider,
 Checkbox, Radio, Switch, Chip, IconButton, Fab, Badge, NavigationRail,
@@ -248,9 +258,6 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   have nowhere to attach.
 - **Motion.** No animation or transition system; every state change is instant
   — a Switch thumb jumps rather than sliding.
-- **An overlay/portal layer.** Dialog, Menu, Tooltip, Snackbar and both Sheet
-  types must render above the tree, outside their parent's layout and clip.
-  Six components are blocked on this one feature.
 - **Arc/stroke rendering.** The SDF shader draws rounded boxes, so a circular
   progress indicator cannot be expressed. Linear progress is fine.
 - **Tonal elevation.** Shadows only (see Step 2).

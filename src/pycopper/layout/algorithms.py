@@ -87,6 +87,19 @@ class SingleChildNode(LayoutNode):
     def __init__(self, child: LayoutNode | None = None) -> None:
         super().__init__([child] if child is not None else [])
 
+    def insert_child(self, index: int, child: LayoutNode) -> None:
+        """Reject a second child rather than silently dropping it.
+
+        A single-child node lays out only ``children[0]`` but paint walks all
+        of them, so extra children would render unpositioned on top of each
+        other -- visible as overlapping content with no error anywhere.
+        """
+        if self._children:
+            raise ValueError(
+                f"{type(self).__name__} takes a single child; wrap several in a Row or Column"
+            )
+        super().insert_child(index, child)
+
     @property
     def child(self) -> LayoutNode | None:
         return self._children[0] if self._children else None
