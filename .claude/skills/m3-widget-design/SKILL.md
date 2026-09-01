@@ -160,7 +160,7 @@ what to close before implementing.
 
 ## Current framework state
 
-*Last updated: after M3 component wave 1 (post-M5). Update this section whenever a milestone changes it.*
+*Last updated: after M3 component wave 2 (post-M5). Update this section whenever a milestone changes it.*
 
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
@@ -183,12 +183,20 @@ widget must do: add its kind to `FOCUSABLE_KINDS` in `runtime/events.py` if it
 is interactive, and override `effective_radii` if it computes its own corner
 radius at paint time, or the ring will be the wrong shape.
 
-**Widgets today:** primitives — Container, Row, Column, Stack, Spacer, Text,
-Icon. M3 components — Card, Divider, Checkbox, Radio, Switch, Chip, IconButton,
-Fab, Badge, and Button with its five variants.
+**Widgets today (27 kinds):** primitives — Container, Row, Column, Stack,
+Spacer, Text, Icon. M3 components — Button (5 variants), Card, Divider,
+Checkbox, Radio, Switch, Chip, IconButton, Fab, Badge, NavigationRail,
+NavigationDrawer, NavItem, TopAppBar, Tabs, Tab, SegmentedButton, Segment,
+ListItem, LinearProgress.
 
-**Before adding a component, check `widgets/material.py`** — it has nine worked
-examples and the shared helpers (`_emit_state_layer`, `_box`, `content_token`)
+**A container of items where one is selected** — rail, drawer, tabs, segmented
+— subclasses `_SelectionContainer` in `widgets/navigation.py`. The container
+carries `value:` (the selected child's id) and calls `set_selected` during
+layout; the item reads `self.selected` and renders itself. Use the icon FILL
+axis for the selected state, which is what M3 uses it for.
+
+**Before adding a component, check `widgets/material.py` and
+`widgets/navigation.py`** — together they hold nineteen worked examples and the shared helpers (`_emit_state_layer`, `_box`, `content_token`)
 that a new one should reuse rather than reimplement.
 
 **Selection is a binding, not style.** Controls read the `value:` spec field,

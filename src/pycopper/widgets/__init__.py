@@ -23,6 +23,18 @@ from .material import (
     RadioElement,
     SwitchElement,
 )
+from .navigation import (
+    LinearProgressElement,
+    ListItemElement,
+    NavigationDrawerElement,
+    NavigationRailElement,
+    NavItemElement,
+    SegmentedButtonElement,
+    SegmentElement,
+    TabElement,
+    TabsElement,
+    TopAppBarElement,
+)
 
 __all__ = [
     "BadgeElement",
@@ -36,12 +48,22 @@ __all__ = [
     "FabElement",
     "IconButtonElement",
     "IconElement",
+    "LinearProgressElement",
+    "ListItemElement",
+    "NavItemElement",
+    "NavigationDrawerElement",
+    "NavigationRailElement",
     "RadioElement",
     "RowElement",
+    "SegmentElement",
+    "SegmentedButtonElement",
     "SpacerElement",
     "StackElement",
     "SwitchElement",
+    "TabElement",
+    "TabsElement",
     "TextElement",
+    "TopAppBarElement",
     "build_element",
     "create_element",
 ]

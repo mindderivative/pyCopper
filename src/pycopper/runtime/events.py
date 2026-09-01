@@ -98,7 +98,19 @@ HANDLER_KEYS = {
 #: These are interactive controls: a user must be able to Tab to a checkbox
 #: whether or not the view file wired an on_click.
 FOCUSABLE_KINDS: frozenset[str] = frozenset(
-    {"Button", "Checkbox", "Radio", "Switch", "Chip", "IconButton", "Fab"}
+    {
+        "Button",
+        "Checkbox",
+        "Radio",
+        "Switch",
+        "Chip",
+        "IconButton",
+        "Fab",
+        "NavItem",
+        "Tab",
+        "Segment",
+        "ListItem",
+    }
 )
 
 

@@ -730,6 +730,38 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3 |
 | `Badge` | 6dp dot, or 16dp-high pill | `value:` carries the count |
 
+**Wave 2** added navigation and structure in `widgets/navigation.py`:
+
+| Widget | M3 spec | Notes |
+|---|---|---|
+| `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination |
+| `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem` |
+| `TopAppBar` | 64dp, title-large | small and centre-aligned; medium/large expand on scroll |
+| `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
+| `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment |
+| `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
+| `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
+
+**Bottom-anchored navigation is deliberately absent.** M3's Navigation Bar and
+Bottom App Bar are mobile patterns (§1.2.1); the rail and drawer are their
+desktop counterparts.
+
+Four of these share one shape — a container of items where exactly one is
+selected — modelled once as `_SelectionContainer`: the container carries
+`value:`, the id of the selected child; during layout it calls `set_selected`
+on each child; the item renders its own selected appearance. That is also where
+the icon **FILL** axis finally earns its place, since it is exactly what M3 uses
+to distinguish a selected destination.
+
+Two sizing decisions worth recording:
+
+- **A segmented group shrinks to its content by default**, and divides the
+  width equally among segments only when the view gives it one. Filling by
+  default left the outline running on past the last segment.
+- **The group's outline is drawn once around the whole container**, with a 1dp
+  divider between each pair — not per segment, which would double every
+  internal edge.
+
 `Button` gained the same treatment: M3 describes its five variants as **one
 component in five configurations**, so they are one widget with a `variant`,
 not five widget kinds.

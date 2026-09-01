@@ -54,6 +54,16 @@ class WidgetKind(StrEnum):
     ICON_BUTTON = "IconButton"
     FAB = "Fab"
     BADGE = "Badge"
+    NAVIGATION_RAIL = "NavigationRail"
+    NAVIGATION_DRAWER = "NavigationDrawer"
+    NAV_ITEM = "NavItem"
+    TOP_APP_BAR = "TopAppBar"
+    TABS = "Tabs"
+    TAB = "Tab"
+    SEGMENTED_BUTTON = "SegmentedButton"
+    SEGMENT = "Segment"
+    LIST_ITEM = "ListItem"
+    LINEAR_PROGRESS = "LinearProgress"
 
 
 class SizeSpec:
@@ -197,6 +207,15 @@ Variant = Literal[
     # dividers
     "full_bleed",
     "inset",
+    # app bars
+    "center_aligned",
+    # tabs (primary anchors a rounded indicator; secondary a flat stroke)
+    "primary",
+    "secondary",
+    # list items
+    "one_line",
+    "two_line",
+    "three_line",
 ]
 
 
@@ -253,6 +272,8 @@ class WidgetSpec(_Frozen):
     #: Badge, progress for indicators. Templated like `text`, so
     #: `value: "{{ checked.get() }}"` tracks a signal.
     value: str | None = None
+    #: A ListItem's second line. Content, not style, and templated like `text`.
+    supporting_text: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
     children: tuple[WidgetSpec, ...] = ()
 
@@ -270,6 +291,9 @@ class WidgetSpec(_Frozen):
 
     def value_template(self) -> Template | None:
         return Template(self.value) if self.value is not None else None
+
+    def supporting_template(self) -> Template | None:
+        return Template(self.supporting_text) if self.supporting_text is not None else None
 
     def walk(self) -> Any:
         yield self

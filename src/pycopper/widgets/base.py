@@ -433,6 +433,7 @@ class SpacerElement(_StyledMixin, Padding):
 def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
     from . import material as m
+    from . import navigation as n
 
     return {
         WidgetKind.CARD: m.CardElement,
@@ -444,6 +445,16 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.ICON_BUTTON: m.IconButtonElement,
         WidgetKind.FAB: m.FabElement,
         WidgetKind.BADGE: m.BadgeElement,
+        WidgetKind.NAVIGATION_RAIL: n.NavigationRailElement,
+        WidgetKind.NAVIGATION_DRAWER: n.NavigationDrawerElement,
+        WidgetKind.NAV_ITEM: n.NavItemElement,
+        WidgetKind.TOP_APP_BAR: n.TopAppBarElement,
+        WidgetKind.TABS: n.TabsElement,
+        WidgetKind.TAB: n.TabElement,
+        WidgetKind.SEGMENTED_BUTTON: n.SegmentedButtonElement,
+        WidgetKind.SEGMENT: n.SegmentElement,
+        WidgetKind.LIST_ITEM: n.ListItemElement,
+        WidgetKind.LINEAR_PROGRESS: n.LinearProgressElement,
     }
 
 

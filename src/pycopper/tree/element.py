@@ -99,6 +99,8 @@ class ElementMixin:
     _template: Template | None
     _value_template: Template | None
     _value: str
+    _supporting_template: Template | None
+    _supporting: str
     _cached: np.ndarray | None
     _cached_origin: Offset | None
     _needs_paint: bool
@@ -113,6 +115,8 @@ class ElementMixin:
         self._text = spec.text or ""
         self._value_template = spec.value_template()
         self._value = spec.value or ""
+        self._supporting_template = spec.supporting_template()
+        self._supporting = spec.supporting_text or ""
         self._cached = None
         self._cached_origin = None
         self._needs_paint = True
@@ -128,6 +132,9 @@ class ElementMixin:
         self._value_template = spec.value_template()
         if self._value_template is None or self._value_template.is_static:
             self._value = spec.value or ""
+        self._supporting_template = spec.supporting_template()
+        if self._supporting_template is None or self._supporting_template.is_static:
+            self._supporting = spec.supporting_text or ""
         self.configure()
         self.mark_needs_layout()
 
@@ -165,6 +172,26 @@ class ElementMixin:
     def value(self) -> str:
         """Rendered `value:` binding -- selection, count, or progress."""
         return self._value
+
+    @property
+    def supporting(self) -> str:
+        """Rendered `supporting_text` binding -- a list item's second line."""
+        return self._supporting
+
+    @property
+    def selected(self) -> bool:
+        """Whether a parent container has marked this item as the active one.
+
+        Set by NavigationRail/Drawer, Tabs and SegmentedButton on their
+        children during layout, so an item renders its own selected appearance
+        without reaching back up the tree.
+        """
+        return bool(self.state.data.get("selected", False))
+
+    def set_selected(self, value: bool) -> None:
+        if bool(self.state.data.get("selected", False)) != value:
+            self.state.data["selected"] = value
+            self.mark_needs_paint()
 
     @property
     def checked(self) -> bool:
@@ -211,24 +238,24 @@ class ElementMixin:
         The Effect re-evaluates on change and marks only this element dirty --
         the fine-grained half of fine-grained reactivity.
         """
-        text_t = self._template
-        value_t = self._value_template
-        dynamic_text = text_t is not None and not text_t.is_static
-        dynamic_value = value_t is not None and not value_t.is_static
-        if not (dynamic_text or dynamic_value):
+        bound: list[tuple[str, Template]] = [
+            (name, tpl)
+            for name, tpl in (
+                ("_text", self._template),
+                ("_value", self._value_template),
+                ("_supporting", self._supporting_template),
+            )
+            if tpl is not None and not tpl.is_static
+        ]
+        if not bound:
             return
 
         def refresh() -> None:
             changed = False
-            if dynamic_text and text_t is not None:
-                rendered = text_t.render(context)
-                if rendered != self._text:
-                    self._text = rendered
-                    changed = True
-            if dynamic_value and value_t is not None:
-                rendered = value_t.render(context)
-                if rendered != self._value:
-                    self._value = rendered
+            for attr, tpl in bound:
+                rendered = tpl.render(context)
+                if rendered != getattr(self, attr):
+                    setattr(self, attr, rendered)
                     changed = True
             if changed:
                 self.mark_needs_layout()

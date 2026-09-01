@@ -333,3 +333,111 @@ def test_focus_ring_baseline(render_scene, assert_golden) -> None:
     app.dispatcher.drain()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("focus_ring", np.asarray(engine.canvas.draw()))
+
+
+def test_navigation_baseline(render_scene, assert_golden) -> None:
+    """Wave 2 in one frame: rail, app bar, tabs, progress, segments, lists."""
+    from pycopper import Signal
+
+    view = {
+        "id": "root",
+        "widget": "Row",
+        "style": {"background": "surface", "width": "expand", "height": "expand"},
+        "children": [
+            {
+                "id": "rail",
+                "widget": "NavigationRail",
+                "value": "{{ dest.get() }}",
+                "style": {"spacing": 8, "padding": [0, 12]},
+                "children": [
+                    {
+                        "id": "r_home",
+                        "widget": "NavItem",
+                        "text": "home",
+                        "supporting_text": "Home",
+                    },
+                    {
+                        "id": "r_search",
+                        "widget": "NavItem",
+                        "text": "search",
+                        "supporting_text": "Search",
+                    },
+                    {
+                        "id": "r_set",
+                        "widget": "NavItem",
+                        "text": "settings",
+                        "supporting_text": "Settings",
+                    },
+                ],
+            },
+            {
+                "id": "main",
+                "widget": "Column",
+                "style": {"width": "expand"},
+                "children": [
+                    {
+                        "id": "bar",
+                        "widget": "TopAppBar",
+                        "text": "Wave 2",
+                        "style": {"width": "expand"},
+                    },
+                    {
+                        "id": "tabs",
+                        "widget": "Tabs",
+                        "value": "{{ tab.get() }}",
+                        "style": {"width": "expand"},
+                        "children": [
+                            {"id": "t1", "widget": "Tab", "text": "Overview"},
+                            {"id": "t2", "widget": "Tab", "text": "Details"},
+                            {"id": "t3", "widget": "Tab", "text": "History"},
+                        ],
+                    },
+                    {
+                        "id": "prog",
+                        "widget": "LinearProgress",
+                        "value": "0.62",
+                        "style": {"width": "expand"},
+                    },
+                    {
+                        "id": "body",
+                        "widget": "Column",
+                        "style": {"padding": 16, "spacing": 14, "width": "expand"},
+                        "children": [
+                            {
+                                "id": "seg",
+                                "widget": "SegmentedButton",
+                                "value": "{{ seg.get() }}",
+                                "children": [
+                                    {"id": "s1", "widget": "Segment", "text": "Day"},
+                                    {"id": "s2", "widget": "Segment", "text": "Week"},
+                                    {"id": "s3", "widget": "Segment", "text": "Month"},
+                                ],
+                            },
+                            {
+                                "id": "li1",
+                                "widget": "ListItem",
+                                "text": "Single line item",
+                                "style": {"width": "expand"},
+                            },
+                            {"id": "dv", "widget": "Divider", "style": {"width": "expand"}},
+                            {
+                                "id": "li2",
+                                "widget": "ListItem",
+                                "text": "Two line item",
+                                "supporting_text": "With supporting text beneath",
+                                "style": {"width": "expand"},
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=680, height=400, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(dest=Signal("r_search"), tab=Signal("t2"), seg=Signal("s2"))
+    app.attach(engine)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("navigation", np.asarray(engine.canvas.draw()))
