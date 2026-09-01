@@ -278,7 +278,10 @@ class StyleSpec(_Frozen):
 
 
 class WidgetSpec(_Frozen):
-    id: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")
+    #: A dot separates include scopes: a fragment pulled in as `delete_confirm`
+    #: has its inner `heading` become `delete_confirm.heading`, so the same
+    #: fragment can be included twice without colliding.
+    id: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$")
     widget: WidgetKind
     style: StyleSpec = StyleSpec()
     text: str | None = None

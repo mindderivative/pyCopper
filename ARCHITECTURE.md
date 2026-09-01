@@ -713,6 +713,66 @@ nothing-focused state an application starts in. Focus order is document order,
 and `FOCUSABLE_KINDS` makes every interactive control reachable whether or not
 the view file wired a handler.
 
+### 5.1.1 View composition — `spec/include.py`
+
+A `source:` key pulls a subtree in from another file:
+
+```yaml
+# parts/confirm.yaml
+params: [title, open]
+id: dialog
+widget: Card
+open: "{{ open }}"
+children:
+  - {id: heading, widget: Text, text: "{{ title }}"}
+
+# call site
+overlays:
+  - id: delete_confirm
+    source: parts/confirm.yaml
+    with: {title: "Delete file?", open: "{{ show.get() }}"}
+```
+
+**Resolution happens on the decoded YAML, before validation.** A resolved
+include is therefore indistinguishable from inline content: the spec models,
+reconciliation, and the renderer never learn a file boundary existed. That is
+why this feature needed no changes below the loader.
+
+**Parameters are the interface; there is no merge.** A `source:` node accepts
+only `id:` and `with:`. The alternative — letting the call site override keys —
+needs precedence rules nobody can predict ("does a local `style:` replace the
+fragment's or merge into it?"). The cost is real and worth stating: *everything*
+a call site needs to control must be a declared parameter, including `open:`.
+In exchange there is nothing to memorise.
+
+**Parameters substitute textually**, which is what makes them compose with
+bindings. Passing `title: "Delete?"` leaves static text; passing
+`title: "{{ user.get() }}"` leaves a live template evaluated against the
+application context. No separate reactive path exists or is needed.
+
+Four things this had to get right:
+
+- **Id namespacing.** Reconciliation matches on `(id, widget)`, so including a
+  fragment twice would otherwise produce duplicate ids — `find()` would return
+  the wrong element and hot reload's state preservation would silently break.
+  Ids inside a fragment are qualified with the call-site id
+  (`delete_confirm.heading`), and `.` is reserved in the id pattern for exactly
+  this.
+- **Hot reload watches the whole graph.** `App.sources` records every file
+  touched, and **a change to any of them reloads the entry view** — not the
+  file that changed, which is not a view on its own and would fail on its
+  `params:` block.
+- **Error provenance.** Failures report the include chain
+  (`a.yaml -> b.yaml -> a.yaml`), not just a line number.
+- **Cycles and path confinement.** A cycle is refused with its chain, and an
+  include may not escape the view directory — view files are untrusted input.
+
+Deliberately absent: conditional includes, computed paths, and loops. This is
+where a view format starts becoming a programming language. In particular
+**includes are not the way to repeat a row a hundred times** — that needs a
+`repeat:` construct with stable identity for reconciliation, which is a
+separate and larger decision.
+
 ### 5.13 The overlay layer — `runtime/overlay.py`
 
 Six M3 components — Dialog, Menu, Tooltip, Snackbar, and both Sheet types —

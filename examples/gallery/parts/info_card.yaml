@@ -1,0 +1,14 @@
+# The elevated card at the top of the gallery.
+params: [body]
+id: card
+widget: Card
+style:
+  height: 92
+  variant: elevated
+  corner_radius: 16
+  padding: 16
+children:
+  - id: text
+    widget: Text
+    text: "{{ body }}"
+    style: {color: on_surface_variant, font_size: 14}

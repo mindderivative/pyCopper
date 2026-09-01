@@ -49,6 +49,9 @@ class App:
         self.palette = Palette(self.theme)
 
         self._source = Path(view) if isinstance(view, str | Path) else None
+        #: Every file the view was assembled from, including fragments pulled
+        #: in with `source:`. Hot reload watches all of them.
+        self.sources: set[Path] = set()
         self.view = self._load(view)
         self.root = build_element(self.view.root)
         self.layout_owner = LayoutOwner()
@@ -71,13 +74,13 @@ class App:
         self.reload_errors: list[str] = []
         self._mounted = False
 
-    @staticmethod
-    def _load(view: str | Path | ViewSpec | dict[str, Any]) -> ViewSpec:
+    def _load(self, view: str | Path | ViewSpec | dict[str, Any]) -> ViewSpec:
         if isinstance(view, ViewSpec):
             return view
         if isinstance(view, dict):
             return parse_view(view)
-        return load_view(view)
+        self.sources = set()
+        return load_view(view, sources=self.sources)
 
     # -------------------------------------------------------------- wiring
 
@@ -117,8 +120,13 @@ class App:
         """
         if self._source is None:
             raise ValueError("cannot watch a view that was not loaded from a file")
-        if self.reloader is None:
-            self.reloader = HotReloader([self._source])
+        # Watch the whole include graph: editing a fragment must reload the
+        # view, or `source:` would silently break the best feature there is.
+        watched = sorted(self.sources) or [self._source]
+        if self.reloader is None or set(self.reloader.paths) != {p.resolve() for p in watched}:
+            if self.reloader is not None:
+                self.reloader.stop()
+            self.reloader = HotReloader(watched)
         self.reloader.start()
         return self.reloader
 
@@ -134,7 +142,11 @@ class App:
         """
         if self.reloader is None:
             return 0
-        events = self.reloader.apply(lambda p: self.reload(p))
+        # Any file in the include graph changing reloads the ENTRY view, not
+        # the file that changed: a fragment is not a view on its own, and
+        # loading one directly would fail on its `params:` block.
+        entry = self._source
+        events = self.reloader.apply(lambda _p: self.reload(entry) if entry else None)
         for event in events:
             if event.error:
                 self.reload_errors.append(event.error)

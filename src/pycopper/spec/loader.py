@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from .include import IncludeError, resolve_includes
 from .models import ViewSpec, WidgetSpec
 
 __all__ = ["SpecError", "load_view", "parse_view"]
@@ -42,8 +43,12 @@ def parse_view(data: Any, *, origin: str = "<string>") -> ViewSpec:
         raise SpecError(_format(exc, origin)) from exc
 
 
-def load_view(path: str | Path) -> ViewSpec:
-    """Read and validate a YAML view file."""
+def load_view(path: str | Path, *, sources: set[Path] | None = None) -> ViewSpec:
+    """Read and validate a YAML view file, expanding any ``source:`` includes.
+
+    Every file touched is added to *sources* when given, which is how hot
+    reload watches the whole include graph rather than only the entry file.
+    """
     p = Path(path)
     try:
         text = p.read_text(encoding="utf-8")
@@ -55,6 +60,13 @@ def load_view(path: str | Path) -> ViewSpec:
         raise SpecError(f"{p}: invalid YAML: {exc}") from exc
     if data is None:
         raise SpecError(f"{p}: file is empty")
+
+    touched = sources if sources is not None else set()
+    touched.add(p.resolve())
+    try:
+        data = resolve_includes(data, base=p.parent, root=p.parent, sources=touched)
+    except IncludeError as exc:
+        raise SpecError(f"{p}: {exc}") from exc
     return parse_view(data, origin=str(p))
 
 

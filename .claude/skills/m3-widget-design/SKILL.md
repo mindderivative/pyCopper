@@ -183,6 +183,12 @@ widget must do: add its kind to `FOCUSABLE_KINDS` in `runtime/events.py` if it
 is interactive, and override `effective_radii` if it computes its own corner
 radius at paint time, or the ring will be the wrong shape.
 
+**Views compose across files.** A `source:` key pulls a subtree in from another
+file; the fragment declares `params:` and the call site passes `with:`. A
+`source:` node accepts only `id:` and `with:` — there is no key merging, so
+anything configurable must be a declared parameter. Ids inside a fragment are
+namespaced by the call-site id. See ARCHITECTURE.md §5.1.1.
+
 **Overlays are available.** Anything that must float above the tree —  dialog,
 menu, tooltip, snackbar, sheet — is declared in the view's top-level
 `overlays:` list, never as a child of what opens it. `open:` is a templated

@@ -1,0 +1,26 @@
+# A reusable modal dialog.
+#
+# Every configurable thing is a declared parameter -- including `open`. A call
+# site may pass only `id:` and `with:`, so anything it needs to control has to
+# be named here. That is the cost of having no merge rules, and the reason the
+# interface is explicit.
+params: [title, body, open]
+id: dialog
+widget: Card
+open: "{{ open }}"
+style:
+  width: 320
+  height: 170
+  placement: center
+  modal: true
+  scrim: true
+  variant: elevated
+  corner_radius: 28
+  padding: 24
+children:
+  - id: col
+    widget: Column
+    style: {spacing: 10}
+    children:
+      - {id: heading, widget: Text, text: "{{ title }}", style: {font_size: 20}}
+      - {id: message, widget: Text, text: "{{ body }}", style: {color: on_surface_variant}}

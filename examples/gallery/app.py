@@ -22,12 +22,19 @@ app = App(
 
 clicks = Signal(0, name="clicks")
 dark = Signal(True, name="dark")
-app.expose(clicks=clicks, dark=dark)
+confirming = Signal(False, name="confirming")
+app.expose(clicks=clicks, dark=dark, confirming=confirming)
 
 
 @app.handler
 def confirm(event) -> None:
     clicks.update(lambda n: n + 1)
+
+
+@app.handler
+def ask(event) -> None:
+    """Opens the dialog defined in parts/confirm_dialog.yaml."""
+    confirming.set(True)
 
 
 @app.handler
