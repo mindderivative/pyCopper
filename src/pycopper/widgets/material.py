@@ -6,8 +6,13 @@ maps 1:1 (ARCHITECTURE.md 7). Colours are palette **tokens**, never literals,
 so a theme switch stays a single buffer upload.
 
 Where pyCopper cannot express part of a spec, the class says so rather than
-quietly approximating -- notably the 48dp minimum touch target, which needs a
-hit rect larger than the painted rect and has nowhere to live yet.
+quietly approximating.
+
+**pyCopper is a desktop framework and does not target touch.** M3's 48x48dp
+minimum touch target is a finger-precision requirement; a mouse pointer is
+precise to the pixel, so hit rects deliberately match the painted control.
+Desktop affordances M3 treats as secondary -- hover, focus rings, keyboard
+traversal, right-click -- matter correspondingly more.
 """
 
 from __future__ import annotations
@@ -36,12 +41,6 @@ __all__ = [
 HOVER: Final = 0.08
 FOCUS: Final = 0.10
 PRESS: Final = 0.10
-
-#: M3 specifies a 48x48dp minimum touch target for every interactive control.
-#: pyCopper cannot yet separate the hit rect from the painted rect, so controls
-#: smaller than this (checkbox 18dp, radio 20dp) are hit-tested at their visual
-#: size. Recorded here so it is a known gap, not an oversight.
-MIN_TOUCH_TARGET: Final = 48.0
 
 
 def _state_alpha(element: Any) -> float:
@@ -218,8 +217,8 @@ class DividerElement(_StyledMixin, Padding):
 class CheckboxElement(_StyledMixin, Padding):
     """M3 Checkbox: 18dp box, 2dp radius, checkmark when selected.
 
-    The 48dp touch target M3 requires is not expressible yet, so hit testing
-    uses the 18dp visual (see MIN_TOUCH_TARGET).
+    Hit-tested at its 18dp visual size: M3's 48dp touch target is a
+    finger-precision rule and does not apply to a pointer.
     """
 
     BOX: Final = 18.0
@@ -444,10 +443,7 @@ class ChipElement(_StyledMixin, Padding):
 
 
 class IconButtonElement(_StyledMixin, Padding):
-    """M3 Icon Button: 40dp container, 24dp icon, full radius, four variants.
-
-    The 48dp touch target is not expressible yet (see MIN_TOUCH_TARGET).
-    """
+    """M3 Icon Button: 40dp container, 24dp icon, full radius, four variants."""
 
     SIZE: Final = 40.0
 

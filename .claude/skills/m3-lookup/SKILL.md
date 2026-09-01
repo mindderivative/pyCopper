@@ -69,10 +69,11 @@ reflects when the file distinguishes them.
 Report as:
 
 - **Variants** -- the named sub-types (Filled / Outlined / Elevated / Text).
-- **Anatomy & dimensions** -- sizes, touch targets, corner radii, **in the
-  source's own dp**. Note where a spec gives both a visual size and a larger
-  minimum touch target (buttons: 40dp container, 48x48dp target) -- that gap
-  is a real design constraint, not a rounding artefact.
+- **Anatomy & dimensions** -- sizes, corner radii, **in the source's own dp**.
+  Report touch targets where a spec gives them, but flag them as
+  **mobile-only**: pyCopper is a desktop, pointer-only framework and
+  deliberately does not implement M3's 48x48dp minimum (`ARCHITECTURE.md`
+  §1.2.1). The same applies to touch ripple and the compact breakpoint.
 - **Colour-role tokens** -- the `md.sys.color.*` role names the spec assigns,
   never invented hex values. M3 has no fixed hex; real values derive from a
   seed through HCT.

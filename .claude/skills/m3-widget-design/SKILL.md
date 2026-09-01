@@ -61,10 +61,16 @@ what pyCopper does, and why they differ.
   extra box above the container, tinted with the *content* role token, at the
   state opacity. Follow it rather than swapping to a different container
   colour per state.
-- **Touch targets.** M3's 48x48dp minimum applies to hit testing, not to the
-  visible container. A 40dp button with a 48dp target needs the hit rect to
-  exceed the painted rect -- pyCopper does not model that split yet, so raise
-  it as a real design question rather than silently painting a 48dp button.
+- **Ignore touch-specific rules.** pyCopper is a DESKTOP framework with no
+  touch support (`ARCHITECTURE.md` §1.2.1). M3 is written mobile-first, so part
+  of translating it is knowing which rules are about fingers. The 48x48dp
+  minimum touch target does **not** apply -- a pointer is pixel-precise, so hit
+  rects match the painted control. Neither does touch-origin ripple, nor the
+  compact (<600dp) breakpoint. Do not record these as gaps.
+- **Desktop affordances rank higher.** Hover is a first-class state, not a
+  nicety. Focus rings, keyboard traversal, right-click, cursor shape, and
+  visible scrollbars have no mobile analogue and matter more here than they do
+  in the M3 source material.
 - **Elevation is approximated.** M3 elevation is tonal surface shift *plus*
   shadow; pyCopper currently has only `ShadowSpec` (blur, offset, opacity).
   Pick a shadow that reads like the right level and say that the tonal half is
@@ -224,13 +230,11 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 - **Scrolling / viewports.** No scroll element; `state.scroll` exists but
   nothing consumes it.
-- **Separate hit and paint rects**, so M3's 48dp minimum touch target on a
-  smaller visible container cannot be expressed. Checkbox (18dp) and Radio
-  (20dp) are hit-tested at their visual size; see `MIN_TOUCH_TARGET`.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
 - **Focus ring rendering.** Focus is tracked and dispatched, but nothing draws
-  M3's 2dp high-contrast indicator.
+  M3's 2dp high-contrast indicator. On desktop this is a *significant* gap, not
+  a cosmetic one -- keyboard traversal is a primary input path.
 - **Motion.** No animation or transition system; every state change is instant
   — a Switch thumb jumps rather than sliding.
 - **An overlay/portal layer.** Dialog, Menu, Tooltip, Snackbar and both Sheet

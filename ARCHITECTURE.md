@@ -23,12 +23,43 @@ pyCopper is a **distributable** desktop GUI framework: users `pip install pycopp
 
 | Non-goal | Rationale |
 |---|---|
-| Web, mobile, or embedded targets | Desktop-only keeps the windowing and input model coherent. |
+| Web, mobile, or embedded targets | **Desktop-only, and not merely for now** — see §1.2.1. |
+| Touch input | No touch, stylus, or gesture handling. Pointer, keyboard, and scroll wheel only. |
 | Complex text shaping (Arabic, Devanagari, CJK vertical) | Requires HarfBuzz; a seam is designed in, see §5.7. |
 | Accessibility tree (AT-SPI / UIA / NSAccessibility) | Large, platform-specific. Architecturally reserved, not built. |
 | CSS compatibility | The style vocabulary is MD3-shaped, not CSS-shaped. |
 | Hot-reload of Python application logic | YAML reload only. Python reload is a different, much harder problem. |
 | Multi-window | Single window in v1; the engine is written so the canvas is not a singleton. |
+
+#### 1.2.1 What "desktop-only" changes
+
+This is a design stance, not a deferral, and it settles a class of questions
+that would otherwise be argued repeatedly.
+
+**M3 is written mobile-first.** Applying it faithfully to a desktop framework
+means knowing which of its rules are about *fingers* and which are about
+*design*. Rules that do not apply here:
+
+- **The 48×48dp minimum touch target.** A finger-precision requirement. A mouse
+  pointer is precise to the pixel, so hit rects match the painted control and an
+  18dp checkbox is hit-tested at 18dp. This is deliberate, not a limitation.
+- **Touch ripple radiating from the contact point.** State layers still apply;
+  the ripple's touch-origin behaviour does not.
+- **Compact breakpoints (<600dp).** Desktop windows live in M3's Expanded,
+  Large, and Extra Large classes. Window *resizing* still matters; phone-shaped
+  layout does not.
+- **Bottom-anchored navigation.** Navigation Bar and Bottom App Bar are
+  explicitly mobile patterns in M3's own catalogue. Navigation Rail and
+  Navigation Drawer are their desktop counterparts and take priority.
+
+Correspondingly, affordances M3 treats as secondary are **primary** here, and
+should be built before mobile-shaped components:
+
+- **Hover** is a first-class state, not a progressive enhancement.
+- **Focus rings and keyboard traversal** are how a desktop application is
+  navigated — currently the largest real gap.
+- **Right-click and context menus**, **cursor shape**, **visible scrollbars**,
+  and **mouse text selection** are desktop conventions with no mobile analogue.
 
 ### 1.3 Design principles
 
@@ -694,11 +725,10 @@ interactive component behaves identically rather than each reimplementing it.
 
 Two gaps these components inherit, both stated rather than approximated:
 
-- **The 48dp minimum touch target cannot be expressed.** M3 requires it for
-  every interactive control, but pyCopper has no way to make a hit rect larger
-  than the painted rect, so an 18dp checkbox is hit-tested at 18dp. Recorded as
-  `MIN_TOUCH_TARGET` in the module.
 - **No motion.** A switch thumb jumps between positions; M3 animates it.
+
+M3's 48dp minimum touch target is deliberately **not** implemented: it is a
+finger-precision rule and pyCopper is pointer-only (§1.2.1).
 
 ---
 
