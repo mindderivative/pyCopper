@@ -275,7 +275,12 @@ def test_selected_filter_chip_is_wider() -> None:
 
 @pytest.mark.parametrize("kind", ["Checkbox", "Radio", "Switch", "IconButton", "Fab"])
 def test_hover_adds_a_state_layer(kind: str) -> None:
-    """M3 §0: hover is an 8% overlay, not a different container colour."""
+    """M3 §0: hover is an 8% overlay, not a different container colour.
+
+    The layer cross-fades in, so the frame on which the hover is noticed still
+    shows nothing -- the clock has to advance before there is anything to
+    assert. Driving time by hand keeps that deterministic.
+    """
     view = {
         "name": "root",
         "widget": "Column",
@@ -284,12 +289,17 @@ def test_hover_adds_a_state_layer(kind: str) -> None:
         ],
     }
     app = App(view, theme=Theme(dark=True))
+    now = 0.0
+    app.clock = lambda: now
     app.mount()
     base = DisplayList()
     app.paint(base)
     w = app.root.find("w")
     w.state.hovered = True
     w.mark_needs_paint()
+
+    app.paint(DisplayList())  # notices the hover and starts the fade
+    now = 0.2  # past the 100ms state-layer duration
     hovered = DisplayList()
     app.paint(hovered)
     assert len(hovered) == len(base) + 1

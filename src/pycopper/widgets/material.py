@@ -43,15 +43,33 @@ FOCUS: Final = 0.10
 PRESS: Final = 0.10
 
 
+#: State layers cross-fade rather than snapping. **Not sourced** -- M3 gives no
+#: duration for a state layer, and the "begin and end on screen" pair (Standard,
+#: 300ms) is about elements arriving, not an in-place emphasis change. 100ms is
+#: chosen because a hover response slower than that reads as lag.
+STATE_LAYER_MOTION: Final = "short2"
+STATE_LAYER_CURVE: Final = "standard"
+
+
 def _state_alpha(element: Any) -> float:
-    """State-layer opacity for the element's current interaction state."""
+    """State-layer opacity for the element's current interaction state.
+
+    Animated, so a hover fades in and out instead of blinking. Every component
+    that emits a state layer gets this from one place -- which is the whole
+    reason `_emit_state_layer` is shared.
+    """
     if element.state.pressed:
-        return PRESS
-    if element.state.focused:
-        return FOCUS
-    if element.state.hovered:
-        return HOVER
-    return 0.0
+        target = PRESS
+    elif element.state.focused:
+        target = FOCUS
+    elif element.state.hovered:
+        target = HOVER
+    else:
+        target = 0.0
+    alpha: float = element.animated(
+        "state_layer", target, duration=STATE_LAYER_MOTION, curve=STATE_LAYER_CURVE
+    )
+    return alpha
 
 
 def _emit_state_layer(
@@ -63,7 +81,9 @@ def _emit_state_layer(
 ) -> None:
     """M3 state layer: a tinted overlay above the container, below the content."""
     alpha = _state_alpha(element)
-    if alpha <= 0.0:
+    if alpha <= 0.001:
+        # Below this the layer is invisible; emitting it would cost an instance
+        # a frame for nothing, and the fade-out has effectively landed.
         return
     dpr = ctx.pixel_ratio
     ctx.display_list.add_box(

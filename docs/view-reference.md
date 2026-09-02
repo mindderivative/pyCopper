@@ -336,11 +336,11 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 
 Stated plainly so you can design around it:
 
-- **Motion on most components.** The animation system exists — a `Switch`
-  slides and indeterminate progress runs — but most transitions are not wired
-  to it yet: a carousel snaps without travel, overlays appear without a fade,
-  and state layers change instantly. Set `reduce_motion` in `Settings` to
-  disable what does animate.
+- **Motion on some components.** Overlays fade, state layers cross-fade, the
+  `Switch` slides, and indeterminate progress runs. Not yet animated: a
+  carousel's snap has no travel, and selection controls other than the switch
+  change instantly. Set `reduce_motion` in `Settings` to make everything
+  arrive at once.
 - **A theme engine / stylesheet.** `classes` is a reserved selector target with
   no consumer yet.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% opacities have

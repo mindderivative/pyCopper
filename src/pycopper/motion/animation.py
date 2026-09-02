@@ -100,13 +100,29 @@ class Animation:
             self.on_change()
         return not self.done
 
-    def retarget(self, end: float) -> None:
-        """Aim at a new end, starting from the value right now."""
+    def retarget(
+        self,
+        end: float,
+        *,
+        duration: str | float | None = None,
+        curve: str | Curve | None = None,
+    ) -> None:
+        """Aim at a new end, starting from the value right now.
+
+        Timing may change with direction, because M3's own pairs do: entering
+        the screen is Emphasized decelerate over 400ms, leaving it is
+        Emphasized accelerate over 200ms. A thing arrives gently and departs
+        briskly.
+        """
         if end == self.end:
             return
         self.start = self.value
         self.end = end
         self._elapsed = 0.0
+        if duration is not None:
+            self._duration = max(0.0, _resolve_duration(duration))
+        if curve is not None:
+            self._curve = _resolve_curve(curve)
 
     def finish(self) -> None:
         """Jump to the end. Used when motion is disabled."""

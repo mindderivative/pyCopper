@@ -336,20 +336,13 @@ class ButtonElement(ContainerElement):
                 clip_radii=ctx.clip_radii,
             )
 
-        # MD3 state layer: over the container, under the label.
-        if self.state.pressed or self.state.hovered or self.state.focused:
-            alpha = 0.10 if (self.state.pressed or self.state.focused) else 0.08
-            ctx.display_list.add_box(
-                absolute.x * dpr,
-                absolute.y * dpr,
-                size.width * dpr,
-                size.height * dpr,
-                token=token,
-                color=(1.0, 1.0, 1.0, alpha),
-                radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
-                clip=ctx.clip,
-                clip_radii=ctx.clip_radii,
-            )
+        # MD3 state layer: over the container, under the label. Shared with
+        # every other component rather than reimplemented here -- Button had
+        # its own copy, which is why it alone did not cross-fade when state
+        # layers were animated.
+        from .material import _emit_state_layer
+
+        _emit_state_layer(ctx, self, absolute, token, radii)
 
         if self._text.strip():
             font = style.font_size

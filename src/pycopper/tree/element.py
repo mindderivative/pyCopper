@@ -223,7 +223,9 @@ class ElementMixin:
             self.ticker.add(animation)
             return animation.value
         if animation.end != target:
-            animation.retarget(target)
+            # Timing is passed through on every retarget, so a caller can give
+            # a transition different enter and exit pairs -- which M3 does.
+            animation.retarget(target, duration=duration, curve=curve)
             self.ticker.add(animation)
         return animation.value
 

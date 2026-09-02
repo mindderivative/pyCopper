@@ -72,7 +72,7 @@ class App:
         self._last_tick: float | None = None
 
         self.overlays = OverlayHost()
-        self.overlays.build(self.view.overlays, text_engine=self.text)
+        self.overlays.build(self.view.overlays, text_engine=self.text, ticker=self.motion)
 
         self.dispatcher = EventDispatcher()
         self.dispatcher.root = self.root

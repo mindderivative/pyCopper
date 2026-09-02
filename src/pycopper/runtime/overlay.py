@@ -33,6 +33,15 @@ SCRIM_OPACITY: Final = 0.32
 #: Keep an overlay this far inside the window edge.
 MARGIN: Final = 8.0
 
+#: M3's own easing/duration pairs, from the "suggested pairs" table:
+#: "Emphasized decelerate | 400ms | Enter the screen" and
+#: "Emphasized accelerate | 200ms | Exit the screen". A thing arrives gently
+#: and departs briskly, which is why the two are not symmetric.
+ENTER_DURATION: Final = "medium4"
+ENTER_CURVE: Final = "emphasized_decelerate"
+EXIT_DURATION: Final = "short4"
+EXIT_CURVE: Final = "emphasized_accelerate"
+
 
 @dataclass(slots=True)
 class OverlayEntry:
@@ -45,6 +54,24 @@ class OverlayEntry:
     def spec(self) -> WidgetSpec:
         spec: WidgetSpec = self.element.spec
         return spec
+
+    @property
+    def showing(self) -> bool:
+        """Whether the application wants this overlay up."""
+        return bool(self.element.is_open)
+
+    @property
+    def opacity(self) -> float:
+        """Fade level, advanced by the element's own animation clock."""
+        target = 1.0 if self.showing else 0.0
+        entering = target > 0.0
+        value: float = self.element.animated(
+            "overlay_opacity",
+            target,
+            duration=ENTER_DURATION if entering else EXIT_DURATION,
+            curve=ENTER_CURVE if entering else EXIT_CURVE,
+        )
+        return value
 
     @property
     def visible(self) -> bool:
@@ -78,6 +105,23 @@ class OverlayEntry:
         return Rect.from_offset_size(self.origin, self.element.size)
 
 
+def _fade(display_list: DisplayList, start: int, opacity: float) -> None:
+    """Scale the alpha of everything an overlay just emitted.
+
+    Applied to the display-list slice rather than threaded through the paint
+    context, because that keeps subtree opacity in one place instead of
+    obliging every emit site to multiply. The display list is a numpy
+    structured array, so this is a single vectorised pass over a view -- and it
+    catches cached subtrees spliced in at full alpha, which a context flag
+    would have missed.
+    """
+    view = display_list.view[start:]
+    if len(view) == 0:
+        return
+    view["fill"][:, 3] *= opacity
+    view["border"][:, 3] *= opacity
+
+
 class OverlayHost:
     """Owns every overlay: layout, paint, hit testing, and dismissal."""
 
@@ -91,7 +135,13 @@ class OverlayHost:
 
     # ------------------------------------------------------------- lifecycle
 
-    def build(self, specs: tuple[WidgetSpec, ...], *, text_engine: Any = None) -> None:
+    def build(
+        self,
+        specs: tuple[WidgetSpec, ...],
+        *,
+        text_engine: Any = None,
+        ticker: Any = None,
+    ) -> None:
         from ..widgets import build_element
 
         self.entries = []
@@ -99,6 +149,10 @@ class OverlayHost:
             element = build_element(spec)
             if text_engine is not None:
                 element.set_text_engine(text_engine)
+            # Without this an overlay animates against the process-wide default
+            # ticker, which the App never advances -- so its fade never moved.
+            if ticker is not None:
+                element.set_ticker(ticker)
             self.entries.append(OverlayEntry(element))
         self._dismissed.clear()
 
@@ -123,8 +177,20 @@ class OverlayHost:
     # -------------------------------------------------------------- visibility
 
     def visible(self) -> list[OverlayEntry]:
-        """Visible overlays, bottom to top. Declaration order is z-order."""
-        return [e for e in self.entries if e.visible and e.key not in self._dismissed]
+        """Overlays that are **interactive**, bottom to top.
+
+        Deliberately excludes one that is fading out. A dialog the user has
+        just dismissed must stop swallowing clicks the moment it is dismissed,
+        not 200ms later -- so hit testing, modality and dismissal all read this
+        list, while layout and paint read `rendered()`.
+        """
+        return [e for e in self.entries if e.showing and e.key not in self._dismissed]
+
+    def rendered(self) -> list[OverlayEntry]:
+        """Overlays that must be **drawn**: the interactive ones, plus any
+        still fading out. Declaration order is z-order."""
+        live = {id(e) for e in self.visible()}
+        return [e for e in self.entries if id(e) in live or e.opacity > 0.0]
 
     @property
     def has_modal(self) -> bool:
@@ -159,7 +225,7 @@ class OverlayHost:
     def layout(self, window: Size, root: Any) -> None:
         """Size and place every visible overlay against the window."""
         self.sync_dismissals()
-        for entry in self.visible():
+        for entry in self.rendered():
             element = entry.element
             element.layout(Constraints.loose(window))
             entry.origin = self._place(entry, window, root)
@@ -213,7 +279,11 @@ class OverlayHost:
         from ..tree.element import PaintContext
 
         painted = 0
-        for entry in self.visible():
+        for entry in self.rendered():
+            opacity = entry.opacity
+            if opacity <= 0.0:
+                continue
+            start = len(ctx.display_list)
             if entry.scrim:
                 self._paint_scrim(ctx, palette, window)
             child_ctx = PaintContext(
@@ -224,6 +294,8 @@ class OverlayHost:
             )
             entry.element.offset = entry.origin
             entry.element.paint(child_ctx, OFFSET_ZERO)
+            if opacity < 1.0:
+                _fade(ctx.display_list, start, opacity)
             painted += 1
         return painted
 

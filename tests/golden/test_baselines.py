@@ -1021,3 +1021,68 @@ def test_motion_baseline(render_scene, assert_golden) -> None:
     clock["t"] = 0.030
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("motion", np.asarray(engine.canvas.draw()))
+
+
+def test_transitions_baseline(render_scene, assert_golden) -> None:
+    """A dialog caught part-way through its entrance, over a partial scrim.
+
+    Sampled 60ms into the 400ms emphasized-decelerate entrance. The scrim is
+    visibly weaker than its settled 32%, which is the point: the fade is
+    applied to the whole slice the overlay emitted, host-drawn scrim included.
+    The button behind it is mid hover cross-fade at the same moment.
+    """
+    from pycopper import Signal
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 12},
+            "children": [
+                {
+                    "name": "hovered",
+                    "widget": "Button",
+                    "text": "Hovered",
+                    "style": {"width": 150, "height": 40, "variant": "filled_tonal"},
+                },
+                {
+                    "name": "li",
+                    "widget": "ListItem",
+                    "text": "Background content",
+                    "supporting_text": "Dimmed by a partial scrim",
+                    "style": {"width": "expand"},
+                },
+            ],
+        },
+        "overlays": [
+            {
+                "name": "dlg",
+                "widget": "Dialog",
+                "text": "Delete this item?",
+                "supporting_text": "Caught mid-entrance.",
+                "open": "{{ show.get() }}",
+                "style": {"modal": True, "scrim": True, "width": 300},
+            }
+        ],
+    }
+    show = Signal(False)
+    _, engine = render_scene(
+        lambda dl: None, width=420, height=280, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(show=show)
+    app.attach(engine)
+
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
+    app.mount()
+    app.paint(DisplayList())  # resting frame establishes both animations
+
+    show.set(True)
+    app.root.find("hovered").state.hovered = True
+    app.root.find("hovered").mark_needs_paint()
+    app.paint(DisplayList())  # notices both changes; still at rest
+
+    clock["t"] = 0.060  # 60ms into a 400ms entrance
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("transitions", np.asarray(engine.canvas.draw()))

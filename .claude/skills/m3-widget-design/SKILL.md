@@ -57,10 +57,11 @@ what pyCopper does, and why they differ.
   becomes a number or `[tl, tr, br, bl]`. For "full", use half the height.
   Per-corner radii are supported all the way through to the shader.
 - **State layers are the established pattern.** M3's hover 8% / focus 10% /
-  press 10% / drag 16% overlays are how `ButtonElement` already works: emit an
-  extra box above the container, tinted with the *content* role token, at the
-  state opacity. Follow it rather than swapping to a different container
-  colour per state.
+  press 10% / drag 16% overlays. Call the shared `_emit_state_layer` rather
+  than emitting the box yourself -- it cross-fades between states, so a private
+  copy silently misses the animation (which is exactly what happened to
+  `Button`). Follow it rather than swapping to a different container colour per
+  state.
 - **Ignore touch-specific rules.** pyCopper is a DESKTOP framework with no
   touch support (`ARCHITECTURE.md` §1.2.1). M3 is written mobile-first, so part
   of translating it is knowing which rules are about fingers. The 48x48dp
@@ -313,9 +314,9 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
-- **Motion on most components.** The system exists and the `Switch` and
-  indeterminate progress use it, but most transitions are not wired to it yet:
-  overlays appear without a fade, state layers change instantly, and a carousel
-  snaps without travel. Wiring one up is usually a small change — see the
-  "Motion exists" note above.
+- **Motion on some components.** Overlay fades, state-layer cross-fades, the
+  `Switch`, and indeterminate progress use it. A carousel's snap still has no
+  travel, and that one is not small: item widths depend on scroll position, so
+  a travelling carousel relayouts every frame. Wiring up a simple transition
+  is small — see the "Motion exists" note above.
 - **Tonal elevation.** Shadows only (see Step 2).

@@ -858,6 +858,33 @@ Dismissals are tracked separately from the `open:` binding and reconciled each
 frame, so an overlay closed by clicking outside can still be reopened by its
 signal — otherwise the dismissal would outlive the state change.
 
+#### 5.13.2 Fading, and why rendered ≠ visible
+
+Overlays enter and leave on M3's own pairs: **Emphasized decelerate over 400ms
+to enter, Emphasized accelerate over 200ms to exit**, straight from the
+suggested-pairs table. A thing arrives gently and departs briskly, which is why
+the two are not symmetric.
+
+Fading out forces a distinction the host did not previously need:
+
+| Set | Contains | Used by |
+|---|---|---|
+| `visible()` | overlays the application wants up | hit testing, modality, dismissal |
+| `rendered()` | those, **plus any still fading out** | layout and paint |
+
+A dismissed modal must stop swallowing clicks the instant it is dismissed, not
+200ms later, so it leaves `visible()` immediately while remaining in
+`rendered()` until its exit finishes. Clicking through a half-faded dialog is
+the deliberate consequence.
+
+**Opacity is applied to the display-list slice**, not threaded through the
+paint context. The host records the index before painting an overlay and scales
+`fill.a` and `border.a` across everything emitted after it — one vectorised
+numpy pass, in one place, instead of obliging every emit site to multiply. It
+also catches a **cached subtree**, which is spliced in at full alpha and which
+a context flag would have missed entirely, and the **scrim**, which the host
+draws itself rather than the widget.
+
 #### 5.13.1 Placement a component does not have to declare
 
 `placement:` defaults to `center` for every widget, which is wrong for most of
@@ -1147,7 +1174,19 @@ advances by however long the test setup happened to take, and the transition is
 over before the frame is captured. That is exactly what happened while building
 the motion baseline.
 
-Two widgets are wired to it so far. The `Switch` thumb slides and grows on
+Four things are wired to it. Overlays fade in and out (§5.13.2) and **state
+layers cross-fade** — hover, focus and press opacities animate instead of
+blinking, which reaches every component at once because `_emit_state_layer` is
+shared. It reached every component *except* `Button`, which turned out to have
+its own private copy of the state-layer code; unifying it was the fix, and is a
+small argument for shared helpers over duplicated ones.
+
+The state-layer duration (100ms, standard) is **not sourced**: M3 gives none,
+and its "begin and end on screen" pair is about elements arriving rather than
+an in-place emphasis change. 100ms is chosen because a hover response slower
+than that reads as lag.
+
+The `Switch` thumb slides and grows on
 timing M3 states directly — "Selection controls have a short duration of 200ms
 with Standard easing" — and **indeterminate progress** now works: omitting
 `value:` selects it, which is also how M3 describes an indicator changing from
