@@ -14,9 +14,9 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
-from typing import Any
+from typing import Any, Final
 
-from ..layout import OFFSET_ZERO
+from ..layout import OFFSET_ZERO, Offset
 from .signals import batch
 
 __all__ = [
@@ -30,6 +30,13 @@ __all__ = [
 ]
 
 
+#: Mouse buttons as the backend reports them: 1 primary, 2 secondary, 3 middle.
+#: One-based, not zero-based -- checked against `rendercanvas/glfw.py` rather
+#: than assumed, because guessing this wrong fails silently.
+MOUSE_PRIMARY: Final = 1
+MOUSE_SECONDARY: Final = 2
+
+
 class EventType(StrEnum):
     POINTER_DOWN = "pointer_down"
     POINTER_UP = "pointer_up"
@@ -37,6 +44,7 @@ class EventType(StrEnum):
     POINTER_ENTER = "pointer_enter"
     POINTER_LEAVE = "pointer_leave"
     CLICK = "click"
+    CONTEXT_MENU = "context_menu"
     WHEEL = "wheel"
     KEY_DOWN = "key_down"
     KEY_UP = "key_up"
@@ -120,6 +128,7 @@ HANDLER_KEYS = {
     EventType.POINTER_ENTER: "on_pointer_enter",
     EventType.POINTER_LEAVE: "on_pointer_leave",
     EventType.CLICK: "on_click",
+    EventType.CONTEXT_MENU: "on_context_menu",
     EventType.WHEEL: "on_wheel",
     EventType.KEY_DOWN: "on_key_down",
     EventType.TEXT: "on_text",
@@ -270,13 +279,17 @@ class EventDispatcher:
             case EventType.POINTER_MOVE:
                 self._update_hover(path)
             case EventType.POINTER_DOWN:
-                target = path[0] if path else None
-                self._pressed = target
-                self._captured = target
-                if target is not None:
-                    target.state.pressed = True
-                    target.mark_needs_paint()
-                self.focus(target if target and self._focusable(target) else None)
+                # Only the primary button presses, captures, and moves focus.
+                # A right-click that left a button stuck in its pressed state
+                # would be a visible bug the moment anyone tried a context menu.
+                if event.button != MOUSE_SECONDARY:
+                    target = path[0] if path else None
+                    self._pressed = target
+                    self._captured = target
+                    if target is not None:
+                        target.state.pressed = True
+                        target.mark_needs_paint()
+                    self.focus(target if target and self._focusable(target) else None)
             case EventType.POINTER_UP:
                 pressed = self._pressed
                 self._captured = None
@@ -286,6 +299,17 @@ class EventDispatcher:
                     pressed.mark_needs_paint()
 
         self._propagate(path, event)
+
+        # A secondary press is a context-menu request. Synthesised like CLICK
+        # rather than delivered raw, so a view writes `on_context_menu:` and
+        # never has to know which integer the backend calls "right".
+        if event.type is EventType.POINTER_DOWN and event.button == MOUSE_SECONDARY:
+            if self.overlays is not None:
+                self.overlays.pointer_anchor = Offset(event.x, event.y)
+            self._propagate(
+                path,
+                PointerEvent(EventType.CONTEXT_MENU, x=event.x, y=event.y, button=event.button),
+            )
 
         # An element that claimed the drag during the press takes capture from
         # whatever happened to be topmost. Applied after propagation, so a

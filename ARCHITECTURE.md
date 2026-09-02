@@ -1371,6 +1371,30 @@ was correct, rather than on what was painted. Fixing it exposed the real
 structure: Card and Button rest at level 1 only in their `elevated` variant, so
 the resting level is a **property**, not a class constant.
 
+### 5.17.4 Context menus
+
+Two pieces, and both belong in the runtime rather than in a widget.
+
+**A `CONTEXT_MENU` event**, synthesised from a secondary press the way `CLICK`
+is synthesised from a press and release. A view writes `on_context_menu:` and
+never learns which integer the backend calls "right" — which is worth hiding,
+because the numbering is **one-based** (1 primary, 2 secondary, 3 middle),
+checked against `rendercanvas/glfw.py` rather than assumed. Guessing it wrong
+fails silently: nothing would ever fire.
+
+The secondary button also no longer presses, focuses or clicks. It used to,
+because `_dispatch_pointer` did not look at which button was down — so
+right-clicking a button left it stuck in its pressed state, a bug that would
+have appeared the first time anyone tried this feature.
+
+**`placement: pointer`**, an overlay positioned at a *point* rather than
+against an element. A context menu has no anchor element by definition. The
+host records where the request happened and opens down and to the right of it,
+flipping near an edge instead of clipping — the same rule anchoring already
+uses — then clamps, so a menu taller than the window still starts on screen.
+
+It dismisses on an outside press or Escape like any other transient surface.
+
 ### 5.18 Disabled state
 
 M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity

@@ -116,9 +116,9 @@ handlers:
 def save(event) -> None: ...
 ```
 
-Available keys: `on_click`, `on_pointer_down`, `on_pointer_up`,
-`on_pointer_move`, `on_pointer_enter`, `on_pointer_leave`, `on_wheel`,
-`on_key_down`, `on_text`, `on_focus`, `on_blur`.
+Available keys: `on_click`, `on_context_menu`, `on_pointer_down`,
+`on_pointer_up`, `on_pointer_move`, `on_pointer_enter`, `on_pointer_leave`,
+`on_wheel`, `on_key_down`, `on_text`, `on_focus`, `on_blur`.
 
 An unknown handler name fails at mount, not at the first click.
 
@@ -190,7 +190,7 @@ overlays:
 
 | Property | Effect |
 |---|---|
-| `placement` | `center`, `anchor`, `top`, `bottom`, `left`, `right` |
+| `placement` | `center`, `anchor`, `pointer`, `top`, `bottom`, `left`, `right` |
 | `anchor` | `name:` of the element to attach to |
 | `modal` | blocks input to everything beneath |
 | `scrim` | draws M3's 32% backdrop |
@@ -293,6 +293,41 @@ application keeps focus, scroll, and text.
 
 Selectors are structured rather than CSS-like strings, deliberately: a `#name`
 selector would need quoting in every rule, because YAML reads `#` as a comment.
+
+## Context menus
+
+A right-click fires `on_context_menu`, and an overlay with `placement: pointer`
+opens where the click happened:
+
+```yaml
+root:
+  children:
+    - name: canvas
+      widget: Container
+      handlers: {on_context_menu: show_menu}
+
+overlays:
+  - name: ctx
+    widget: Menu
+    open: "{{ menu_open.get() }}"
+    style: {placement: pointer}
+    children:
+      - {widget: MenuItem, text: Cut,  supporting_text: "Ctrl+X"}
+      - {widget: MenuItem, text: Copy, supporting_text: "Ctrl+C"}
+```
+
+```python
+@app.handler
+def show_menu(event) -> None:
+    menu_open.set(True)
+```
+
+The event carries the point that was clicked, and the menu opens down and to the
+right of it — flipping near an edge rather than being clipped. It closes on a
+click outside or on Escape, like any other dismissable overlay.
+
+A secondary press does **not** press, focus, or click the thing under it, so
+right-clicking a button does not leave it stuck looking pressed.
 
 ## Elevation
 
@@ -555,4 +590,4 @@ Stated plainly so you can design around it:
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
   expressed on a smaller visible control. This is deliberate — pyCopper is
   pointer-only.
-- **Right-click menus, cursor shapes, and mouse text selection.**
+- **Cursor shapes and mouse text selection.**

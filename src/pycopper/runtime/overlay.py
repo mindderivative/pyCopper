@@ -125,10 +125,13 @@ def _fade(display_list: DisplayList, start: int, opacity: float) -> None:
 class OverlayHost:
     """Owns every overlay: layout, paint, hit testing, and dismissal."""
 
-    __slots__ = ("_dismissed", "entries")
+    __slots__ = ("_dismissed", "entries", "pointer_anchor")
 
     def __init__(self) -> None:
         self.entries: list[OverlayEntry] = []
+        #: Where the last context-menu request happened. `placement: pointer`
+        #: positions against this rather than against another element.
+        self.pointer_anchor: Offset = OFFSET_ZERO
         #: Ids dismissed by a click-outside or Escape. Cleared when the
         #: application reopens them, so a signal-driven overlay still wins.
         self._dismissed: set[str] = set()
@@ -252,6 +255,8 @@ class OverlayHost:
         #: (snackbar, menu, tooltip) keeps clear of it.
         margin = 0.0 if entry.element.DOCKED else MARGIN
 
+        if placement == "pointer":
+            return self._at_pointer(size, window) + drag
         if placement == "anchor" and style.anchor:
             return self._anchored(entry, window, root)
         if placement == "top":
@@ -267,6 +272,22 @@ class OverlayHost:
                 Offset(window.width - size.width - margin, (window.height - size.height) / 2) + drag
             )
         return Offset((window.width - size.width) / 2, (window.height - size.height) / 2) + drag
+
+    def _at_pointer(self, size: Size, window: Size) -> Offset:
+        """Open at the pointer, kept whole inside the window.
+
+        A context menu opens down and to the right of the cursor, which is the
+        desktop convention; near an edge it flips rather than being clipped,
+        the same rule anchoring already uses. Clamped afterwards so a menu
+        taller than the window still starts on screen.
+        """
+        point = self.pointer_anchor
+        x = point.x if point.x + size.width <= window.width - MARGIN else point.x - size.width
+        y = point.y if point.y + size.height <= window.height - MARGIN else point.y - size.height
+        return Offset(
+            min(max(MARGIN, x), max(MARGIN, window.width - size.width - MARGIN)),
+            min(max(MARGIN, y), max(MARGIN, window.height - size.height - MARGIN)),
+        )
 
     def _anchored(self, entry: OverlayEntry, window: Size, root: Any) -> Offset:
         """Below the anchor, flipping above it when it would overflow.
@@ -366,6 +387,6 @@ class OverlayHost:
             if entry.modal:
                 self.dismiss(entry)
                 return True
-            if entry.dismissable and entry.placement == "anchor":
+            if entry.dismissable and entry.placement in ("anchor", "pointer"):
                 self.dismiss(entry)
         return self.has_modal

@@ -1558,3 +1558,81 @@ def test_elevation_baseline(render_scene, assert_golden) -> None:
     app.mount()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("elevation", np.asarray(engine.canvas.draw()))
+
+
+def test_context_menu_baseline(render_scene, assert_golden) -> None:
+    """A context menu opened at the pointer by a right-click.
+
+    Driven through the real dispatcher with a secondary press rather than by
+    setting a signal, so the frame proves the whole path: button 2 becomes a
+    CONTEXT_MENU event, the handler opens the overlay, and `placement: pointer`
+    puts it where the click happened.
+    """
+    from pycopper import Signal
+    from pycopper.runtime.events import MOUSE_SECONDARY, EventType, PointerEvent
+
+    opened = Signal(False)
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16},
+            "children": [
+                {
+                    "name": "canvas",
+                    "widget": "Container",
+                    "style": {
+                        "width": "expand",
+                        "height": "expand",
+                        "background": "surface_container",
+                        "corner_radius": 12,
+                    },
+                    "handlers": {"on_context_menu": "show"},
+                }
+            ],
+        },
+        "overlays": [
+            {
+                "name": "ctx",
+                "widget": "Menu",
+                "open": "{{ opened.get() }}",
+                "style": {"placement": "pointer", "width": 190},
+                "children": [
+                    {"name": "cut", "widget": "MenuItem", "text": "Cut", "supporting_text": "^X"},
+                    {"name": "copy", "widget": "MenuItem", "text": "Copy", "supporting_text": "^C"},
+                    {
+                        "name": "paste",
+                        "widget": "MenuItem",
+                        "text": "Paste",
+                        "supporting_text": "^V",
+                    },
+                ],
+            }
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=420, height=280, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(opened=opened)
+
+    @app.handler
+    def show(event) -> None:
+        opened.set(True)
+
+    app.attach(engine)
+    # Drive time by hand: an overlay fades in over 400ms, so the frame on
+    # which the menu opens shows nothing at all.
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
+    app.mount()
+    app.paint(DisplayList())
+
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=90, y=70, button=MOUSE_SECONDARY))
+    app.dispatcher.drain()
+    for _ in range(12):
+        clock["t"] += 0.05
+        app.paint(DisplayList())
+
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("context_menu", np.asarray(engine.canvas.draw()))

@@ -116,7 +116,7 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 |---|---|
 | M3 type scale as named roles | Widgets take a raw `font_size` |
 | Separate hit and paint rects | M3's 48dp minimum touch target cannot be expressed — deliberate, as pyCopper is pointer-only |
-| Right-click menus, cursor shapes, text selection | Desktop conventions still to come |
+| Cursor shapes, text selection | Desktop conventions still to come |
 
 Mobile and touch are explicit non-goals.
 

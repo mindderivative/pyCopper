@@ -289,7 +289,7 @@ class StyleSpec(_Frozen):
 
     # overlays (see runtime/overlay.py)
     #: Where an overlay sits. `anchor` positions it against another element.
-    placement: Literal["center", "anchor", "top", "bottom", "left", "right"] = "center"
+    placement: Literal["center", "anchor", "pointer", "top", "bottom", "left", "right"] = "center"
     #: `name` of the element an anchored overlay attaches to.
     anchor: str | None = None
     #: A modal overlay blocks input to everything beneath it.

@@ -299,6 +299,10 @@ change *behaviour*, not appearance.
 *before* them, which is right for a background and wrong for a label over an
 image -- the carousel item's caption was invisible until this existed.
 
+**Right-click** is `on_context_menu:`, synthesised in the dispatcher; pair it
+with an overlay using `placement: pointer` to open a menu where the click
+happened. Mouse buttons are one-based (1 primary, 2 secondary).
+
 **Dragging** needs `PointerEvent.capture()` in `on_pointer_down`: capture
 otherwise goes to whatever was topmost under the press, so a control drawn over
 something else (a scrollbar thumb over rows) would move for one frame and stop.

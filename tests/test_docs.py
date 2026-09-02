@@ -78,5 +78,5 @@ def test_the_docs_do_not_promise_unbuilt_subsystems() -> None:
     tail = REFERENCE.split("## What does not exist yet")[-1]
     # Substrings, not whole phrases: the wording of each entry changes as
     # subsystems land, and a test that pins prose gets deleted rather than fixed.
-    for absent in ("Motion", "type scale", "Right-click", "hit and paint rects"):
+    for absent in ("Motion", "type scale", "Cursor shapes", "hit and paint rects"):
         assert absent in tail
