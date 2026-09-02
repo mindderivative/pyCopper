@@ -481,3 +481,185 @@ def test_an_uncontained_carousel_still_does_not_relayout_to_scroll() -> None:
     c.set_scroll(60.0)
     assert c.needs_paint
     assert not c.needs_layout
+
+
+# -------------------------------------------------------------- parallax
+
+
+def test_item_content_is_oversized_so_panning_never_uncovers_an_edge() -> None:
+    """M3: "carousel items move at a different speed than their content"."""
+    app = hosted("multi_browse", n=4)
+    app.paint(DisplayList())
+    c = app.root.find("c")
+    # Rebuild with content, since the shared helper's items are empty.
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Column",
+                "style": {"background": "surface"},
+                "children": [
+                    {
+                        "name": "c",
+                        "widget": "Carousel",
+                        "style": {"variant": "multi_browse", "height": 100, "width": "expand"},
+                        "children": [
+                            {
+                                "name": f"i{j}",
+                                "widget": "CarouselItem",
+                                "children": [
+                                    {
+                                        "name": f"g{j}",
+                                        "widget": "Container",
+                                        "style": {
+                                            "background": "primary_container",
+                                            "width": "expand",
+                                            "height": "expand",
+                                        },
+                                    }
+                                ],
+                            }
+                            for j in range(4)
+                        ],
+                    }
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=int(WIDTH), height=200),
+    )
+    app.mount()
+    app.paint(DisplayList())
+    c = app.root.find("c")
+    for item in c.children:
+        content = item.children[0]
+        margin = item.size.width * CarouselItemElement.PARALLAX
+        assert content.size.width == pytest.approx(item.size.width + margin * 2)
+        assert content.offset.x == pytest.approx(-margin)
+        # The pan can never exceed the margin, or an edge would show.
+        assert abs(item.parallax) <= margin + 1e-6
+
+
+def parallax_carousel(variant: str = "multi_browse", n: int = 5):
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Column",
+                "style": {"background": "surface"},
+                "children": [
+                    {
+                        "name": "c",
+                        "widget": "Carousel",
+                        "style": {"variant": variant, "height": 100, "width": "expand"},
+                        "children": [
+                            {
+                                "name": f"i{j}",
+                                "widget": "CarouselItem",
+                                "style": {"width": 150} if variant == "uncontained" else {},
+                                "children": [
+                                    {
+                                        "name": f"g{j}",
+                                        "widget": "Container",
+                                        "style": {
+                                            "background": "primary_container",
+                                            "width": "expand",
+                                            "height": "expand",
+                                        },
+                                    }
+                                ],
+                            }
+                            for j in range(n)
+                        ],
+                    }
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=int(WIDTH), height=200),
+    )
+    app.mount()
+    app.paint(DisplayList())
+    return app, app.root.find("c")
+
+
+def test_the_pan_differs_across_the_strip() -> None:
+    """An item at one edge pans one way and one at the other edge the other,
+    which is what makes it read as depth rather than a uniform offset."""
+    _app, c = parallax_carousel()
+    pans = [item.parallax for item in c.children]
+    assert pans[0] > 0.0, "the leading item did not pan"
+    assert pans[-1] < 0.0, "the trailing item panned the same way as the leading one"
+    assert len({round(p, 3) for p in pans}) > 1
+
+
+def test_the_pan_follows_an_uncontained_scroll() -> None:
+    """Uncontained translates its children at paint time, so the offset has to
+    be folded in or every item would report its unscrolled position."""
+    app, c = parallax_carousel("uncontained")
+    before = [item.parallax for item in c.children]
+    c.set_scroll(120.0)
+    app.paint(DisplayList())
+    after = [item.parallax for item in c.children]
+    assert before != after
+
+
+def test_the_pan_costs_paint_only() -> None:
+    """It is a function of position, so it rides along with movement the strip
+    was already repainting for."""
+    _app, c = parallax_carousel()
+    item = c.children[0]
+    assert item.child_origin(Offset(0.0, 0.0)).x == pytest.approx(item.parallax)
+    assert not item.needs_layout
+
+
+def test_an_item_label_paints_over_its_content() -> None:
+    """M3 items hold images, so a label drawn with the background would be
+    covered by the very content it captions."""
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Column",
+                "style": {"background": "surface"},
+                "children": [
+                    {
+                        "name": "c",
+                        "widget": "Carousel",
+                        "style": {"variant": "hero", "height": 100, "width": "expand"},
+                        "children": [
+                            {
+                                "name": "i0",
+                                "widget": "CarouselItem",
+                                "text": "Caption",
+                                "children": [
+                                    {
+                                        "name": "g0",
+                                        "widget": "Container",
+                                        "style": {
+                                            "background": "primary_container",
+                                            "width": "expand",
+                                            "height": "expand",
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=int(WIDTH), height=200),
+    )
+    app.mount()
+    dl = DisplayList()
+    app.paint(dl)
+    kinds = [int(s["flags"][0]) for s in dl.view]
+    fills = [
+        i for i, s in enumerate(dl.view) if int(s["flags"][2]) == PALETTE.index("primary_container")
+    ]
+    glyphs = [i for i, k in enumerate(kinds) if k == 1]
+    assert glyphs, "the caption was not drawn"
+    assert fills, "the content was not drawn"
+    assert min(glyphs) > max(fills), "the caption is painted underneath the content"

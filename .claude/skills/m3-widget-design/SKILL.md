@@ -277,6 +277,10 @@ that does, and it is affordable there only because a carousel holds a handful
 of items; the same choice in a `ScrollView` would relayout a thousand rows a
 frame.
 
+**Paint above your children with `paint_foreground`.** `paint_self` runs
+*before* them, which is right for a background and wrong for a label over an
+image -- the carousel item's caption was invisible until this existed.
+
 **Not all motion is timed.** A collapsing app bar is a direct function of a
 scroll offset, not of a clock -- so it tracks a drag exactly and never touches
 the ticker. If you build another scroll-linked widget, register it with
@@ -332,8 +336,4 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
-- **Motion is not everywhere.** Overlay fades, state layers, every selection
-  control, tab and navigation indicators, indeterminate progress, the carousel
-  snap and app-bar collapse are animated. Carousel parallax is not. Wiring one
-  up is usually small — see the "Motion exists" note above.
 - **Tonal elevation.** Shadows only (see Step 2).

@@ -25,7 +25,7 @@ carousel layout per frame while travelling -- measured at 0.2 ms for six items,
 Affordable at any sane carousel length, and the reason `ScrollView` must never
 do the same thing.
 
-Still absent: the parallax on item visuals.
+Item *content* parallaxes as the strip moves -- see `CarouselItemElement`.
 
 Dimensions are quoted from `COMPONENT_CAROUSEL.md`. The medium item width is
 the one exception and is marked where it is defined.
@@ -341,11 +341,22 @@ class CarouselItemElement(_StyledMixin, Flex):
     Sized entirely by its parent -- an item does not choose its own width in a
     resizing layout, which is the point of the component. `text:` is drawn over
     the bottom of the surface, where M3 puts an item's label.
+
+    **Content parallaxes.** M3: "carousel items move at a different speed than
+    their content". The content is laid out wider than the item and panned
+    within it as a function of where the item sits in the strip, so it lags
+    behind the container as the strip moves. That is a paint-time translation
+    -- the same mechanism as scrolling -- so it costs nothing per frame beyond
+    the repaint the movement already required.
     """
 
     RADIUS: Final = ITEM_RADIUS
     LABEL: Final = 14.0
     LABEL_PAD: Final = 12.0
+    #: How far the content may pan, as a fraction of the item's width. The
+    #: content is oversized by twice this so the pan never exposes an edge.
+    #: Not sourced -- M3 describes the effect but gives no figure.
+    PARALLAX: Final = 0.12
 
     axis = Axis.VERTICAL
 
@@ -367,10 +378,40 @@ class CarouselItemElement(_StyledMixin, Flex):
             constraints.max_width if constraints.has_bounded_width else 0.0,
             constraints.max_height if constraints.has_bounded_height else 0.0,
         )
+        # Content is oversized by the pan range on each side and centred, so
+        # panning it never uncovers an edge of the item.
+        margin = size.width * self.PARALLAX
+        inner = Size(size.width + margin * 2, size.height)
         for child in self.children:
-            child.layout(Constraints.loose(size))
-            child.offset = Offset(0.0, 0.0)
+            child.layout(Constraints.loose(inner))
+            child.offset = Offset(-margin, 0.0)
         return constraints.constrain(size)
+
+    @property
+    def parallax(self) -> float:
+        """Horizontal pan of the content, in logical px.
+
+        Derived from where the item sits across the strip: an item at the
+        leading edge pans one way, one at the trailing edge the other, and an
+        item in the middle not at all. No state and no clock -- it is a pure
+        function of position, so it stays exact under a drag.
+        """
+        parent = self.parent
+        if not isinstance(parent, CarouselElement):
+            return 0.0
+        viewport = parent.size.width
+        if viewport <= 0.0 or self.size.width <= 0.0:
+            return 0.0
+        # The uncontained layout translates its children at paint time, so its
+        # scroll offset has to be folded in to get the on-screen position.
+        visual_x = float(self.offset.x) - (0.0 if parent.snaps else float(parent.scroll_x))
+        centre = visual_x + self.size.width / 2.0
+        normalised = (centre - viewport / 2.0) / (viewport / 2.0)
+        normalised = max(-1.0, min(1.0, normalised))
+        return float(-normalised * self.size.width * self.PARALLAX)
+
+    def child_origin(self, absolute: Offset) -> Offset:
+        return Offset(absolute.x + self.parallax, absolute.y)
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         style = self.style
@@ -384,6 +425,15 @@ class CarouselItemElement(_StyledMixin, Flex):
             token=ctx.palette.index(style.background or "surface_container_high"),
             radius=radii[0],
         )
+
+    def paint_foreground(self, ctx: PaintContext, absolute: Any) -> None:
+        """The label sits **over** the item's visual.
+
+        M3 carousel items hold images, so a label drawn with the background
+        would be covered by the very content it captions -- which is exactly
+        what happened before this existed.
+        """
+        style = self.style
         label = self._text.strip()
         if not label or self.size.width < self.LABEL_PAD * 2:
             return

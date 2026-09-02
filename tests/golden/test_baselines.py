@@ -1318,3 +1318,82 @@ def test_app_bar_collapse_baseline(render_scene, assert_golden) -> None:
     app.paint(DisplayList())
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("app_bar_collapse", np.asarray(engine.canvas.draw()))
+
+
+def test_carousel_parallax_baseline(render_scene, assert_golden) -> None:
+    """Item content panning relative to its container.
+
+    Each item holds a two-tone block whose boundary sits at the content's
+    centre. If the content were pinned to its item the boundary would land at
+    every item's centre; parallax shifts it, one way at the leading edge and
+    the other at the trailing one, so the boundaries fan across the strip.
+
+    The item labels are drawn by the item itself, not by a child, so they do
+    **not** pan -- M3 parallaxes the visual, not the caption.
+    """
+
+    def item(j: int) -> dict:
+        return {
+            "name": f"i{j}",
+            "widget": "CarouselItem",
+            "text": f"Item {j}",
+            "children": [
+                {
+                    "name": f"row{j}",
+                    "widget": "Row",
+                    "style": {"width": "expand", "height": "expand"},
+                    "children": [
+                        {
+                            "name": f"a{j}",
+                            "widget": "Container",
+                            "style": {
+                                "background": "primary_container",
+                                "width": "50%",
+                                "height": "expand",
+                            },
+                        },
+                        {
+                            "name": f"b{j}",
+                            "widget": "Container",
+                            "style": {
+                                "background": "tertiary_container",
+                                "width": "expand",
+                                "height": "expand",
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 8, "spacing": 10},
+            "children": [
+                {
+                    "name": "mb",
+                    "widget": "Carousel",
+                    "style": {"variant": "multi_browse", "height": 110, "width": "expand"},
+                    "children": [item(j) for j in range(5)],
+                },
+                {
+                    "name": "unc",
+                    "widget": "Carousel",
+                    "style": {"variant": "uncontained", "height": 110, "width": "expand"},
+                    "children": [{**item(10 + j), "style": {"width": 150}} for j in range(5)],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=440, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.paint(DisplayList())
+    app.root.find("unc").set_scroll(70.0)  # part-way, so the pan differs per item
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("carousel_parallax", np.asarray(engine.canvas.draw()))

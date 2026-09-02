@@ -282,7 +282,7 @@ M3 asks for.
 | Widget | Notes |
 |---|---|
 | `Carousel` | `uncontained` (items keep their width, free scroll), `hero` (large + small), `multi_browse` (large + medium + small). |
-| `CarouselItem` | 28dp radius. Sized by the strip, not by itself. |
+| `CarouselItem` | 28dp radius. Sized by the strip, not by itself. Its children parallax as the strip moves; its `text:` label sits over them. |
 
 `hero` and `multi_browse` resize their items and snap by item; `uncontained`
 scrolls by pixels.
@@ -361,12 +361,11 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 
 Stated plainly so you can design around it:
 
-- **Motion is not everywhere yet.** Animated: overlay fades, state layers,
-  every selection control, tab and navigation indicators, indeterminate
-  progress, a carousel's snap, and app-bar collapse. Not animated: a carousel's
-  parallax. Set `reduce_motion` in `Settings` to make everything arrive at
-  once — it does not affect app-bar collapse, which follows a scroll offset
-  rather than a clock.
+- **Motion.** Animated: overlay fades, state layers, every selection control,
+  tab and navigation indicators, indeterminate progress, a carousel's snap and
+  content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
+  make timed transitions arrive at once — it does not affect app-bar collapse
+  or carousel parallax, which follow a position rather than a clock.
 - **A theme engine / stylesheet.** `classes` is a reserved selector target with
   no consumer yet.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% opacities have

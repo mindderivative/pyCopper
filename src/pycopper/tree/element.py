@@ -399,6 +399,7 @@ class ElementMixin:
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.paint(child_ctx, child_origin)
+        self.paint_foreground(ctx, absolute)
 
         self.paint_focus_ring(ctx, absolute)
         self._cached = ctx.display_list.snapshot(start)
@@ -478,6 +479,15 @@ class ElementMixin:
     def child_paint_context(self, ctx: PaintContext, absolute: Offset) -> PaintContext:
         """Override to introduce a clip for children (scroll views, cards)."""
         return ctx
+
+    def paint_foreground(self, ctx: PaintContext, absolute: Offset) -> None:
+        """Emit primitives that belong **above** this element's children.
+
+        `paint_self` runs before them, which is right for a background and
+        wrong for anything that must sit over content -- a carousel item's
+        label over its image, a scrim under text. Inside the cached range, so
+        a clean subtree still splices correctly.
+        """
 
     def child_origin(self, absolute: Offset) -> Offset:
         """Origin children are positioned from. Default: this element's own.

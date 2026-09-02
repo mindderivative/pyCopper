@@ -1223,6 +1223,24 @@ for the looping animations, because an eased loop decelerates into the wrap and
 jumps back to full speed, reading as a stutter once a second. Eased curves are
 for transitions that end.
 
+#### 5.16.2 Parallax, and `paint_foreground`
+
+M3: "carousel items move at a different speed than their content". An item lays
+its children out wider than itself by the pan range on each side, then pans them
+by where the item sits across the strip — one way at the leading edge, the other
+at the trailing one, not at all in the middle. It is a paint-time translation,
+the same mechanism as scrolling, so it costs nothing beyond the repaint the
+movement already required, and being a pure function of position it stays exact
+under a drag. The 12% pan range is **not sourced**; M3 describes the effect
+without giving a figure.
+
+Building it exposed a gap. `paint_self` runs *before* an element's children,
+which is right for a background and wrong for anything that must sit over
+content — and M3 carousel items hold images, so the item's label was drawn
+underneath the very content it captions and was invisible in every realistic
+use. `ElementMixin.paint_foreground` runs after the children and **inside the
+cached range**, so a clean subtree still splices correctly.
+
 ### 5.19 The collapsing app bar — scroll-linked motion
 
 M3: "when scrolled, medium and large app bars can transform into small app
@@ -1317,7 +1335,7 @@ Widths per layout, with the leftover going to the large item (M3 calls it
 continuously as they travel and snaps them home; here the snap is
 instantaneous and the resize happens in one step. At rest the geometry is
 exactly what M3 specifies — it is the movement between rest states that is
-absent, along with the parallax on item visuals. The **medium item width
+absent. The **medium item width
 (112dp) is not sourced**: M3 calls it "dynamic" and gives no figure.
 
 **The snap now travels** (§5.17). `position` is a continuous animated value
