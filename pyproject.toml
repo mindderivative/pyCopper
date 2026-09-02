@@ -4,22 +4,29 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pycopper"
-version = "0.0.1"
+version = "1.0.0"
 description = "A GPU-accelerated declarative desktop GUI framework for Python"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE", "src/pycopper/assets/fonts/LICENSE-*.txt"]
 requires-python = ">=3.12"
 authors = [{ name = "phil" }]
 keywords = ["gui", "desktop", "wgpu", "webgpu", "material-design", "declarative"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: X11 Applications",
+    "Environment :: MacOS X",
+    "Environment :: Win32 (MS Windows)",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Multimedia :: Graphics",
     "Topic :: Software Development :: User Interfaces",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
 ]
 
 dependencies = [
@@ -58,9 +65,26 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/phil/pycopper"
+Source = "https://github.com/phil/pycopper"
+Issues = "https://github.com/phil/pycopper/issues"
+Architecture = "https://github.com/phil/pycopper/blob/main/ARCHITECTURE.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pycopper"]
+
+[tool.hatch.build.targets.sdist]
+# Ship what someone needs to build, test, and understand the package. Tooling
+# caches, agent instructions, and CI config are not that -- and `M3-References`
+# is 2.2MB of third-party material that is gitignored and must never ship.
+include = [
+    "/src/pycopper",
+    "/tests",
+    "/examples",
+    "/README.md",
+    "/ARCHITECTURE.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
 
 # ---------------------------------------------------------------- tooling
 

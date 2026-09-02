@@ -1104,6 +1104,25 @@ Three details that are not obvious:
   `(thickness, start, sweep, _)`. No struct growth: the instance stays 144
   bytes, and every field stays vec4-aligned.
 
+### 5.16.1 The frozen surface
+
+`pycopper.__all__` is the whole public API — 24 names — and is covered by
+semantic versioning: adding to it is a minor release, removing or re-signing
+anything in it is a major one. `tests/test_public_api.py` pins the list, so a
+change to it is a decision rather than an accident.
+
+Two things that audit surfaced:
+
+- **The event classes were not exported.** Annotating a handler
+  (`def save(event: PointerEvent)`) required importing from
+  `pycopper.runtime.events`, i.e. from a private module. A surface that cannot
+  type its own callbacks is not finished, so `Event`, `EventType`,
+  `PointerEvent`, `KeyEvent`, and `WheelEvent` are public.
+- **There was no `LICENSE` file**, despite `pyproject.toml` declaring MIT since
+  M0. MIT requires the notice travel with the distribution, and the three
+  bundled font licences needed the same guarantee — all four are now declared
+  through `license-files` and verified present in the built wheel.
+
 ### 5.16 Carousel — `widgets/carousel.py`
 
 M3 draws an explicit line through the carousel layouts, and it is the line
@@ -1435,7 +1454,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M3** ✅ | `spec/` (Pydantic + sandboxed expressions), `runtime/signals.py`, `tree/` (element + reconcile), `runtime/events.py`, `widgets/`, and the public `App` | **Done.** 293 tests green. Full slice works: YAML → elements → layout → paint → click → signal → re-render, with state-preserving reload |
 | **M4** ✅ | `text/` — Face/FontDB with coverage fallback, uharfbuzz shaping with a size-independent cache, bidi + script itemisation, UAX #14/#29 segmentation, paragraph layout with wrapping and alignment; `render/atlas.py` skyline packer; real `Text`/`Button` labels | **Done.** 371 tests green. Shaped, kerned, ligature-forming Roboto renders through the atlas in the same single draw call |
 | **M5** ✅ | `runtime/hotreload.py` (watchfiles → engine thread), golden-image suite with six committed baselines, `examples/gallery` | **Done.** 390 tests green. Editing a view file updates the window without losing click count, focus, or scroll |
-| **M6** | API freeze, docs, PyPI release | v1.0 |
+| **M6** ✅ | API freeze, `docs/view-reference.md`, `LICENSE`, packaging metadata, reproducible sdist/wheel | **Done.** 893 tests green. The public surface is pinned by `tests/test_public_api.py`; the reference is pinned by `tests/test_docs.py`, which fails when a widget, style property, node field, or handler key is added without documenting it. The wheel installs into a clean environment and renders text, icons, arcs, a carousel, and a modal overlay with no source tree present. **Publishing to PyPI is a separate, explicit step and has not been done.** |
 
 ---
 
