@@ -95,10 +95,17 @@ release will be named separately. That is why this is classified *Beta* despite
 a 1.x version number — the version tracks the API contract, the classifier
 tracks the phase.
 
-**v1.1 — the public API is frozen.** `pycopper.__all__` is covered by semantic
+**The public API is frozen.** `pycopper.__all__` is covered by semantic
 versioning and pinned by a test; adding to it is a minor release, changing or
-removing anything in it is a major one. (1.1 is that rule in action: motion
+removing anything in it is a major one. (1.1 was that rule in action: motion
 added four names and nothing else moved.)
+
+**v1.2 — the view format grew, `__all__` did not.** Type-scale weight, letter
+spacing and line height; `hit_padding` and `min_hit_size`; an `error:` state,
+an `on_change` handler, and the `TextField` widget. All additive, none of it in
+`__all__`, so the version moves for the *view format's* sake — a view file
+written against 1.2 will not load on 1.1, and that is what a minor number is
+for.
 
 **Stylesheets are built.** A `styles:` list selects on widget kind, `classes:`,
 and `name:`, with CSS-like precedence, resolved once at load so nothing is paid
