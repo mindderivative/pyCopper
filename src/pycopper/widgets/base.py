@@ -467,6 +467,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.SEGMENT: n.SegmentElement,
         WidgetKind.LIST_ITEM: n.ListItemElement,
         WidgetKind.LINEAR_PROGRESS: n.LinearProgressElement,
+        WidgetKind.CIRCULAR_PROGRESS: n.CircularProgressElement,
         WidgetKind.DIALOG: o.DialogElement,
         WidgetKind.MENU: o.MenuElement,
         WidgetKind.MENU_ITEM: o.MenuItemElement,

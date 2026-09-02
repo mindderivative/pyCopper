@@ -112,6 +112,40 @@ def _box(
     )
 
 
+def _arc(
+    ctx: PaintContext,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    *,
+    token: int,
+    thickness: float,
+    start: float,
+    sweep: float,
+    alpha: float = 1.0,
+) -> None:
+    """Emit one token-coloured stroked arc in logical coordinates.
+
+    Angles are radians clockwise from 12 o'clock, which is the direction M3
+    specifies for circular progress.
+    """
+    dpr = ctx.pixel_ratio
+    ctx.display_list.add_arc(
+        x * dpr,
+        y * dpr,
+        w * dpr,
+        h * dpr,
+        thickness=thickness * dpr,
+        start=start,
+        sweep=sweep,
+        token=token,
+        color=(1.0, 1.0, 1.0, alpha),
+        clip=ctx.clip,
+        clip_radii=ctx.clip_radii,
+    )
+
+
 # ------------------------------------------------------------------- cards
 
 

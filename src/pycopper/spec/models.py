@@ -67,6 +67,7 @@ class WidgetKind(StrEnum):
     SEGMENT = "Segment"
     LIST_ITEM = "ListItem"
     LINEAR_PROGRESS = "LinearProgress"
+    CIRCULAR_PROGRESS = "CircularProgress"
     # Overlay components (see runtime/overlay.py and widgets/overlays.py)
     DIALOG = "Dialog"
     MENU = "Menu"

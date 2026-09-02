@@ -251,6 +251,12 @@ along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.
 
+**Arcs exist.** The shader has a `KIND_ARC` branch (`DisplayList.add_arc`,
+or the `_arc` helper in `material.py` for logical coordinates). Angles are
+radians clockwise from 12 o'clock; round caps come free from the distance
+field; a full turn is handled as a ring to avoid a seam. Use it for anything
+circular and stroked rather than approximating with boxes.
+
 **Scrolling exists.** Wrap content in a `ScrollView` with a bounded size on its
 scroll axis (`style: {height: 300}` for the default vertical axis, or
 `axis: horizontal`). It clips in-shader, handles the wheel natively with no
@@ -287,6 +293,4 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   have nowhere to attach.
 - **Motion.** No animation or transition system; every state change is instant
   — a Switch thumb jumps rather than sliding.
-- **Arc/stroke rendering.** The SDF shader draws rounded boxes, so a circular
-  progress indicator cannot be expressed. Linear progress is fine.
 - **Tonal elevation.** Shadows only (see Step 2).

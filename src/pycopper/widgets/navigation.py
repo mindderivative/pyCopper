@@ -16,6 +16,7 @@ counterparts (ARCHITECTURE.md 1.2.1).
 
 from __future__ import annotations
 
+import math
 from typing import Any, Final
 
 from ..layout import (
@@ -30,9 +31,10 @@ from ..layout import (
 from ..spec import WidgetSpec
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
-from .material import _box, _emit_state_layer
+from .material import _arc, _box, _emit_state_layer
 
 __all__ = [
+    "CircularProgressElement",
     "LinearProgressElement",
     "ListItemElement",
     "NavItemElement",
@@ -49,6 +51,9 @@ LABEL_SIZE: Final = 12.0
 TITLE_SIZE: Final = 22.0
 TAB_LABEL_SIZE: Final = 14.0
 ICON: Final = 24.0
+
+#: One full turn, for the circular progress sweep.
+TAU: Final = 2.0 * math.pi
 
 
 class _SelectionContainer(_StyledMixin, Flex):
@@ -605,6 +610,11 @@ class LinearProgressElement(_StyledMixin, Padding):
 
     Determinate only -- `value:` is the fraction complete, 0 to 1. The
     indeterminate form is an animation and pyCopper has no motion system.
+
+    Colour roles are shared with `CircularProgress`: active `primary`, track
+    `secondary_container`. This widget originally used `surface_variant` for
+    the track, which the spec does not say -- corrected when the circular
+    variant was built and the two had to agree.
     """
 
     HEIGHT: Final = 4.0
@@ -634,7 +644,7 @@ class LinearProgressElement(_StyledMixin, Padding):
             absolute.y,
             self.size.width,
             self.size.height,
-            token=ctx.palette.index(self.style.background or "surface_variant"),
+            token=ctx.palette.index(self.style.background or "secondary_container"),
             radius=radius,
         )
         filled = self.size.width * self.progress
@@ -647,4 +657,91 @@ class LinearProgressElement(_StyledMixin, Padding):
                 self.size.height,
                 token=content_token(ctx, self.style, "primary"),
                 radius=radius,
+            )
+
+
+class CircularProgressElement(_StyledMixin, Padding):
+    """M3 Circular Progress: a 4dp ring, filled clockwise from 12 o'clock.
+
+    Determinate only -- `value:` is the fraction complete, 0 to 1. The
+    indeterminate form is an animation and pyCopper has no motion system, the
+    same reason `LinearProgress` is determinate only.
+
+    Sourced from `COMPONENT_PROGRESS_INDICATORS.md`: "Track thickness: Fixed
+    (4dp)", the shared colour roles (active `primary`, track
+    `secondary_container`), and "circular indicators animate from the top of
+    the track, clockwise by default" -- which is why angles here are measured
+    clockwise from 12 o'clock rather than from the +X axis.
+
+    The **48dp default diameter is not sourced**: that page's size table is an
+    image, so the scrape carries no text for it. Set `width:` to override.
+    """
+
+    DIAMETER: Final = 48.0
+    THICKNESS: Final = 4.0
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, EdgeInsets())
+        self.init_element(spec)
+
+    @property
+    def progress(self) -> float:
+        return max(0.0, min(1.0, self.number))
+
+    @property
+    def thickness(self) -> float:
+        """`style.thickness` defaults to 1dp for Divider's sake, so an explicit
+        value is distinguished from the field default rather than compared to
+        it."""
+        if "thickness" in self.style.model_fields_set:
+            return float(self.style.thickness)
+        return self.THICKNESS
+
+    def _diameter(self, constraints: Constraints) -> float:
+        style = self.style
+        if style.width.kind == "fixed":
+            return float(style.width.value)
+        if style.height.kind == "fixed":
+            return float(style.height.value)
+        return self.DIAMETER
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        d = self._diameter(constraints)
+        # Square by default. A view that sets *both* width and height gets the
+        # box it asked for -- constraints are not negotiable -- and the circle
+        # is then inscribed in the shorter side and centred by paint_self,
+        # rather than stretched into an ellipse.
+        return outer.constrain(Size(d, d))
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        style = self.style
+        thickness = self.thickness
+        side = min(self.size.width, self.size.height)
+        x = absolute.x + (self.size.width - side) / 2
+        y = absolute.y + (self.size.height - side) / 2
+
+        _arc(
+            ctx,
+            x,
+            y,
+            side,
+            side,
+            token=ctx.palette.index(style.background or "secondary_container"),
+            thickness=thickness,
+            start=0.0,
+            sweep=TAU,
+        )
+        sweep = TAU * self.progress
+        if sweep > 0.0:
+            _arc(
+                ctx,
+                x,
+                y,
+                side,
+                side,
+                token=content_token(ctx, style, "primary"),
+                thickness=thickness,
+                start=0.0,
+                sweep=sweep,
             )

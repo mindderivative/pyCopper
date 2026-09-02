@@ -17,6 +17,9 @@ const KIND_BOX:    u32 = 0u;
 const KIND_GLYPH:  u32 = 1u;
 const KIND_IMAGE:  u32 = 2u;
 const KIND_SHADOW: u32 = 3u;
+const KIND_ARC:    u32 = 4u;
+
+const TAU: f32 = 6.28318530718;
 
 // Sentinel meaning "use the literal colour, not a palette lookup".
 const NO_TOKEN: u32 = 0xFFFFFFFFu;
@@ -45,6 +48,7 @@ struct VertexIn {
     @location(6) border     : vec4<f32>,
     @location(7) uv         : vec4<f32>,   // u0, v0, u1, v1
     @location(8) params     : vec4<f32>,   // border_w, blur, shadow_dx, shadow_dy
+                                           // KIND_ARC: thickness, start, sweep, _
     @location(9) flags      : vec4<u32>,   // kind, atlas, fill_token, border_token
 };
 
@@ -71,7 +75,7 @@ fn vs_main(in: VertexIn) -> VertexOut {
     // their own geometry. Textured kinds need no padding -- the atlas sample is
     // already antialiased, and padding would break the UV mapping.
     var pad = 0.0;
-    if (kind == KIND_BOX) {
+    if (kind == KIND_BOX || kind == KIND_ARC) {
         pad = 1.5;
     } else if (kind == KIND_SHADOW) {
         pad = in.params.y * 3.0 + max(abs(in.params.z), abs(in.params.w)) + 2.0;
@@ -114,6 +118,27 @@ fn sd_rounded_box(p: vec2<f32>, half: vec2<f32>, r: vec4<f32>) -> f32 {
     let radius = select(pair.y, pair.x, p.x < 0.0);
     let q = abs(p) - half + radius;
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - radius;
+}
+
+// Signed distance to a circular arc of half-aperture `sc` = (sin, cos), centre
+// radius `ra` and half-thickness `rb`. The arc is symmetric about +Y.
+//
+// Two cases: inside the wedge the nearest point is on the circle, so the
+// distance is to the ring; outside it the nearest point is the cap centre, so
+// the distance is to that point -- which is what gives round caps for free,
+// and is why M3's rounded progress ends need no extra geometry.
+fn sd_arc(p: vec2<f32>, sc: vec2<f32>, ra: f32, rb: f32) -> f32 {
+    let q = vec2<f32>(abs(p.x), p.y);
+    if (sc.y * q.x > sc.x * q.y) {
+        return length(q - sc * ra) - rb;
+    }
+    return abs(length(q) - ra) - rb;
+}
+
+// Signed distance to a full ring. A sweep of a full turn must not go through
+// sd_arc: its wedge test degenerates at half-aperture pi and seams at the join.
+fn sd_ring(p: vec2<f32>, ra: f32, rb: f32) -> f32 {
+    return abs(length(p) - ra) - rb;
 }
 
 // Analytic coverage from a distance field. This is the whole antialiasing story.
@@ -161,6 +186,31 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         // Gaussian approximated by a smoothstep ramp across the blur radius.
         let a = 1.0 - smoothstep(-blur, blur, d);
         color = premultiply(fill) * a;
+
+    } else if (kind == KIND_ARC) {
+        // Angles are measured clockwise from 12 o'clock, matching M3
+        // ("circular indicators animate from the top of the track, clockwise").
+        // Screen y grows downward, so 12 o'clock is -Y.
+        let thickness = in.params.x;
+        let start     = in.params.y;
+        let sweep     = in.params.z;
+        let rb        = thickness * 0.5;
+        let ra        = max(min(half.x, half.y) - rb, 0.0);
+
+        var d: f32;
+        if (sweep >= TAU - 1e-4) {
+            d = sd_ring(p, ra, rb);
+        } else {
+            // Rotate so the arc's midpoint lands on -Y, then flip into the
+            // +Y-symmetric frame sd_arc expects.
+            let mid = start + sweep * 0.5;
+            let c = cos(mid);
+            let sn = sin(mid);
+            let rotated = vec2<f32>(p.x * c + p.y * sn, -p.x * sn + p.y * c);
+            let hb = sweep * 0.5;
+            d = sd_arc(vec2<f32>(rotated.x, -rotated.y), vec2<f32>(sin(hb), cos(hb)), ra, rb);
+        }
+        color = premultiply(fill) * coverage(d);
 
     } else if (kind == KIND_GLYPH) {
         // R8 coverage atlas tinted by the fill colour.

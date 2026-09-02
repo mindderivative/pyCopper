@@ -820,3 +820,72 @@ def test_scroll_baseline(render_scene, assert_golden) -> None:
     app.root.find("sv").set_scroll(90.0)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("scroll", np.asarray(engine.canvas.draw()))
+
+
+def test_arc_baseline(render_scene, assert_golden) -> None:
+    """Circular progress at several values, plus raw arcs.
+
+    The top row is the widget at 0/25/50/75/100%, which is what verifies the
+    sweep direction: M3 fills clockwise from 12 o'clock, so 25% must light the
+    right-hand quadrant and nothing else. The bottom row exercises the
+    primitive directly -- an offset start angle, a thick stroke, and a full
+    ring, whose join must be seamless.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 16},
+            "children": [
+                {
+                    "name": "row",
+                    "widget": "Row",
+                    "style": {"height": 48, "spacing": 14, "width": "expand"},
+                    "children": [
+                        {
+                            "name": f"p{int(v * 100)}",
+                            "widget": "CircularProgress",
+                            "value": str(v),
+                        }
+                        for v in (0.0, 0.25, 0.5, 0.75, 1.0)
+                    ],
+                },
+                {
+                    "name": "row2",
+                    "widget": "Row",
+                    "style": {"height": 56, "spacing": 14, "width": "expand"},
+                    "children": [
+                        {
+                            "name": "thick",
+                            "widget": "CircularProgress",
+                            "value": "0.4",
+                            "style": {"width": 56, "thickness": 10},
+                        },
+                        {
+                            "name": "thin",
+                            "widget": "CircularProgress",
+                            "value": "0.65",
+                            "style": {"width": 56, "thickness": 2},
+                        },
+                        {
+                            "name": "tinted",
+                            "widget": "CircularProgress",
+                            "value": "0.85",
+                            "style": {
+                                "width": 56,
+                                "color": "tertiary",
+                                "background": "surface_container_highest",
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=380, height=180, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("arc", np.asarray(engine.canvas.draw()))

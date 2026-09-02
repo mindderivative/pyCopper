@@ -32,6 +32,7 @@ class Kind(IntEnum):
     GLYPH = 1
     IMAGE = 2
     SHADOW = 3
+    ARC = 4
 
 
 #: Sentinel in ``flags.z`` / ``flags.w`` meaning "use the literal colour".
@@ -50,6 +51,7 @@ INSTANCE_DTYPE: Final = np.dtype(
         ("border", np.float32, 4),
         ("uv", np.float32, 4),  # u0, v0, u1, v1
         ("params", np.float32, 4),  # border_w, blur, shadow_dx, shadow_dy
+        #                           # ARC: thickness, start, sweep, _
         ("flags", np.uint32, 4),  # kind, atlas, fill_token, border_token
     ]
 )
@@ -145,6 +147,46 @@ class DisplayList:
         s["uv"] = _ZERO4
         s["params"] = (border_width, 0.0, 0.0, 0.0)
         s["flags"] = (Kind.BOX, 0, token, border_token)
+        return i
+
+    def add_arc(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        *,
+        thickness: float,
+        start: float,
+        sweep: float,
+        color: tuple[float, float, float, float] = _WHITE,
+        token: int = NO_TOKEN,
+        clip: tuple[float, float, float, float] = _ZERO4,
+        clip_radii: tuple[float, float, float, float] = _ZERO4,
+        opacity: float = 1.0,
+    ) -> int:
+        """Emit a stroked circular arc inscribed in the given box.
+
+        `start` and `sweep` are radians measured **clockwise from 12 o'clock**,
+        which is the direction M3 specifies for circular progress. The arc is
+        centred in the box and its radius comes from the shorter side, so a
+        non-square rect still produces a circle rather than an ellipse.
+
+        Round caps come free from the distance field -- there is no separate
+        cap geometry, and a full turn takes a ring branch that avoids the seam
+        a degenerate wedge test would leave at the join.
+        """
+        i = self._count
+        s = self._next()[0]
+        s["rect"] = (x, y, width, height)
+        s["radii"] = _ZERO4
+        s["clip"] = clip
+        s["clip_radii"] = clip_radii
+        s["fill"] = (color[0], color[1], color[2], color[3] * opacity)
+        s["border"] = _ZERO4
+        s["uv"] = _ZERO4
+        s["params"] = (thickness, start, sweep, 0.0)
+        s["flags"] = (Kind.ARC, 0, token, NO_TOKEN)
         return i
 
     def add_shadow(

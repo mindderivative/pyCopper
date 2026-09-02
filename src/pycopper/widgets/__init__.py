@@ -24,6 +24,7 @@ from .material import (
     SwitchElement,
 )
 from .navigation import (
+    CircularProgressElement,
     LinearProgressElement,
     ListItemElement,
     NavigationDrawerElement,
@@ -53,6 +54,7 @@ __all__ = [
     "CardElement",
     "CheckboxElement",
     "ChipElement",
+    "CircularProgressElement",
     "ColumnElement",
     "ContainerElement",
     "DialogElement",

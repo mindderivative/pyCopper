@@ -352,7 +352,12 @@ INSTANCE_DTYPE = np.dtype(
 
 Everything is `vec4`-aligned by construction, sidestepping WGSL alignment traps.
 
-`flags.x` (kind) selects fragment behaviour: `0` = SDF box, `1` = glyph (atlas coverage × fill), `2` = image (atlas RGBA × tint).
+`flags.x` (kind) selects fragment behaviour: `0` = SDF box, `1` = glyph (atlas coverage × fill), `2` = image (atlas RGBA × tint), `3` = shadow, `4` = arc.
+
+**Arcs are a fifth branch, not extra geometry** (§5.15). A test parses
+`ui.wgsl` and asserts its `KIND_*` constants equal the Python `Kind` enum —
+nothing else ties the two together, so a renumbered enum would silently draw
+every box as a glyph rather than fail.
 
 **Subtree caching.** Each Element caches the instance slice it produced. A clean subtree's cached slice is copied wholesale into the frame buffer; only `needs_paint` subtrees re-emit. Because instances carry absolute coordinates, a subtree that merely *moved* still needs re-emission — this is a deliberate simplicity trade, revisitable by adding a per-instance transform index.
 
@@ -921,6 +926,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
 | `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
+| `CircularProgress` | 4dp ring, clockwise from 12 o'clock | determinate only; needs the arc primitive (§5.15). The 48dp default diameter is **not** sourced — that page's size table is an image |
 
 **Wave 3** added the six components the overlay layer (§5.13) exists for, in
 `widgets/overlays.py`. They contribute M3 *anatomy* only — container token,
@@ -1000,6 +1006,12 @@ Two gaps these components inherit, both stated rather than approximated:
 M3's 48dp minimum touch target is deliberately **not** implemented: it is a
 finger-precision rule and pyCopper is pointer-only (§1.2.1).
 
+**One correction made later:** `LinearProgress` drew its track in
+`surface_variant`, which the spec does not say. M3 gives progress indicators a
+single colour-role table covering both variants — active `primary`, track
+`secondary container` — so the track was corrected when `CircularProgress`
+arrived and the two had to agree. A test now asserts they use the same token.
+
 ### 5.14 Scrolling — `widgets/scroll.py`
 
 **Scrolling is a paint-time translation, not a relayout.** That single decision
@@ -1052,6 +1064,44 @@ that a scrolling menu "shows a persistent scrollbar" — so its 4dp thickness an
 than a drag target, since dragging it needs pointer capture wiring that is not
 built. Visible scrollbars are a desktop convention with no mobile analogue
 (§1.2), which is why one exists at all.
+
+### 5.15 Arc rendering — `KIND_ARC`
+
+The SDF shader drew only rounded boxes, so anything circular and *stroked* —
+a circular progress indicator, a ring gauge — could not be expressed at all.
+Arcs are a fifth fragment branch rather than tessellated geometry, which keeps
+the single instanced draw call intact (§5.8): an arc is one more instance of
+the same unit quad, and costs no extra draw call.
+
+The distance field is the standard two-case arc:
+
+```wgsl
+fn sd_arc(p: vec2<f32>, sc: vec2<f32>, ra: f32, rb: f32) -> f32 {
+    let q = vec2<f32>(abs(p.x), p.y);
+    if (sc.y * q.x > sc.x * q.y) { return length(q - sc * ra) - rb; }  // past the cap
+    return abs(length(q) - ra) - rb;                                   // on the ring
+}
+```
+
+Inside the wedge the nearest point is on the circle, so the distance is to the
+ring; outside it the nearest point is the cap centre, so the distance is to
+that point. **That second case is what gives round caps for free** — M3's
+rounded progress ends need no extra geometry, and antialiasing stays analytic
+because the result is still a true distance field.
+
+Three details that are not obvious:
+
+- **A full turn takes a separate `sd_ring` branch.** At a half-aperture of π
+  the wedge test degenerates and leaves a visible seam at the join. A test
+  samples the ring's brightness at every degree and asserts it is uniform.
+- **Angles are clockwise from 12 o'clock**, because M3 says circular
+  indicators "animate from the top of the track, clockwise by default". Screen
+  y grows downward, so the arc is rotated to put its midpoint on −Y before the
+  +Y-symmetric field is evaluated.
+- **`params` is reinterpreted per kind.** For an arc the vec4 that normally
+  carries `(border_w, blur, shadow_dx, shadow_dy)` carries
+  `(thickness, start, sweep, _)`. No struct growth: the instance stays 144
+  bytes, and every field stays vec4-aligned.
 
 ---
 
