@@ -79,15 +79,21 @@ pip install pycopper
 
 ## Documentation
 
-- **[View file reference](docs/view-reference.md)** — every widget, every style
+- **[View file reference](https://github.com/mindderivative/pyCopper/blob/main/docs/view-reference.md)** — every widget, every style
   property, bindings, handlers, composition, and overlays.
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — the design and the reasoning: the
+- **[ARCHITECTURE.md](https://github.com/mindderivative/pyCopper/blob/main/ARCHITECTURE.md)** — the design and the reasoning: the
   four-tree model, constraint layout, the single-draw-call pipeline, the text
   stack, and the measurements behind each decision.
-- **[examples/](examples/)** — `hello`, `counter`, and `gallery`, which exercises
+- **[examples/](https://github.com/mindderivative/pyCopper/tree/main/examples)** — `hello`, `counter`, and `gallery`, which exercises
   every widget and doubles as the golden-image corpus.
 
 ## Status
+
+**pyCopper is a phase name, not the framework's final identity.** It is the
+first beta phase; later phases will carry their own names, and the stable
+release will be named separately. That is why this is classified *Beta* despite
+a 1.x version number — the version tracks the API contract, the classifier
+tracks the phase.
 
 **v1.1 — the public API is frozen.** `pycopper.__all__` is covered by semantic
 versioning and pinned by a test; adding to it is a minor release, changing or
@@ -127,7 +133,7 @@ pytest -m "not gpu"       # no GPU required
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/mindderivative/pyCopper/blob/main/LICENSE).
 
 Bundled fonts keep their own licences: Roboto and Noto Sans under the SIL Open
 Font License 1.1, Material Symbols under Apache 2.0. All three travel with every

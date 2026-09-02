@@ -64,10 +64,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/phil/pycopper"
-Source = "https://github.com/phil/pycopper"
-Issues = "https://github.com/phil/pycopper/issues"
-Architecture = "https://github.com/phil/pycopper/blob/main/ARCHITECTURE.md"
+Homepage = "https://github.com/mindderivative/pyCopper"
+Source = "https://github.com/mindderivative/pyCopper"
+Issues = "https://github.com/mindderivative/pyCopper/issues"
+Architecture = "https://github.com/mindderivative/pyCopper/blob/main/ARCHITECTURE.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pycopper"]
