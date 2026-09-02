@@ -355,6 +355,13 @@ class WidgetSpec(_Frozen):
     #: Whether an overlay is showing. Templated: `open: "{{ show.get() }}"`.
     #: Meaningless outside the `overlays:` list.
     open: str | None = None
+
+    #: Whether this control is inert. Templated like `value:` and `open:`, so
+    #: it tracks a signal: `disabled: "{{ not form_valid.get() }}"`. It is
+    #: **state, not style** -- it changes what a control *is*, not how a view
+    #: chooses to paint it -- which is why it lives here and not on StyleSpec.
+    #: Disabling a container disables everything inside it.
+    disabled: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
     children: tuple[WidgetSpec, ...] = ()
 
@@ -375,6 +382,9 @@ class WidgetSpec(_Frozen):
 
     def open_template(self) -> Template | None:
         return Template(self.open) if self.open is not None else None
+
+    def disabled_template(self) -> Template | None:
+        return Template(self.disabled) if self.disabled is not None else None
 
     def supporting_template(self) -> Template | None:
         return Template(self.supporting_text) if self.supporting_text is not None else None

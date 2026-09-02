@@ -47,6 +47,7 @@ Every node accepts these. Only `widget` is required.
 | `value` | string | State binding — what a control *is*. See [Bindings](#bindings). |
 | `supporting_text` | string | Second line, trailing text, or action label, per widget. |
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
+| `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `handlers` | mapping | `on_*` keys to handler names registered in Python. |
 | `children` | list | Child nodes. |
 
@@ -121,6 +122,25 @@ Available keys: `on_click`, `on_pointer_down`, `on_pointer_up`,
 
 An unknown handler name fails at mount, not at the first click.
 
+### Handlers run in two phases
+
+An event travels down to the target (capture) and back up (bubble), and a
+handler you declare is invoked in **both**. That lets an ancestor intercept an
+event before the target ever sees it — call `event.stop_propagation()` during
+capture and the target never runs.
+
+The consequence is worth knowing: a handler on an **ancestor** of the target
+runs **twice** for one event. Check the phase when that matters:
+
+```python
+@app.handler
+def on_card_click(event) -> None:
+    if event.phase is not Phase.CAPTURE:
+        ...   # runs once, on the way back up
+```
+
+A handler on the target itself runs once, so the common case is unaffected.
+
 ---
 
 ## Composition
@@ -182,6 +202,29 @@ Most components know where they belong: `BottomSheet` and `Snackbar` default to
 implies `placement: anchor`. Declaration order is z-order.
 
 ---
+
+## Disabled controls
+
+`disabled:` marks a control inert. It is templated like `value:`, so it tracks
+a signal:
+
+```yaml
+- name: save
+  widget: Button
+  text: Save
+  disabled: "{{ not form_valid.get() }}"
+  handlers: {on_click: save}
+```
+
+A disabled control ignores the pointer, never shows hover or press, and is
+skipped by Tab — leaving it keyboard-reachable when the mouse cannot touch it
+is the accessibility failure the state exists to avoid. **Disabling a container
+disables everything inside it**, which is how you grey out a whole form section.
+
+It repaints per M3: the container becomes `on_surface` at 12% and the content
+`on_surface` at 38%. Note that M3 *replaces* the colours rather than dimming the
+control's own, so a disabled filled button and a disabled outlined one look
+alike — that is intended.
 
 ## Widgets
 
@@ -368,8 +411,6 @@ Stated plainly so you can design around it:
   or carousel parallax, which follow a position rather than a clock.
 - **A theme engine / stylesheet.** `classes` is a reserved selector target with
   no consumer yet.
-- **Disabled state.** No `disabled` flag, so M3's 12%/38% opacities have
-  nowhere to attach.
 - **The M3 type scale as named roles.** Widgets take a raw `font_size`;
   `label-large` and friends are not modelled.
 - **Drag gestures.** A bottom sheet's drag handle and a scrollbar's thumb are

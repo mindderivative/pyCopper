@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 import numpy as np
 
@@ -85,6 +85,49 @@ class PaintContext:
     clip_radii: tuple[float, float, float, float] = _NO_CLIP
 
 
+#: M3's disabled treatment: "Container opacity 12%, Content opacity 38%", and
+#: both take the `on_surface` role rather than fading their own colour.
+DISABLED_CONTAINER: Final = 0.12
+DISABLED_CONTENT: Final = 0.38
+
+
+def _apply_disabled(
+    display_list: DisplayList,
+    start: int,
+    palette: Palette,
+    size: Any,
+    pixel_ratio: float,
+) -> None:
+    """Recolour everything a disabled element drew.
+
+    Applied to the display-list slice rather than threaded through every emit
+    site, the same mechanism the overlay fade uses -- one vectorised numpy pass
+    in one place, and it catches a cached subtree spliced in whole.
+
+    M3 does not fade a disabled control's own colours; it **replaces** them with
+    `on_surface` at 12% for the container and 38% for the content. Container is
+    identified as a box covering the element's own bounds, which distinguishes a
+    button's filled container from a radio's dot or a switch's thumb -- content
+    that happens to be drawn as a box and would be near-invisible at 12%.
+    """
+    view = display_list.view[start:]
+    if len(view) == 0:
+        return
+    token = palette.index("on_surface")
+    width = size.width * pixel_ratio
+    height = size.height * pixel_ratio
+    covers = (np.abs(view["rect"][:, 2] - width) < 0.5) & (
+        np.abs(view["rect"][:, 3] - height) < 0.5
+    )
+    alpha = np.where(covers, DISABLED_CONTAINER, DISABLED_CONTENT).astype(np.float32)
+
+    view["fill"][:, 3] = alpha
+    view["flags"][:, 2] = token
+    has_border = view["flags"][:, 3] != NO_TOKEN
+    view["border"][:, 3] = np.where(has_border, alpha, view["border"][:, 3])
+    view["flags"][:, 3] = np.where(has_border, token, view["flags"][:, 3])
+
+
 class ElementMixin:
     """Shared element behaviour. Combined with a layout algorithm by widgets."""
 
@@ -104,6 +147,8 @@ class ElementMixin:
     _supporting: str
     _open_template: Template | None
     _open: str
+    _disabled_template: Template | None
+    _disabled: str
     _cached: np.ndarray | None
     _cached_origin: Offset | None
     _needs_paint: bool
@@ -124,6 +169,8 @@ class ElementMixin:
         self._supporting = spec.supporting_text or ""
         self._open_template = spec.open_template()
         self._open = spec.open or ""
+        self._disabled_template = spec.disabled_template()
+        self._disabled = spec.disabled or ""
         self._cached = None
         self._cached_origin = None
         self._needs_paint = True
@@ -280,6 +327,38 @@ class ElementMixin:
         return self._open.strip().lower() not in ("", "false", "0", "none", "no")
 
     @property
+    def disabled(self) -> bool:
+        """Whether this element itself is marked disabled."""
+        return self._disabled.strip().lower() in ("true", "1", "yes")
+
+    @property
+    def _ancestor_disabled(self) -> bool:
+        node = self.parent
+        while node is not None:
+            if isinstance(node, ElementMixin) and node.disabled:
+                return True
+            node = node.parent
+        return False
+
+    @property
+    def effective_disabled(self) -> bool:
+        """Disabled by its own flag *or* by any ancestor's.
+
+        Inherited, so disabling a form section disables the controls inside it
+        -- which is the case people actually reach for. Walking the parent
+        chain is O(depth), and depth is small; nothing caches it because a
+        cached answer would go stale the moment a signal flipped an ancestor.
+        """
+        if self.disabled:
+            return True
+        node = self.parent
+        while node is not None:
+            if isinstance(node, ElementMixin) and node.disabled:
+                return True
+            node = node.parent
+        return False
+
+    @property
     def supporting(self) -> str:
         """Rendered `supporting_text` binding -- a list item's second line."""
         return self._supporting
@@ -351,6 +430,7 @@ class ElementMixin:
                 ("_value", self._value_template),
                 ("_supporting", self._supporting_template),
                 ("_open", self._open_template),
+                ("_disabled", self._disabled_template),
             )
             if tpl is not None and not tpl.is_static
         ]
@@ -393,6 +473,7 @@ class ElementMixin:
             return
 
         start = len(ctx.display_list)
+        outermost_disabled = self.disabled and not self._ancestor_disabled
         self.paint_self(ctx, absolute)
         child_ctx = self.child_paint_context(ctx, absolute)
         child_origin = self.child_origin(absolute)
@@ -400,6 +481,8 @@ class ElementMixin:
             if isinstance(child, ElementMixin):
                 child.paint(child_ctx, child_origin)
         self.paint_foreground(ctx, absolute)
+        if outermost_disabled:
+            _apply_disabled(ctx.display_list, start, ctx.palette, self.size, ctx.pixel_ratio)
 
         self.paint_focus_ring(ctx, absolute)
         self._cached = ctx.display_list.snapshot(start)

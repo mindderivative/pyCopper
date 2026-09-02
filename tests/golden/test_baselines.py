@@ -1397,3 +1397,69 @@ def test_carousel_parallax_baseline(render_scene, assert_golden) -> None:
     app.root.find("unc").set_scroll(70.0)  # part-way, so the pan differs per item
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("carousel_parallax", np.asarray(engine.canvas.draw()))
+
+
+def test_disabled_baseline(render_scene, assert_golden) -> None:
+    """Enabled controls beside their disabled counterparts.
+
+    M3 replaces a disabled control's colours with `on_surface` — container at
+    12%, content at 38% — rather than dimming what it had, so the filled and
+    outlined buttons converge on the same look. The right column also shows a
+    whole disabled container greying out the controls inside it.
+    """
+
+    def controls(suffix: str, disabled: str) -> dict:
+        return {
+            "name": f"col{suffix}",
+            "widget": "Column",
+            "style": {"width": 170, "spacing": 12},
+            "disabled": disabled,
+            "children": [
+                {
+                    "name": f"filled{suffix}",
+                    "widget": "Button",
+                    "text": "Filled",
+                    "style": {"width": 140, "height": 40, "variant": "filled"},
+                },
+                {
+                    "name": f"out{suffix}",
+                    "widget": "Button",
+                    "text": "Outlined",
+                    "style": {"width": 140, "height": 40, "variant": "outlined"},
+                },
+                {
+                    "name": f"row{suffix}",
+                    "widget": "Row",
+                    "style": {"height": 40, "spacing": 14, "cross_alignment": "center"},
+                    "children": [
+                        {"name": f"cb{suffix}", "widget": "Checkbox", "value": "true"},
+                        {"name": f"rd{suffix}", "widget": "Radio", "value": "true"},
+                        {"name": f"sw{suffix}", "widget": "Switch", "value": "true"},
+                    ],
+                },
+                {
+                    "name": f"chip{suffix}",
+                    "widget": "Chip",
+                    "text": "Filter",
+                    "style": {"variant": "filter"},
+                    "value": "true",
+                },
+            ],
+        }
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Row",
+            "style": {"background": "surface", "padding": 16, "spacing": 24},
+            "children": [controls("a", "false"), controls("b", "true")],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=400, height=220, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("disabled", np.asarray(engine.canvas.draw()))

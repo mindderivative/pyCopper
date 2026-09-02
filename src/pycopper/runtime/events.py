@@ -178,6 +178,19 @@ class EventDispatcher:
 
     # ------------------------------------------------------------ hit testing
 
+    @staticmethod
+    def _enabled_path(path: list[Any]) -> list[Any]:
+        """Drop a disabled target and everything under it.
+
+        Truncated rather than filtered: an enabled ancestor of a disabled
+        control must still receive the event, so the path is cut at the
+        disabled element and its ancestors are kept.
+        """
+        for index, element in enumerate(path):
+            if getattr(element, "effective_disabled", False):
+                return path[index + 1 :]
+        return path
+
     def hit_path(self, x: float, y: float) -> list[Any]:
         """Topmost-first list of elements under the point.
 
@@ -220,12 +233,13 @@ class EventDispatcher:
         pointer is over, which is the desktop convention every toolkit follows
         and is why this does not go through `_dispatch_to_focused`.
         """
-        self._propagate(self.hit_path(event.x, event.y), event)
+        self._propagate(self._enabled_path(self.hit_path(event.x, event.y)), event)
 
     def _dispatch_pointer(self, event: PointerEvent) -> None:
         # A captured pointer keeps receiving events outside its own bounds,
         # which is what makes dragging work.
         path = [self._captured] if self._captured is not None else self.hit_path(event.x, event.y)
+        path = self._enabled_path(path)
 
         # A press outside a modal dismisses it and goes no further.
         if (
@@ -258,9 +272,11 @@ class EventDispatcher:
 
         self._propagate(path, event)
 
-        # A click is press and release over the same element.
+        # A click is press and release over the same element. The live path is
+        # filtered the same way, or a press that landed on an enabled ancestor
+        # of a disabled child would never match and no click would fire.
         if event.type is EventType.POINTER_UP and path and path[0] is not None:
-            live = self.hit_path(event.x, event.y)
+            live = self._enabled_path(self.hit_path(event.x, event.y))
             if live and live[0] is path[0]:
                 self._propagate(live, PointerEvent(EventType.CLICK, x=event.x, y=event.y))
 
@@ -323,6 +339,15 @@ class EventDispatcher:
 
     @staticmethod
     def _invoke(element: Any, event: Event) -> None:
+        # Invoked in BOTH the capture and bubble phases, deliberately: the
+        # view format registers one handler with no phase, and an ancestor
+        # being able to intercept during capture is a tested feature
+        # (`test_stop_propagation_during_capture_prevents_the_target`).
+        #
+        # The consequence is a real sharp edge: a handler on an *ancestor* of
+        # the target runs twice for one event unless it checks `event.phase`.
+        # Documented in docs/view-reference.md rather than silently changed --
+        # it is a frozen 1.x API.
         handler = element.handlers.get(HANDLER_KEYS.get(event.type, ""))
         if handler is not None:
             handler(event)
@@ -332,6 +357,8 @@ class EventDispatcher:
         # view-declared handler -- a scroll view consumes the wheel whether or
         # not anyone wrote `on_wheel:`. The view's handler runs first so it can
         # stop propagation and pre-empt the built-in behaviour.
+        # Native behaviour runs once, on the way up only -- a scroll view must
+        # not consume one wheel notch twice.
         native = getattr(element, HANDLER_KEYS.get(event.type, ""), None)
         if native is not None and event.phase is not Phase.CAPTURE:
             native(event)
@@ -340,6 +367,14 @@ class EventDispatcher:
 
     @staticmethod
     def _focusable(element: Any) -> bool:
+        """A disabled control is skipped by Tab as well as by the pointer.
+
+        Leaving it in the focus order would let the keyboard reach something
+        the mouse cannot, which is the accessibility failure disabled state
+        exists to avoid.
+        """
+        if getattr(element, "effective_disabled", False):
+            return False
         return bool(element.handlers) or str(element.spec.widget) in FOCUSABLE_KINDS
 
     def focus(self, element: Any, *, keyboard: bool = False) -> None:

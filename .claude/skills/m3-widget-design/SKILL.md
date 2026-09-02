@@ -277,6 +277,13 @@ that does, and it is affordable there only because a carousel holds a handful
 of items; the same choice in a `ScrollView` would relayout a thousand rows a
 frame.
 
+**Disabled state exists** and is handled centrally: `disabled:` is a templated
+node field, it is inherited by children, and the M3 recolour (container
+`on_surface` 12%, content 38%) is applied to the whole emitted slice in
+`tree/element.py`. A new widget gets it for free -- do **not** add per-widget
+disabled branches. Check `element.effective_disabled` only if a widget needs to
+change *behaviour*, not appearance.
+
 **Paint above your children with `paint_foreground`.** `paint_self` runs
 *before* them, which is right for a background and wrong for a label over an
 image -- the carousel item's caption was invisible until this existed.
@@ -334,6 +341,4 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   Arabic or Hebrew glyphs, and caret/selection across a direction boundary is
   unimplemented (risk R9).
 
-- **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
-  have nowhere to attach.
 - **Tonal elevation.** Shadows only (see Step 2).

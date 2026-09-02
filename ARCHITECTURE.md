@@ -1241,6 +1241,46 @@ underneath the very content it captions and was invisible in every realistic
 use. `ElementMixin.paint_foreground` runs after the children and **inside the
 cached range**, so a clean subtree still splices correctly.
 
+### 5.18 Disabled state
+
+M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity
+38% (0.38)". Two details matter. It is a **replacement** with the `on_surface`
+role, not a dimming of the control's own colours — which is why a disabled
+filled button and a disabled outlined one look alike. And it is **state, not
+style**: `disabled:` is a templated node field beside `value:` and `open:`, not
+a `StyleSpec` property, because it changes what a control *is*.
+
+**Inherited.** Disabling a container disables everything inside it, which is the
+case people actually reach for. `effective_disabled` walks the parent chain;
+nothing caches it, because a cached answer goes stale the moment a signal flips
+an ancestor.
+
+**Inert, and invisible to the keyboard.** A disabled element is removed from the
+focus order as well as from the pointer path — leaving it Tab-reachable when the
+mouse cannot touch it is the accessibility failure the state exists to prevent.
+The hit path is **truncated, not filtered**: an enabled ancestor of a disabled
+control still receives the event, so a disabled button inside a clickable card
+does not swallow the card.
+
+**Painting** reuses the display-list slice mechanism (§5.13.2): one vectorised
+pass recolours everything the element drew. Container and content need different
+opacities, and the split is made by geometry — a box covering the element's own
+bounds is its container, anything else is content. Splitting on primitive *kind*
+would have been simpler and wrong: a radio's dot and a switch's thumb are
+content drawn as boxes, and at 12% they are all but invisible.
+
+#### One thing found and deliberately not changed
+
+A handler declared in a view is invoked in **both** the capture and bubble
+phases, so a handler on an *ancestor* of the target runs twice for one event.
+That looks like a bug and is not: an ancestor intercepting during capture is a
+tested feature, and the view format registers one handler with no phase to
+choose between them. Changing it would break a frozen 1.x API, so it is
+documented in the view reference instead. `event.phase` distinguishes them.
+
+Native widget behaviour (a scroll view consuming a wheel notch) *is* guarded to
+the non-capture phases, because running it twice would double the scroll.
+
 ### 5.19 The collapsing app bar — scroll-linked motion
 
 M3: "when scrolled, medium and large app bars can transform into small app
