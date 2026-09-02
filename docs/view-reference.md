@@ -231,13 +231,37 @@ Selection is a **binding, not style**: `value: "{{ checked.get() }}"`.
 |---|---|
 | `Card` | 12dp radius, 16dp padding. `elevated`, `filled`, `outlined`. |
 | `ListItem` | 56 / 72 / 88dp by line count. |
-| `TopAppBar` | 64dp. `small`, `center_aligned`. |
+| `TopAppBar` | 64dp small, 112dp `medium`, 152dp `large`. |
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator. |
 | `NavigationDrawer` | 240–360dp, 56dp items. |
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. |
 
 A selection container carries `value:` naming the selected child by `name`.
+
+### Collapsing app bars
+
+A `medium` or `large` app bar shrinks into a small one as its page scrolls,
+which M3 describes as transforming "into small app bars... until the page is
+scrolled back to the top". Name the scrolling view:
+
+```yaml
+- name: bar
+  widget: TopAppBar
+  text: Inbox
+  style: {variant: large, collapses_with: body, width: expand}
+- name: body
+  widget: ScrollView
+  style: {height: expand, width: expand}
+  children: [ ... ]
+```
+
+The height is a direct function of the scroll offset — there is no animation
+clock involved, so it tracks a drag exactly. The container also fills with
+`surface_container` as it collapses, which is M3's own way of separating the
+bar from the content beneath.
+
+Without `collapses_with:` a medium or large bar simply stays expanded.
 
 ### Progress
 
@@ -328,6 +352,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `axis` | `ScrollView` — `vertical` (default) or `horizontal` |
 | `scrollbar` | `ScrollView` — show the indicator when content overflows |
 | `handle` | `BottomSheet` — draw the drag handle |
+| `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |
 
 ---
@@ -338,9 +363,10 @@ Stated plainly so you can design around it:
 
 - **Motion is not everywhere yet.** Animated: overlay fades, state layers,
   every selection control, tab and navigation indicators, indeterminate
-  progress, and a carousel's snap. Not animated: a carousel's parallax and
-  app-bar collapse. Set `reduce_motion` in `Settings` to make everything arrive
-  at once.
+  progress, a carousel's snap, and app-bar collapse. Not animated: a carousel's
+  parallax. Set `reduce_motion` in `Settings` to make everything arrive at
+  once — it does not affect app-bar collapse, which follows a scroll offset
+  rather than a clock.
 - **A theme engine / stylesheet.** `classes` is a reserved selector target with
   no consumer yet.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% opacities have

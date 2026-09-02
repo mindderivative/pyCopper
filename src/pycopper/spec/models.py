@@ -300,6 +300,9 @@ class StyleSpec(_Frozen):
     dismissable: bool = True
     #: Gap between an anchored overlay and its anchor, in logical px.
     offset: float = Field(default=4.0, ge=0)
+    #: `name` of the ScrollView a TopAppBar collapses with. Without it a
+    #: medium or large bar simply stays expanded.
+    collapses_with: str | None = None
     #: Which way a ScrollView scrolls. Row/Column encode their axis in the
     #: widget kind, but a viewport's axis is independent of its content's.
     axis: Literal["vertical", "horizontal"] = "vertical"

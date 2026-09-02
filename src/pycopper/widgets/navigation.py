@@ -301,24 +301,85 @@ def _resolved_width(style: Any, constraints: Constraints, default: float) -> flo
 
 
 class TopAppBarElement(_StyledMixin, Flex):
-    """M3 Top App Bar: 64dp small/center-aligned, title-large.
+    """M3 Top App Bar: 64dp small/center-aligned, 112dp medium, 152dp large.
 
-    Only the collapsed forms are implemented; the medium and large variants
-    expand on scroll (112dp/152dp), which needs the scroll system.
+    A medium or large bar **collapses into a small one as its page scrolls** --
+    "when scrolled, medium and large app bars can transform into small app
+    bars; they should remain small until the page is scrolled back to the top".
+    Name the scrolling view with `collapses_with:`::
+
+        - {name: bar, widget: TopAppBar, text: Inbox,
+           style: {variant: large, collapses_with: body}}
+        - {name: body, widget: ScrollView, style: {height: expand}}
+
+    This is **scroll-linked**, not timed: there is no animation clock involved,
+    the height is a direct function of the offset. The bar registers as a
+    follower of that scroll view, which relayouts it as the view moves -- the
+    scrolled content itself is untouched and still travels at paint time.
+
+    The expanded heights are **not sourced**: that spec page's measurements are
+    images. The behaviour and the colour change are quoted.
     """
 
     HEIGHT: Final = 64.0
     PAD: Final = 16.0
+    #: variant -> expanded height. Small and centre-aligned do not collapse.
+    EXPANDED: Final = {"medium": 112.0, "large": 152.0}
+    #: Headline size while expanded, shrinking to title-large on collapse.
+    HEADLINE: Final = 28.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Flex.__init__(self, axis=Axis.HORIZONTAL, spacing=spec.style.spacing or 8.0)
         self.init_element(spec)
+        self._followed: Any = None
 
     def configure(self) -> None:
         self._spacing = self.style.spacing or 8.0
+        self._followed = None  # the view may have been renamed by a reload
+
+    @property
+    def expanded_height(self) -> float:
+        return self.EXPANDED.get(str(self.style.variant), self.HEIGHT)
+
+    def _scroll_source(self) -> Any:
+        """The ScrollView named by `collapses_with:`, resolved once.
+
+        Looked up from the root rather than a sibling search: an app bar and
+        the view it follows need not share a parent, and often will not.
+        """
+        name = self.style.collapses_with
+        if name is None:
+            return None
+        if self._followed is None:
+            node: Any = self
+            while node.parent is not None:
+                node = node.parent
+            found = node.find(name) if hasattr(node, "find") else None
+            if found is not None and hasattr(found, "scroll_offset"):
+                found.follow(self)
+                self._followed = found
+        return self._followed
+
+    @property
+    def collapse(self) -> float:
+        """How far collapsed, 0 (fully expanded) to 1 (a small bar)."""
+        expanded = self.expanded_height
+        travel = expanded - self.HEIGHT
+        if travel <= 0.0:
+            return 0.0
+        source = self._scroll_source()
+        if source is None:
+            return 0.0
+        return max(0.0, min(1.0, float(source.scroll_offset) / travel))
+
+    @property
+    def current_height(self) -> float:
+        expanded = self.expanded_height
+        return expanded - (expanded - self.HEIGHT) * self.collapse
 
     def perform_layout(self, constraints: Constraints) -> Size:
-        outer = constraints.copy_with(min_height=self.HEIGHT, max_height=self.HEIGHT)
+        height = self.current_height
+        outer = constraints.copy_with(min_height=height, max_height=height)
         size = super().perform_layout(outer)
         for child in self.children:
             child.offset = child.offset + EdgeInsets.all(self.PAD).top_left
@@ -326,20 +387,39 @@ class TopAppBarElement(_StyledMixin, Flex):
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         style = self.style
-        _box(
-            ctx,
-            absolute.x,
-            absolute.y,
-            self.size.width,
-            self.size.height,
-            token=ctx.palette.index(style.background or "surface"),
-            radius=0.0,
-        )
+        t = self.collapse
+        containers: tuple[tuple[int, float], ...]
+        if style.background:
+            containers = ((ctx.palette.index(style.background), 1.0),)
+        else:
+            # "On scroll, the container changes color to surface container."
+            # Tokens resolve in the shader, so this is two boxes, not a lerp.
+            containers = (
+                (ctx.palette.index("surface"), 1.0),
+                (ctx.palette.index("surface_container"), t),
+            )
+        for token_index, weight in containers:
+            if weight <= 0.0:
+                continue
+            _box(
+                ctx,
+                absolute.x,
+                absolute.y,
+                self.size.width,
+                self.size.height,
+                token=token_index,
+                radius=0.0,
+                alpha=weight,
+            )
         title = self._text.strip()
         if not title:
             return
         token = content_token(ctx, style, "on_surface")
         size = style.font_size if style.font_size != 14.0 else TITLE_SIZE
+        if self.expanded_height > self.HEIGHT:
+            # The headline shrinks to title-large as the bar becomes a small
+            # one, so the two forms agree at the moment of arrival.
+            size = self.HEADLINE + (size - self.HEADLINE) * t
         label = measure_text(title, size, engine=self.text_engine)
         x = (
             absolute.x + (self.size.width - label.width) / 2

@@ -277,6 +277,15 @@ that does, and it is affordable there only because a carousel holds a handful
 of items; the same choice in a `ScrollView` would relayout a thousand rows a
 frame.
 
+**Not all motion is timed.** A collapsing app bar is a direct function of a
+scroll offset, not of a clock -- so it tracks a drag exactly and never touches
+the ticker. If you build another scroll-linked widget, register it with
+`ScrollView.follow()` (scrolling marks paint only, so geometry that depends on
+the offset must be told), and check whether your widget's size feeds back into
+that view's scrollable extent. Two things that size each other need the cycle
+cut at the source: a `mark_needs_layout()` issued *during* a layout pass is
+cleared when its ancestor finishes and never runs.
+
 **Carousels exist**, and show the one case where relayout-on-scroll is right:
 a snapping layout's item widths depend on scroll position, so it marks layout,
 while the uncontained layout translates at paint time like any viewport. If a
@@ -324,7 +333,7 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
 - **Motion is not everywhere.** Overlay fades, state layers, every selection
-  control, tab and navigation indicators, indeterminate progress and the
-  carousel snap are animated. App-bar collapse and carousel parallax are not.
-  Wiring one up is usually small — see the "Motion exists" note above.
+  control, tab and navigation indicators, indeterminate progress, the carousel
+  snap and app-bar collapse are animated. Carousel parallax is not. Wiring one
+  up is usually small — see the "Motion exists" note above.
 - **Tonal elevation.** Shadows only (see Step 2).

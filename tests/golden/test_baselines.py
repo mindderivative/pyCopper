@@ -1260,3 +1260,61 @@ def test_indicators_baseline(render_scene, assert_golden) -> None:
     clock["t"] = 0.080  # 80ms into a 300ms move
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("indicators", np.asarray(engine.canvas.draw()))
+
+
+def test_app_bar_collapse_baseline(render_scene, assert_golden) -> None:
+    """A large app bar half-collapsed over its scrolled list.
+
+    Scroll-linked, so no clock is involved: setting the offset is enough, and
+    the frame is reproducible without driving time. At half travel the
+    headline sits between its expanded size and title-large, and the container
+    is half-filled with `surface_container`.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface"},
+            "children": [
+                {
+                    "name": "bar",
+                    "widget": "TopAppBar",
+                    "text": "Inbox",
+                    "style": {"variant": "large", "collapses_with": "body", "width": "expand"},
+                },
+                {
+                    "name": "body",
+                    "widget": "ScrollView",
+                    "style": {"height": "expand", "width": "expand"},
+                    "children": [
+                        {
+                            "name": "col",
+                            "widget": "Column",
+                            "style": {"width": "expand"},
+                            "children": [
+                                {
+                                    "name": f"row{i}",
+                                    "widget": "ListItem",
+                                    "text": f"Message {i}",
+                                    "supporting_text": "Supporting text",
+                                    "style": {"width": "expand"},
+                                }
+                                for i in range(10)
+                            ],
+                        }
+                    ],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=380, height=300, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.paint(DisplayList())
+    app.root.find("body").set_scroll(44.0)  # half of the 88dp travel
+    app.paint(DisplayList())
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("app_bar_collapse", np.asarray(engine.canvas.draw()))

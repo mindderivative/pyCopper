@@ -948,7 +948,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 |---|---|---|
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination |
 | `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem` |
-| `TopAppBar` | 64dp, title-large | small and centre-aligned; medium/large expand on scroll |
+| `TopAppBar` | 64dp small, 112dp medium, 152dp large | medium and large collapse on scroll (§5.19) |
 | `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
@@ -1222,6 +1222,46 @@ indeterminate to determinate as information arrives. Both use `linear` easing
 for the looping animations, because an eased loop decelerates into the wrap and
 jumps back to full speed, reading as a stutter once a second. Eased curves are
 for transitions that end.
+
+### 5.19 The collapsing app bar — scroll-linked motion
+
+M3: "when scrolled, medium and large app bars can transform into small app
+bars; they should remain small until the page is scrolled back to the top",
+and "on scroll, the container changes color to surface container".
+
+This is the one piece of motion in the framework that is **not driven by the
+clock**. The bar's height is a direct function of a scroll offset, so it tracks
+a drag exactly rather than chasing it, and the ticker is never involved. A view
+links the two by name:
+
+```yaml
+- {name: bar,  widget: TopAppBar, style: {variant: large, collapses_with: body}}
+- {name: body, widget: ScrollView, style: {height: expand}}
+```
+
+The bar registers as a **follower** of that view. Scrolling marks paint on the
+view alone (§5.14), so anything whose *geometry* depends on the offset must be
+told separately — `ScrollView.follow()` relayouts its followers when it moves.
+The scrolled content itself is untouched and still travels at paint time.
+
+#### The feedback loop, and where it had to be cut
+
+The bar and the view size each other: collapsing the bar enlarges the viewport,
+which shrinks `max_scroll`, which clamps the offset down, which un-collapses the
+bar. Measured, the first implementation did not oscillate — it settled into a
+**wrong** fixed point, a list back at its top with the bar stuck collapsed.
+
+The instinct is to invalidate harder. That fails for a specific reason worth
+recording: a `mark_needs_layout()` issued *during* a layout pass is cleared when
+its ancestor finishes laying out, leaving the element permanently dirty and
+never relaid out.
+
+So the cycle is cut at its source instead. `ScrollView` measures its scrollable
+extent against a viewport with its followers' collapse travel **added back**, so
+`max_scroll` is identical whether the bar is expanded or collapsed. There is
+then no loop to invalidate around, and a test asserts the extent does not vary
+across a full collapse. The degenerate case — content only as tall as the
+collapse frees — now scrolls exactly that far, collapses the bar, and stops.
 
 ### 5.16.1 The frozen surface
 

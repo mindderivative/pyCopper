@@ -98,7 +98,7 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 
 | Absent | Consequence |
 |---|---|
-| Motion is not everywhere | M3 easing and duration tokens, an injectable clock, and `reduce_motion`. Drives overlay fades, state layers, every selection control, tab and navigation indicators, indeterminate progress, and the carousel snap. Carousel parallax and app-bar collapse are still absent |
+| Motion is not everywhere | M3 easing and duration tokens, an injectable clock, and `reduce_motion`. Drives overlay fades, state layers, every selection control, tab and navigation indicators, indeterminate progress, the carousel snap, and scroll-linked app-bar collapse. Carousel parallax is still absent |
 | Theme engine and stylesheet | `classes` is a reserved selector target with no consumer |
 | Disabled state | M3's 12%/38% disabled opacities have nowhere to attach |
 | M3 type scale as named roles | Widgets take a raw `font_size` |

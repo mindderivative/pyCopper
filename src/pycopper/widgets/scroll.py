@@ -63,6 +63,10 @@ class ScrollViewElement(_StyledMixin, Padding):
         Padding.__init__(self, None, spec.style.padding)
         self.init_element(spec)
         self._content = Size(0.0, 0.0)
+        #: Elements whose *geometry* depends on this view's scroll offset --
+        #: a collapsing app bar. Scrolling marks paint on this view alone, so
+        #: anything sized from the offset has to be told, and told to relayout.
+        self._followers: list[Any] = []
 
     def configure(self) -> None:
         self._padding = self.style.padding
@@ -90,9 +94,21 @@ class ScrollViewElement(_StyledMixin, Padding):
     @property
     def max_scroll(self) -> float:
         """How far the content can travel. 0 when it already fits."""
+        return self._limit_for(self.size)
+
+    def _limit_for(self, size: Size) -> float:
+        """The scrollable extent against a given viewport.
+
+        `_follower_travel()` is added back because a collapsed follower has
+        *enlarged* this viewport; without it the extent would shrink as an app
+        bar collapses and the two would feed back into each other.
+        """
         pad = self._padding
         inset = pad.horizontal if self.horizontal else pad.vertical
-        return max(0.0, self._main(self._content) + inset - self._main(self.size))
+        return max(
+            0.0,
+            self._main(self._content) + inset - self._main(size) + self._follower_travel(),
+        )
 
     @property
     def scroll_offset(self) -> float:
@@ -117,10 +133,25 @@ class ScrollViewElement(_StyledMixin, Padding):
             else Offset(self.state.scroll.x, clamped)
         )
         self.mark_needs_paint()
+        self._notify_followers()
         return True
+
+    def _notify_followers(self) -> None:
+        for follower in self._followers:
+            follower.mark_needs_layout()
 
     def scroll_by(self, delta: float) -> bool:
         return self.set_scroll(self.scroll_offset + delta)
+
+    def follow(self, element: Any) -> None:
+        """Relayout `element` whenever this view scrolls.
+
+        The cost is explicit and local: a followed scroll view relayouts its
+        follower every frame it moves. The scrolled *content* is untouched --
+        that still travels at paint time.
+        """
+        if element not in self._followers:
+            self._followers.append(element)
 
     # ---------------------------------------------------------------- events
 
@@ -172,14 +203,37 @@ class ScrollViewElement(_StyledMixin, Padding):
 
         size = outer.constrain(viewport)
         # Content may have shrunk since the last frame -- a hot reload that
-        # removed rows can leave the offset past the new end.
+        # removed rows can leave the offset past the new end. So can a
+        # follower collapsing, which enlarges this viewport and reduces the
+        # scrollable extent; followers must be told, or a collapsed app bar
+        # would sit stale above a list that is back at its top.
         self.state.scroll = self._clamped_scroll(size)
         return size
 
+    def _follower_travel(self) -> float:
+        """How much height this view has *gained* from collapsed followers.
+
+        Subtracted back out of the viewport when measuring the scrollable
+        extent, so `max_scroll` is the same whether the app bar above is
+        expanded or collapsed.
+
+        Without this the two feed back into each other: collapsing the bar
+        enlarges this viewport, which shrinks `max_scroll`, which clamps the
+        offset down, which un-collapses the bar. The measured result was a
+        list that snapped back to its top with the bar stuck collapsed. Making
+        the extent invariant breaks the cycle at its source rather than
+        chasing it with invalidations.
+        """
+        if self.horizontal:
+            return 0.0
+        return sum(
+            max(0.0, float(f.expanded_height) - float(f.current_height))
+            for f in self._followers
+            if hasattr(f, "expanded_height")
+        )
+
     def _clamped_scroll(self, size: Size) -> Offset:
-        pad = self._padding
-        inset = pad.horizontal if self.horizontal else pad.vertical
-        limit = max(0.0, self._main(self._content) + inset - self._main(size))
+        limit = self._limit_for(size)
         current = self.state.scroll
         value = current.x if self.horizontal else current.y
         clamped = max(0.0, min(value, limit))
