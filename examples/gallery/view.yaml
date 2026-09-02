@@ -108,7 +108,10 @@ root:
       widget: Row
       style: {height: 40, spacing: 16, width: expand, cross_alignment: center}
       children:
-        - {name: cb_on,  widget: Checkbox, value: "{{ clicks.get() }}"}
+        # cb_on asks for M3's 48dp minimum target. It is still drawn at 18dp
+        # -- the hit rect grows, layout and paint do not -- so this row looks
+        # identical to one without it and is simply easier to click.
+        - {name: cb_on,  widget: Checkbox, value: "{{ clicks.get() }}", style: {min_hit_size: 48}}
         - {name: cb_off, widget: Checkbox, value: "false"}
         - {name: rd_on,  widget: Radio,    value: "true"}
         - {name: rd_off, widget: Radio,    value: "false"}

@@ -121,7 +121,6 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 | Absent | Consequence |
 |---|---|
 | Editable text | Text can be selected and copied, not typed into |
-| Separate hit and paint rects | M3's 48dp minimum touch target cannot be expressed — deliberate, as pyCopper is pointer-only |
 
 Mobile and touch are explicit non-goals.
 

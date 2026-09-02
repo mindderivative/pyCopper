@@ -64,10 +64,17 @@ what pyCopper does, and why they differ.
   state.
 - **Ignore touch-specific rules.** pyCopper is a DESKTOP framework with no
   touch support (`ARCHITECTURE.md` §1.2.1). M3 is written mobile-first, so part
-  of translating it is knowing which rules are about fingers. The 48x48dp
-  minimum touch target does **not** apply -- a pointer is pixel-precise, so hit
-  rects match the painted control. Neither does touch-origin ripple, nor the
-  compact (<600dp) breakpoint. Do not record these as gaps.
+  of translating it is knowing which rules are about fingers. Touch-origin
+  ripple and the compact (<600dp) breakpoint do **not** apply; do not record
+  them as gaps.
+
+  The 48x48dp minimum target is the one to be careful with. It is off by
+  default for the same reason -- a pointer is pixel-precise, so a control is
+  hit-tested at the size it is drawn -- but a view can now ask for it with
+  `min_hit_size: 48`, which grows the hit rect without touching layout or
+  paint. **Never paint a 48dp container to get a 48dp target.** Quote the
+  figure and say it is available as an application's choice, rather than
+  recording it as something pyCopper cannot express.
 - **Desktop affordances rank higher.** Hover is a first-class state, not a
   nicety. Focus rings, keyboard traversal, right-click, cursor shape, and
   visible scrollbars have no mobile analogue and matter more here than they do

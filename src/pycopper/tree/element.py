@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 import numpy as np
 
-from ..layout import OFFSET_ZERO, Offset, Rect
+from ..layout import EDGE_ZERO, OFFSET_ZERO, EdgeInsets, Offset, Rect
 from ..motion import Animation, Ticker, default_ticker
 from ..paint import NO_TOKEN, DisplayList
 from ..runtime.signals import Effect
@@ -155,6 +155,11 @@ class ElementMixin:
     _text_engine: TextEngine | None
     _ticker: Ticker | None
     _animations: dict[str, Animation]
+    _hit_overflow: float
+    _hit_insets: EdgeInsets | None
+    _own_hit_inset: float
+    _hit_pad: EdgeInsets | None
+    _min_hit: float | None
 
     def init_element(self, spec: WidgetSpec) -> None:
         self.spec = spec
@@ -180,11 +185,16 @@ class ElementMixin:
         #: with the rest of the runtime state, so a hot reload does not restart
         #: a transition that is mid-flight.
         self._animations = {}
+        self._hit_overflow = 0.0
+        self._hit_insets = None
+        self._own_hit_inset = 0.0
+        self._read_hit_style()
 
     def update_spec(self, spec: WidgetSpec) -> None:
         """Adopt a new spec, keeping all runtime state. The reconciler's core
         operation -- this is why editing a view file does not lose focus."""
         self.spec = spec
+        self._read_hit_style()
         self._template = spec.template()
         if self._template is None or self._template.is_static:
             self._text = spec.text or ""
@@ -698,24 +708,159 @@ class ElementMixin:
             return Rect.from_offset_size(offset, self.size)
         return Rect.from_offset_size(origin + self.offset, self.size)
 
+    #: Whether this element confines its children to its own rect. A widget
+    #: that clips what it paints must clip what it hits too, or a control
+    #: scrolled just past the edge would still take clicks it cannot show a
+    #: response to.
+    CLIPS_CHILDREN: bool = False
+
+    def _read_hit_style(self) -> None:
+        """Lift the two hit-rect properties off the spec, once.
+
+        They are fixed for a given spec -- the stylesheet has already folded in
+        by the time an element exists -- so reading them here keeps a pydantic
+        attribute chain out of the layout pass, which touches every element
+        every time anything resizes. Both are `None` for the overwhelming
+        majority of nodes, which makes the check downstream two loads and a
+        branch.
+        """
+        style = self.spec.style
+        pad = style.hit_padding
+        self._hit_pad = pad if (pad.left or pad.top or pad.right or pad.bottom) else None
+        self._min_hit = style.min_hit_size
+        if self._hit_pad is None and self._min_hit is None:
+            self._hit_insets = None
+            self._own_hit_inset = 0.0
+        else:
+            # Not left to the next layout pass: a reload that changes only
+            # these two marks paint, not layout, so nothing would refresh them.
+            self._refresh_hit_overflow()
+
+    def hit_insets(self) -> EdgeInsets:
+        """How far this element's hit rect extends past what it paints.
+
+        Two ways to ask for it, because M3 states the rule two ways. A minimum
+        size is the one the spec actually writes -- "at least 48x48dp" -- and
+        it stays correct when the control's size changes; padding is for the
+        asymmetric cases a minimum cannot express.
+        """
+        insets = self._hit_pad or EDGE_ZERO
+        minimum = self._min_hit
+        if minimum is None:
+            return insets
+        grow_x = max(0.0, (minimum - self.size.width - insets.horizontal) / 2.0)
+        grow_y = max(0.0, (minimum - self.size.height - insets.vertical) / 2.0)
+        if not grow_x and not grow_y:
+            return insets
+        return EdgeInsets(
+            insets.left + grow_x,
+            insets.top + grow_y,
+            insets.right + grow_x,
+            insets.bottom + grow_y,
+        )
+
+    def hit_rect(self, absolute: Offset) -> Rect:
+        """The rect this element accepts clicks in, given its absolute origin.
+
+        Reads the insets cached at layout time rather than deriving them: this
+        runs for every element the pointer passes over, on every mouse move,
+        and recomputing from the style there measured half again the cost of
+        the whole hit test.
+        """
+        insets = self._hit_insets
+        if insets is None:
+            return Rect.from_offset_size(absolute, self.size)
+        return Rect(
+            absolute.x - insets.left,
+            absolute.y - insets.top,
+            self.size.width + insets.horizontal,
+            self.size.height + insets.vertical,
+        )
+
+    def absolute_hit_rect(self) -> Rect:
+        """The hit rect in root coordinates, walking the ancestor chain."""
+        offset = self.offset
+        node = self.parent
+        while node is not None:
+            offset = offset + node.offset
+            node = node.parent
+        return self.hit_rect(offset)
+
+    def _refresh_hit_overflow(self) -> None:
+        """Publish how far this element's hit rect reaches past what it paints.
+
+        Hit testing used to stop at any element that did not contain the point,
+        which is correct only while a hit rect never leaves its parent. Now one
+        can, so each ancestor needs to descend into a region wider than itself
+        -- and recomputing that union on every pointer move would put an O(n)
+        walk on the most frequent event there is.
+
+        So the reach is pushed *up* at layout time instead, and only by the few
+        elements that ask for an enlarged target. An element with neither
+        property does two attribute loads and stops, which is what keeps this
+        off the layout budget of a tree that does not use the feature.
+
+        The published figure only ever needs to be an **upper bound**: too
+        large wastes a little recursion, and acceptance is still tested against
+        exact rects. That is what makes it safe to grow a value up the ancestor
+        chain and never shrink it, rather than tracking invalidation for a
+        property that changes about as often as a view file is edited.
+        """
+        if self._hit_pad is None and self._min_hit is None:
+            return
+        insets = self.hit_insets()
+        self._hit_insets = insets
+        reach = max(insets.left, insets.top, insets.right, insets.bottom)
+        self._own_hit_inset = reach
+        node = self.parent
+        while isinstance(node, ElementMixin) and node._hit_overflow < reach:
+            node._hit_overflow = reach
+            node = node.parent
+
+    def layout(self, constraints: Any, *, parent_uses_size: bool = True) -> Any:
+        size = super().layout(constraints, parent_uses_size=parent_uses_size)  # type: ignore[misc]
+        self._refresh_hit_overflow()
+        return size
+
+    def _layout_without_resize(self) -> None:
+        # A relayout boundary never goes through `layout`, so without this a
+        # subtree relayout would leave a target it just resized unpublished.
+        super()._layout_without_resize()  # type: ignore[misc]
+        self._refresh_hit_overflow()
+
     def hit_test(self, x: float, y: float, origin: Offset = OFFSET_ZERO) -> list[Any]:
         """Topmost-first path of elements under the point.
 
         Children are visited in REVERSE order because later siblings paint on
         top; a naive forward walk would report the wrong target whenever
-        anything overlaps.
+        anything overlaps. That ordering is also what resolves two enlarged hit
+        rects that overlap each other: the one drawn on top takes the point.
         """
         absolute = origin + self.offset
-        rect = Rect.from_offset_size(absolute, self.size)
-        if not rect.contains(x, y):
-            return []
+        rect = self.hit_rect(absolute)
+        inside = rect.contains(x, y)
+        if not inside:
+            # The widened descent region, built only when there is one: a tree
+            # that asks for no enlarged targets takes exactly the branch it did
+            # before hit and paint rects were split.
+            overflow = self._hit_overflow
+            if not overflow or self.CLIPS_CHILDREN:
+                return []
+            if not (
+                rect.x - overflow <= x < rect.right + overflow
+                and rect.y - overflow <= y < rect.bottom + overflow
+            ):
+                return []
         child_origin = self.child_origin(absolute)
         for child in reversed(self.children):
             if isinstance(child, ElementMixin):
                 found = child.hit_test(x, y, child_origin)
                 if found:
                     return [*found, self]
-        return [self]
+        # Not `[self]` unconditionally: the point may be in the widened descent
+        # region and outside this element's own rect, which is a miss for it
+        # even though a child could have claimed it.
+        return [self] if inside else []
 
     def walk_elements(self) -> Iterator[Any]:
         yield self

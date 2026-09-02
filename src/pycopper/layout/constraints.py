@@ -108,7 +108,12 @@ OFFSET_ZERO: Final = Offset(0.0, 0.0)
 
 @dataclass(frozen=True, slots=True)
 class Rect:
-    """An absolute, axis-aligned box. Produced by paint, consumed by hit testing."""
+    """An absolute, axis-aligned box.
+
+    Used for both of an element's rects: the one it paints, and the one it
+    accepts clicks in. Those were the same rectangle until `hit_padding` and
+    `min_hit_size` split them.
+    """
 
     x: float = 0.0
     y: float = 0.0

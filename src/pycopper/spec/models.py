@@ -297,6 +297,16 @@ class StyleSpec(_Frozen):
     padding: Edges = EdgeInsets()
     margin: Edges = EdgeInsets()
 
+    #: Extra area around the paint rect that still counts as a hit. Affects
+    #: neither layout nor paint -- a control keeps its size and its drawing,
+    #: and merely becomes easier to hit.
+    hit_padding: Edges = EdgeInsets()
+    #: Smallest hit rect this element accepts, in logical px, centred on the
+    #: paint rect. This is how M3's "at least 48x48dp" target is written:
+    #: `min_hit_size: 48` on an 18dp checkbox, rather than 15dp of padding
+    #: worked out by hand and wrong the moment the box changes size.
+    min_hit_size: float | None = Field(default=None, gt=0.0, le=1000.0)
+
     background: TokenRef | None = None
     #: None means "use this widget's own M3 default for its variant". An
     #: explicit token always wins.

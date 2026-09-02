@@ -40,9 +40,12 @@ that would otherwise be argued repeatedly.
 means knowing which of its rules are about *fingers* and which are about
 *design*. Rules that do not apply here:
 
-- **The 48×48dp minimum touch target.** A finger-precision requirement. A mouse
-  pointer is precise to the pixel, so hit rects match the painted control and an
-  18dp checkbox is hit-tested at 18dp. This is deliberate, not a limitation.
+- **The 48×48dp minimum touch target, by default.** A finger-precision
+  requirement; a mouse pointer is precise to the pixel, so a control is
+  hit-tested at the size it is drawn unless a view asks otherwise. It *can* now
+  be asked for — `min_hit_size: 48` (§5.9.1) — because "expressible but off by
+  default" and "not expressible" are different things, and only the first lets
+  an application decide.
 - **Touch ripple radiating from the contact point.** State layers still apply;
   the ripple's touch-origin behaviour does not.
 - **Compact breakpoints (<600dp).** Desktop windows live in M3's Expanded,
@@ -635,6 +638,50 @@ Events arrive from `rendercanvas` callbacks and are pushed onto a queue drained 
 **Hit testing walks the Element tree in reverse painter order** and returns the topmost hit path, respecting ancestor clip rects. A naive full-tree recursion that visits every node — as in the prior draft — both ignores z-order and cannot express "the panel above intercepted this click".
 
 The path is **the target followed by its ancestors**, not everything under the cursor. An occluded sibling that also contains the point is absent from it and receives nothing, which is the whole point of respecting paint order.
+
+#### 5.9.1 Hit rects are not paint rects
+
+A control may accept clicks in an area larger than the one it draws. Two style
+properties say so: `hit_padding` grows each edge, and `min_hit_size` states a
+minimum square, which is how M3 writes the rule it actually cares about — "at
+least 48×48dp" stays correct when the control's size changes, where 15dp of
+hand-computed padding does not. Neither affects layout or paint: the control
+keeps its size, its neighbours keep their positions, and the display list is
+byte-identical.
+
+Three consequences, each of which had to be handled rather than assumed away:
+
+- **A hit rect can leave its parent.** The old walk returned early from any
+  element that did not contain the point, which is correct only while a child
+  cannot reach past its parent's edge — precisely the edges an enlarged target
+  exists to cover. Each element therefore caches `_hit_overflow`, the furthest
+  any descendant's hit rect can reach beyond its own, and descends into that
+  wider region while still *accepting* only within its exact rect.
+
+  That cache only ever has to be an **upper bound**. Too large costs a little
+  wasted recursion and can never produce a wrong answer, which is what makes it
+  safe to grow the value up the ancestor chain and never shrink it — instead of
+  tracking invalidation for a property that changes about as often as a view
+  file is edited. Recomputing the union per pointer move would put an O(n) walk
+  on the most frequent event there is.
+
+  The reach is therefore **pushed up at layout time by the few elements that
+  ask for a target**, rather than pulled down by every element polling its
+  children. An element with neither property does two attribute loads and
+  stops. The first version did poll, and read the properties off the pydantic
+  spec inside `hit_test`; measured against the gallery that cost +17% on a
+  layout pass and +54% on a hit test. The version that ships costs +3% and +8%
+  — a hit test is ~7µs against a 16ms frame, and it is stated here because
+  "some overhead" is not a number.
+
+- **A widget that clips what it paints must clip what it hits.** `ScrollView`,
+  `Carousel`, `CarouselItem` and `SegmentedButton` set `CLIPS_CHILDREN`, so a
+  control scrolled just past the edge cannot take a click it has no way to show
+  a response to.
+
+- **Enlarged targets can overlap where the drawn controls do not.** M3 asks for
+  8dp between targets and nothing here can enforce it. The tie breaks the same
+  way overlapping paint does: reverse sibling order, so the one on top wins.
 
 The entire drain runs inside one signal `batch()`, so a handler writing several signals triggers dependent work once rather than once per write.
 

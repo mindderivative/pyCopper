@@ -391,6 +391,40 @@ A line height shorter than the font's own is allowed and does occur in the
 scale; the leading is simply negative, and lines close up rather than the
 glyphs being cropped.
 
+## Hit targets
+
+A control is clickable at the size it is drawn, which on a pixel-precise
+pointer is what you want. Two properties widen that without touching anything
+else:
+
+```yaml
+- name: agree
+  widget: Checkbox
+  style: {min_hit_size: 48}      # M3's "at least 48x48dp", on an 18dp box
+```
+
+`min_hit_size` is a minimum square centred on the painted control, and it is
+the way to write M3's rule: the figure stays correct when the control's size
+changes, where padding worked out by hand does not. `hit_padding` takes the
+same forms as `padding` — one number, or `[left, top, right, bottom]` — for the
+asymmetric cases a minimum cannot state.
+
+**Neither affects layout or paint.** The control keeps its size, its neighbours
+keep their positions, and what is drawn is identical. Only where clicks, hover,
+and the cursor shape are picked up changes.
+
+Three things worth knowing:
+
+- A widened target **reaches outside its parent** if it needs to. A 48dp target
+  on an 18dp checkbox in a 40dp row extends past the row, and clicks there
+  still arrive.
+- Two widened targets **can overlap** where the drawn controls do not. M3 asks
+  for 8dp between targets and nothing here enforces it; where they overlap, the
+  one drawn later wins, exactly as overlapping paint does.
+- A widget that **clips** its children — `ScrollView`, `Carousel`,
+  `SegmentedButton` — clips their targets too. A control scrolled just past the
+  edge does not take clicks it cannot visibly respond to.
+
 ## Text selection
 
 A `Text` widget with `selectable: true` can be selected with the mouse:
@@ -733,6 +767,8 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `font_weight` | 400 or 500 (Roboto ships both); resolves to the nearest available |
 | `letter_spacing` | tracking in logical px, added after each grapheme cluster |
 | `line_height` | a fixed line height in logical px; unset keeps the font's own |
+| `hit_padding` | extra clickable area around the paint rect; same form as `padding` |
+| `min_hit_size` | smallest clickable square, in logical px, centred on the paint rect |
 | `icon_size` | dp, default 24 |
 | `icon_fill` | 0–1. M3 uses this for selected state — prefer it to swapping icon names. |
 | `icon_weight` | 100–700 |
@@ -765,6 +801,6 @@ Stated plainly so you can design around it:
   caret blink, no insertion, no undo. A text field is its own piece of work.
 - **A system clipboard.** Copying is in-process with a documented seam for a
   real one — see [Text selection](#text-selection).
-- **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
-  expressed on a smaller visible control. This is deliberate — pyCopper is
-  pointer-only.
+- **The 48dp minimum touch target by default.** A pointer is pixel-precise, so
+  a control is hit-tested at the size it is drawn. `min_hit_size:` asks for
+  more where an application wants it — see [Hit targets](#hit-targets).

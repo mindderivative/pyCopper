@@ -317,6 +317,8 @@ class CarouselElement(_StyledMixin, Flex):
             return absolute
         return Offset(absolute.x - self.scroll_x, absolute.y)
 
+    CLIPS_CHILDREN = True
+
     def child_paint_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
         """Clip items to the strip, so one scrolled off does not spill out."""
         dpr = ctx.pixel_ratio
@@ -448,6 +450,8 @@ class CarouselItemElement(_StyledMixin, Flex):
             self.LABEL,
             paired_content_token(ctx, style, "on_surface"),
         )
+
+    CLIPS_CHILDREN = True
 
     def child_paint_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
         """Clip content to the rounded item -- M3 items hold images."""

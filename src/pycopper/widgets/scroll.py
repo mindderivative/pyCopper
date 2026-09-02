@@ -302,6 +302,11 @@ class ScrollViewElement(_StyledMixin, Padding):
 
     # ----------------------------------------------------------------- paint
 
+    #: Content is clipped to the viewport, so it is hit-tested there too --
+    #: a control scrolled just past the edge must not take a click it cannot
+    #: show a response to.
+    CLIPS_CHILDREN = True
+
     def child_origin(self, absolute: Offset) -> Offset:
         """Translate the content. This is the whole scroll mechanism."""
         scroll = self.state.scroll

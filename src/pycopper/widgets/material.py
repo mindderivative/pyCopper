@@ -10,9 +10,11 @@ quietly approximating.
 
 **pyCopper is a desktop framework and does not target touch.** M3's 48x48dp
 minimum touch target is a finger-precision requirement; a mouse pointer is
-precise to the pixel, so hit rects deliberately match the painted control.
-Desktop affordances M3 treats as secondary -- hover, focus rings, keyboard
-traversal, right-click -- matter correspondingly more.
+precise to the pixel, so hit rects match the painted control by default. A view
+that wants the M3 figure asks for it with `min_hit_size: 48`, which widens the
+hit rect and leaves layout and paint alone. Desktop affordances M3 treats as
+secondary -- hover, focus rings, keyboard traversal, right-click -- matter
+correspondingly more.
 """
 
 from __future__ import annotations
@@ -338,8 +340,10 @@ class DividerElement(_StyledMixin, Padding):
 class CheckboxElement(_StyledMixin, Padding):
     """M3 Checkbox: 18dp box, 2dp radius, checkmark when selected.
 
-    Hit-tested at its 18dp visual size: M3's 48dp touch target is a
-    finger-precision rule and does not apply to a pointer.
+    Hit-tested at its 18dp visual size, because M3's 48dp touch target is a
+    finger-precision rule and a pointer is pixel-precise. An application that
+    wants the M3 figure anyway writes `min_hit_size: 48` on the node; the box
+    is still drawn at 18dp.
     """
 
     BOX: Final = 18.0

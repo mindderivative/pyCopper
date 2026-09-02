@@ -679,6 +679,8 @@ class SegmentedButtonElement(_SelectionContainer):
         self._main_size = MainAxisSize.MAX if self._stretches else MainAxisSize.MIN
         return super().perform_layout(inner)
 
+    CLIPS_CHILDREN = True
+
     def child_paint_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
         """Clip segments to the rounded container so a selected end segment's
         square fill does not poke past the outline."""
