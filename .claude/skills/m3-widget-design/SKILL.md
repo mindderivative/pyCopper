@@ -72,10 +72,14 @@ what pyCopper does, and why they differ.
   nicety. Focus rings, keyboard traversal, right-click, cursor shape, and
   visible scrollbars have no mobile analogue and matter more here than they do
   in the M3 source material.
-- **Elevation is approximated.** M3 elevation is tonal surface shift *plus*
-  shadow; pyCopper currently has only `ShadowSpec` (blur, offset, opacity).
-  Pick a shadow that reads like the right level and say that the tonal half is
-  missing.
+- **Elevation is a level, not a shadow you choose.** Give the widget a
+  `RESTING_ELEVATION` (or a `resting_elevation` property if it depends on the
+  variant, as Card and Button do) from M3's resting-level table, and call
+  `elevation_shadow(...)` with `self.elevation`. Never hand-tune a blur: three
+  widgets used to, and components at the same M3 level did not look like they
+  were at the same height. Do **not** reach for a surface tint overlay -- M3
+  deprecated it; tonal separation comes from the `surface_container_*` roles,
+  which are explicitly not tied to elevation.
 
 ## Step 3: Build it
 
@@ -355,4 +359,3 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   Arabic or Hebrew glyphs, and caret/selection across a direction boundary is
   unimplemented (risk R9).
 
-- **Tonal elevation.** Shadows only (see Step 2).

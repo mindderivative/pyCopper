@@ -318,6 +318,10 @@ class StyleSpec(_Frozen):
 
     #: Which M3 variant of the component to render.
     variant: Variant = "filled"
+    #: M3 elevation level, 0-5. `None` means "this component's resting level".
+    #: A level is a *relationship*, not a shadow: it says where a surface sits
+    #: relative to others. The dp height it maps to is what produces a shadow.
+    elevation: int | None = Field(default=None, ge=0, le=5)
     #: Divider thickness and inset, in logical px.
     thickness: float = Field(default=1.0, gt=0)
     inset: float = Field(default=0.0, ge=0)

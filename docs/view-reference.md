@@ -294,6 +294,38 @@ application keeps focus, scroll, and text.
 Selectors are structured rather than CSS-like strings, deliberately: a `#name`
 selector would need quoting in every rule, because YAML reads `#` as a comment.
 
+## Elevation
+
+M3 gives every component a resting **level**, 0 to 5, and each level a dp
+height. A level says where a surface sits relative to others; the height is
+what produces a shadow.
+
+| Level | Height | Components that rest there |
+|---|---|---|
+| 0 | 0dp | filled/tonal/outlined buttons, filled/outlined cards, chips, tabs, lists, rail |
+| 1 | 1dp | elevated button, elevated card, modal bottom sheet, modal side sheet, modal drawer |
+| 2 | 3dp | menu, scrolled app bar, rich tooltip |
+| 3 | 6dp | FAB, modal dialog |
+| 4–5 | 8/12dp | not resting levels — reserved for interacted states |
+
+Components take their own level, so you rarely set one:
+
+```yaml
+- {name: fab, widget: Fab, text: add}                    # level 3, from M3
+- {name: flat, widget: Fab, style: {elevation: 0}}       # deliberately flat
+```
+
+Hovering or focusing something already raised lifts it one level, which is what
+M3 describes. A level-0 component stays flat — a filled button growing a shadow
+under the pointer is not what the spec means.
+
+**On tonal elevation.** M3 used to express elevation partly as a surface *tint*
+overlay. That mechanism is **deprecated**: "Surface tint color is deprecated.
+Use elevation level tokens (0–5) instead." Tonal separation now comes from
+choosing among the `surface` and `surface_container_*` roles, which the spec
+says are "not tied to elevation" — so picking a container role and setting a
+level are two independent decisions, and pyCopper treats them that way.
+
 ## Dragging
 
 Two things respond to a drag, and both are affordances that would otherwise be
@@ -469,7 +501,8 @@ scrolls by pixels.
 | `color` | content colour; defaults to the widget's own M3 role |
 | `corner_radius` | one number, or `[tl, tr, br, bl]` |
 | `border` | `{width, color}` |
-| `shadow` | `{blur, offset_x, offset_y, color, opacity}` |
+| `shadow` | `{blur, offset_x, offset_y, color, opacity}` — hand-tuned; prefer `elevation` |
+| `elevation` | M3 level 0–5. Omit to use the component's own resting level |
 | `opacity` | 0–1 |
 
 Colours are **token names, not hex** — that is what makes a theme switch a
@@ -519,8 +552,6 @@ Stated plainly so you can design around it:
   or carousel parallax, which follow a position rather than a clock.
 - **The M3 type scale as named roles.** Widgets take a raw `font_size`;
   `label-large` and friends are not modelled.
-- **Tonal elevation.** M3 elevation is a tonal surface shift *plus* a shadow;
-  only the shadow is modelled.
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
   expressed on a smaller visible control. This is deliberate — pyCopper is
   pointer-only.

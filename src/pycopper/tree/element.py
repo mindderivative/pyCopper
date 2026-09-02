@@ -518,6 +518,33 @@ class ElementMixin:
             return "anchor"
         return self.DEFAULT_PLACEMENT or str(style.placement)
 
+    #: This component's M3 resting elevation level, from the spec's own table.
+    #: A view's `elevation:` overrides it. Override `resting_elevation` instead
+    #: where the level depends on the variant, as it does for Card and Button.
+    RESTING_ELEVATION: int = 0
+
+    @property
+    def resting_elevation(self) -> int:
+        return self.RESTING_ELEVATION
+
+    @property
+    def elevation(self) -> int:
+        """The level this element actually sits at.
+
+        M3: elevation "is only used to determine where the component sits in
+        relation to other components, including when hovered or focused (which
+        usually raises elevation by one level)". The raise applies only to
+        something already raised -- a flat filled button growing a shadow on
+        hover is not what the spec means, and "usually" is not licence to do it
+        everywhere.
+        """
+        level = self.style.elevation
+        if level is None:
+            level = self.resting_elevation
+        if level > 0 and (self.state.hovered or self.state.focused):
+            level = min(5, level + 1)
+        return level
+
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
         """Corner radii this element actually paints with.

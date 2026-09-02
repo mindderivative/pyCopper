@@ -116,6 +116,7 @@ class NavItemElement(_StyledMixin, Padding):
     selection, rather than swapping to a different icon.
     """
 
+    #: "Navigation drawer (modal)" is level 1; the rail is level 0.
     RAIL_W: Final = 80.0
     RAIL_H: Final = 56.0
     INDICATOR_W: Final = 56.0

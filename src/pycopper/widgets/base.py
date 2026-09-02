@@ -263,6 +263,12 @@ class ButtonElement(ContainerElement):
     HEIGHT: Final = 40.0
     MIN_WIDTH: Final = 64.0
 
+    #: Only the `elevated` variant rests above the surface; M3 puts filled,
+    #: tonal and outlined buttons at level 0.
+    @property
+    def resting_elevation(self) -> int:
+        return 1 if self.style.variant == "elevated" else 0
+
     #: variant -> (container token or None, content token, outlined, elevated)
     VARIANTS: Final = {
         "filled": ("primary", "on_primary", False, False),
@@ -291,17 +297,18 @@ class ButtonElement(ContainerElement):
         token = content_token(ctx, style, content)
 
         if elevated:
-            ctx.display_list.add_shadow(
-                absolute.x * dpr,
-                absolute.y * dpr,
-                size.width * dpr,
-                size.height * dpr,
-                blur=5.0 * dpr,
-                offset=(0.0, 1.0 * dpr),
-                color=(0.0, 0.0, 0.0, 0.30),
-                radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
-                clip=ctx.clip,
-                clip_radii=ctx.clip_radii,
+            from .material import elevation_shadow
+
+            # "Button (elevated)" is a level-1 resting component. The shadow
+            # comes from the level, not from a number chosen here.
+            elevation_shadow(
+                ctx,
+                absolute.x,
+                absolute.y,
+                size.width,
+                size.height,
+                level=self.elevation,
+                radii=radii,
             )
 
         fill = style.background or container

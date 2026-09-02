@@ -1329,6 +1329,48 @@ element reach into the runtime. A sheet that wants to close raises
 A drag tracks the pointer **exactly** — only the release is animated. Easing a
 drag would make the sheet lag behind the thing moving it.
 
+### 5.17.3 Elevation
+
+This one began as "implement the tonal half of elevation" and turned into a
+correction, because the spec says: **"Surface tint color is deprecated. Use
+elevation level tokens (0–5) instead."** The tonal-overlay mechanism these docs
+had recorded as the missing half is the mechanism M3 has withdrawn. Tonal
+separation now comes from the `surface` and `surface_container_*` roles, which
+the spec says are "not tied to elevation" — so choosing a container role and
+setting a level are independent decisions, and the widget catalogue was already
+doing the first correctly.
+
+What was actually missing was the level system itself. Six levels, each with a
+dp height, both quoted:
+
+| Level | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| Height | 0dp | 1dp | 3dp | 6dp | 8dp | 12dp |
+
+Levels 0–3 are resting states; "+4 and +5 are reserved for user-interacted
+states such as hover and dragged". Each component carries the resting level
+M3's own table assigns it, and `elevation:` in a view overrides that. Hovering
+or focusing something **already raised** lifts it one level — the spec says
+"usually", which is not licence to give every flat button a shadow under the
+pointer.
+
+**Shadows are derived, not chosen.** Three widgets had hand-tuned blur values,
+so a dialog and a FAB at the same M3 level did not look like they were at the
+same height. `elevation_shadow` now maps a level to one shadow for everything.
+The dp→blur mapping is **not sourced** — the spec describes the relationship
+("larger, softer shadows express more distance") in prose and images without
+figures — so the constants are anchored on the value the Card already used at
+level 1, letting the family scale out from a shape that had been reviewed
+rather than from an invention.
+
+**One bug worth recording.** The paint sites resolved their level as
+`self.elevation or FALLBACK`, and `or` cannot tell an explicit `0` from unset —
+so `elevation: 0` silently re-raised the component it was meant to flatten. It
+survived the first round of tests because those asserted on the property, which
+was correct, rather than on what was painted. Fixing it exposed the real
+structure: Card and Button rest at level 1 only in their `elevated` variant, so
+the resting level is a **property**, not a class constant.
+
 ### 5.18 Disabled state
 
 M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity

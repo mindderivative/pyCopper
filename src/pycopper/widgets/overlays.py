@@ -169,6 +169,8 @@ class DialogElement(_StyledMixin, Padding):
     RADIUS: Final = 28.0
     PADDING: Final = 24.0
     MIN_WIDTH: Final = 280.0
+    #: "Dialogs (modal)" sit at level 3.
+    RESTING_ELEVATION = 3
     MAX_WIDTH: Final = 560.0
     HEADLINE: Final = 24.0
     BODY: Final = 14.0
@@ -309,6 +311,8 @@ class MenuElement(_PaddedFlex):
     """
 
     RADIUS: Final = 4.0
+    #: "Menu" sits at level 2.
+    RESTING_ELEVATION = 2
     MIN_WIDTH: Final = 112.0
     MAX_WIDTH: Final = 280.0
     PAD_Y: Final = 8.0
@@ -597,6 +601,8 @@ class BottomSheetElement(_PaddedFlex):
     """
 
     RADIUS: Final = 28.0
+    #: "Bottom sheet (modal)" sits at level 1.
+    RESTING_ELEVATION = 1
     MAX_WIDTH: Final = 640.0
     HANDLE_WIDTH: Final = 32.0
     HANDLE_HEIGHT: Final = 4.0
@@ -745,6 +751,8 @@ class SideSheetElement(_PaddedFlex):
     """
 
     RADIUS: Final = 16.0
+    #: "Side sheet (modal)" sits at level 1.
+    RESTING_ELEVATION = 1
     MAX_WIDTH: Final = 400.0
     PADDING: Final = 24.0
     INSETS: ClassVar[EdgeInsets] = EdgeInsets.all(PADDING)

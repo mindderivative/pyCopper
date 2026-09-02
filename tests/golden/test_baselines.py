@@ -1513,3 +1513,48 @@ def test_stylesheet_baseline(render_scene, assert_golden) -> None:
     app.mount()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("stylesheet", np.asarray(engine.canvas.draw()))
+
+
+def test_elevation_baseline(render_scene, assert_golden) -> None:
+    """The six M3 elevation levels, on a light theme.
+
+    Deliberately light: a 30%-alpha shadow over the dark theme's near-black
+    surface is barely perceptible, so a dark baseline would pass whatever the
+    shadows did. The whole point of this frame is that the levels are
+    distinguishable from each other.
+
+    Levels run 0 (flat) to 5, top to bottom. A `Card` draws no label, so the
+    shadows are the whole content of the frame -- which is the point.
+
+    Levels 0-3 are resting states; M3 reserves +4 and +5 for interacted states
+    such as hover, which is why nothing rests there.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 20, "spacing": 18},
+            "children": [
+                {
+                    "name": f"row{level}",
+                    "widget": "Card",
+                    "style": {
+                        "variant": "elevated",
+                        "elevation": level,
+                        "width": 260,
+                        "height": 34,
+                        "background": "surface_container_lowest",
+                    },
+                }
+                for level in range(6)
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=340, theme=Theme(seed=SEED, dark=False)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=False))
+    app.attach(engine)
+    app.mount()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("elevation", np.asarray(engine.canvas.draw()))

@@ -173,6 +173,56 @@ def _arc(
     )
 
 
+#: M3's six elevation levels and their dp heights, quoted from
+#: `styles/M3-Styles-Elevation-Tokens.md`. Levels 0-3 are resting states;
+#: "+4 and +5 are reserved for user-interacted states such as hover and
+#: dragged".
+ELEVATION_DP: Final = {0: 0.0, 1: 1.0, 2: 3.0, 3: 6.0, 4: 8.0, 5: 12.0}
+
+#: Turning a dp height into a shadow. **Not sourced** -- the spec describes the
+#: relationship ("larger, softer shadows express more distance") and shows it in
+#: images, without giving blur or offset figures. The constants are anchored on
+#: the value the Card already used for level 1, so the family scales out from a
+#: shape that was already reviewed rather than from an invention.
+SHADOW_BASE_BLUR: Final = 4.0
+SHADOW_BLUR_PER_DP: Final = 2.0
+SHADOW_OPACITY: Final = 0.30
+
+
+def elevation_shadow(
+    ctx: PaintContext,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    *,
+    level: int,
+    radii: tuple[float, float, float, float],
+) -> None:
+    """Emit the shadow for an M3 elevation level. Level 0 draws nothing.
+
+    Shared rather than hand-tuned per widget: three components had their own
+    blur values, so a dialog and a FAB at the same M3 level did not look like
+    they were at the same height.
+    """
+    dp = ELEVATION_DP.get(level, 0.0)
+    if dp <= 0.0:
+        return
+    dpr = ctx.pixel_ratio
+    ctx.display_list.add_shadow(
+        x * dpr,
+        y * dpr,
+        w * dpr,
+        h * dpr,
+        blur=(SHADOW_BASE_BLUR + dp * SHADOW_BLUR_PER_DP) * dpr,
+        offset=(0.0, dp * dpr),
+        color=(0.0, 0.0, 0.0, SHADOW_OPACITY),
+        radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+        clip=ctx.clip,
+        clip_radii=ctx.clip_radii,
+    )
+
+
 # ------------------------------------------------------------------- cards
 
 
@@ -186,6 +236,13 @@ class CardElement(_StyledMixin, Padding):
 
     RADIUS: Final = 12.0
     PADDING: Final = 16.0
+    #: M3 resting levels: "Card (elevated)" is level 1; filled and outlined
+    #: cards are level 0. The level therefore depends on the variant.
+    ELEVATED_LEVEL: Final = 1
+
+    @property
+    def resting_elevation(self) -> int:
+        return self.ELEVATED_LEVEL if self.style.variant == "elevated" else 0
 
     CONTAINERS: Final = {
         "elevated": "surface_container_low",
@@ -222,18 +279,16 @@ class CardElement(_StyledMixin, Padding):
         container = ctx.palette.index(style.background or self.CONTAINERS[variant])
 
         if variant == "elevated":
-            dpr = ctx.pixel_ratio
-            ctx.display_list.add_shadow(
-                absolute.x * dpr,
-                absolute.y * dpr,
-                self.size.width * dpr,
-                self.size.height * dpr,
-                blur=6.0 * dpr,
-                offset=(0.0, 1.0 * dpr),
-                color=(0.0, 0.0, 0.0, 0.30),
-                radii=(radius * dpr,) * 4,
-                clip=ctx.clip,
-                clip_radii=ctx.clip_radii,
+            elevation_shadow(
+                ctx,
+                absolute.x,
+                absolute.y,
+                self.size.width,
+                self.size.height,
+                # Not `or ELEVATED_LEVEL`: an explicit `elevation: 0` is an
+                # override, and `or` cannot tell zero from unset.
+                level=self.elevation,
+                radii=(radius,) * 4,
             )
         _box(
             ctx,
@@ -697,8 +752,11 @@ class FabElement(_StyledMixin, Padding):
     """M3 FAB: standard 56dp/16dp radius, small 40/12, large 96/28 with a 36dp icon.
 
     Defaults to `primary_container` on `on_primary_container`, M3's default
-    colour mapping. Elevation is level 3, approximated by shadow.
+    colour mapping. M3 puts a FAB at resting **level 3**, alongside modal
+    dialogs -- the highest resting level any component uses.
     """
+
+    RESTING_ELEVATION = 3
 
     #: variant -> (container size, corner radius, icon size)
     SIZES: Final = {
@@ -729,20 +787,16 @@ class FabElement(_StyledMixin, Padding):
         _, radius, icon = self._geometry()
         container = ctx.palette.index(style.background or "primary_container")
         content = content_token(ctx, style, "on_primary_container")
-        dpr = ctx.pixel_ratio
 
         # Elevation level 3, shadow only -- the tonal half is not modelled.
-        ctx.display_list.add_shadow(
-            absolute.x * dpr,
-            absolute.y * dpr,
-            self.size.width * dpr,
-            self.size.height * dpr,
-            blur=10.0 * dpr,
-            offset=(0.0, 3.0 * dpr),
-            color=(0.0, 0.0, 0.0, 0.35),
-            radii=(radius * dpr,) * 4,
-            clip=ctx.clip,
-            clip_radii=ctx.clip_radii,
+        elevation_shadow(
+            ctx,
+            absolute.x,
+            absolute.y,
+            self.size.width,
+            self.size.height,
+            level=self.elevation,
+            radii=(radius,) * 4,
         )
         _box(
             ctx,
