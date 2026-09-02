@@ -361,11 +361,11 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 **Not available yet -- design around these, and say so when a spec needs one:**
 
-- **M3 type-scale *figures*.** The roles are modelled (`text_style:` resolved
-  against a view's `type_scale:`), but pyCopper ships no sizes: the scraped
-  token table is empty and the scattered values disagree with themselves
-  (`headline-large` is both 32sp and 36sp). Do **not** fill them in from
-  memory -- naming a role with no entry is a deliberate load-time error.
+- **Type-scale line height, weight and tracking.** All 15 roles have sourced
+  sizes (`text_style: title-large`), and the other three properties are
+  recorded per role but not applied -- there is no line-height or per-run
+  weight override to resolve them into. Use `text_style:` rather than a raw
+  `font_size` when a component's M3 role is known.
 - **RTL text.** Direction and run ordering work, but the bundled fonts carry no
   Arabic or Hebrew glyphs, and selection across a direction boundary is
   unimplemented -- the highlight is contiguous in character order, which is not
