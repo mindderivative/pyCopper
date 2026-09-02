@@ -12,16 +12,20 @@ That second mode is what makes a carousel a carousel rather than a horizontal
 list, and it is why this is a widget of its own instead of a styled
 `ScrollView`.
 
-**What is missing is the transition, not the layout.** M3 resizes items
-continuously as they travel and snaps them home; here the snap is
-instantaneous and the resize happens in one step. At rest the geometry is
-exactly what M3 specifies -- it is the movement between rest states that is
-absent, along with the parallax on item visuals.
+**The snap travels.** `position` is a continuous animated value, and every
+width and offset is derived from it, so an item promoted from medium to large
+grows *as it moves* rather than switching size on arrival -- which is what M3
+means by items that "automatically change size and snap into place".
 
-Motion now exists (ARCHITECTURE.md 5.17) and this widget does not yet use it.
-Animating the snap is not a matter of easing one value: item *widths* depend
-on scroll position here, so a travelling carousel relayouts every frame rather
-than repainting. That is a real cost to weigh, not an oversight to tidy up.
+This is the one place a transition invalidates **layout** rather than paint
+(`animated(..., invalidates="layout")`): item widths genuinely depend on
+position here, so repainting alone would draw the old geometry. It costs one
+carousel layout per frame while travelling -- measured at 0.2 ms for six items,
+0.8 ms for a hundred, and 2.2 ms for three hundred, against a 16.7 ms frame.
+Affordable at any sane carousel length, and the reason `ScrollView` must never
+do the same thing.
+
+Still absent: the parallax on item visuals.
 
 Dimensions are quoted from `COMPONENT_CAROUSEL.md`. The medium item width is
 the one exception and is marked where it is defined.
@@ -29,6 +33,7 @@ the one exception and is marked where it is defined.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Final
 
 from ..layout import Axis, Constraints, Flex, Offset, Size
@@ -76,6 +81,13 @@ class CarouselElement(_StyledMixin, Flex):
         "multi_browse": ("large", "medium", "small"),
     }
 
+    #: M3's suggested pair for movement that "begins and ends on screen" is
+    #: either Emphasized/500ms or Standard/300ms. The standard row is the right
+    #: one here: a snap is driven by a wheel notch and repeats as fast as the
+    #: user turns it, and 500ms of emphasis would queue up behind itself.
+    SNAP_DURATION: Final = "medium2"
+    SNAP_CURVE: Final = "standard"
+
     axis = Axis.HORIZONTAL
 
     def __init__(self, spec: WidgetSpec) -> None:
@@ -103,8 +115,27 @@ class CarouselElement(_StyledMixin, Flex):
 
     @property
     def index(self) -> int:
-        """First item at the leading keyline. Only meaningful when snapping."""
+        """Item the carousel is settling on. Only meaningful when snapping."""
         return int(self.state.data.get("carousel_index", 0))
+
+    @property
+    def position(self) -> float:
+        """Where the strip actually is, between items, mid-snap.
+
+        An integer while at rest; fractional while travelling. Every width and
+        offset is derived from this, which is what makes items resize *as they
+        move* rather than jumping when they arrive.
+        """
+        value: float = self.animated(
+            "index",
+            float(min(self.index, max(0, len(self.children) - 1))),
+            duration=self.SNAP_DURATION,
+            curve=self.SNAP_CURVE,
+            # Item widths depend on this, so it is genuinely a layout change.
+            # Affordable only because a carousel holds a handful of items.
+            invalidates="layout",
+        )
+        return value
 
     def set_index(self, value: int) -> bool:
         """Move to an item, clamped. Returns whether it moved.
@@ -113,6 +144,9 @@ class CarouselElement(_StyledMixin, Flex):
         carousel an item's width genuinely depends on its position -- that is
         the behaviour M3 is describing. It stays cheap because a carousel holds
         a handful of items, not the thousand rows a `ScrollView` must assume.
+
+        Sets the *destination*; `position` is where the strip actually is while
+        it travels there.
         """
         clamped = max(0, min(value, max(0, len(self.children) - 1)))
         if clamped == self.index:
@@ -156,15 +190,29 @@ class CarouselElement(_StyledMixin, Flex):
 
     # --------------------------------------------------------------- layout
 
-    def _item_width(self, position: int, large: float) -> float:
-        """Width for the item `position` places after the leading keyline."""
-        pattern = self.PATTERNS[self.layout_name]
-        if position < 0:
+    def _slot_width(self, slot_index: int, large: float) -> float:
+        """Width of the keyline slot `slot_index` places past the leading edge."""
+        if slot_index < 0:
             return self.SMALL_MAX  # already scrolled past the leading edge
-        slot = pattern[min(position, len(pattern) - 1)]
+        pattern = self.PATTERNS[self.layout_name]
+        slot = pattern[min(slot_index, len(pattern) - 1)]
         if slot == "large":
             return large
         return self.MEDIUM if slot == "medium" else self.SMALL_MAX
+
+    def _item_width(self, position: float, large: float) -> float:
+        """Width for an item sitting `position` slots past the leading keyline.
+
+        `position` is fractional mid-snap, so the width is interpolated between
+        the two slots it lies between. That is the whole resize-as-they-travel
+        behaviour: an item promoted from medium to large grows continuously
+        rather than switching size on arrival.
+        """
+        low = math.floor(position)
+        t = position - low
+        if t == 0.0:
+            return self._slot_width(low, large)
+        return self._slot_width(low, large) * (1.0 - t) + self._slot_width(low + 1, large) * t
 
     def _uncontained_width(self, child: Any) -> float:
         style = getattr(child, "style", None)
@@ -203,8 +251,8 @@ class CarouselElement(_StyledMixin, Flex):
         # child is measured exactly once.
         if self.snaps:
             large = self._large_width(available)
-            index = min(self.index, len(children) - 1)
-            widths = [self._item_width(j - index, large) for j in range(len(children))]
+            where = self.position
+            widths = [self._item_width(j - where, large) for j in range(len(children))]
         else:
             # Uncontained items "don't change size": each keeps its own width
             # and the strip scrolls past them.
@@ -225,8 +273,14 @@ class CarouselElement(_StyledMixin, Flex):
         # instead, via `child_origin`, exactly as `ScrollView` does: its widths
         # do not depend on the offset, so relaying out to scroll would be waste.
         if self.snaps:
-            index = min(self.index, len(children) - 1)
-            shift = positions[index] - self.PAD_X
+            # Interpolate the shift across the same widths, so the strip lands
+            # exactly on the keyline at whole positions and travels smoothly
+            # between them.
+            where = min(max(0.0, self.position), float(len(children) - 1))
+            low = min(int(where), len(children) - 1)
+            high = min(low + 1, len(children) - 1)
+            t = where - low
+            shift = positions[low] * (1.0 - t) + positions[high] * t - self.PAD_X
         else:
             shift = 0.0
             # Re-clamp: items may have been removed since the last frame.

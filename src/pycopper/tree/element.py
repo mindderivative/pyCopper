@@ -188,6 +188,7 @@ class ElementMixin:
         duration: str | float = "short4",
         curve: str = "standard",
         repeat: bool = False,
+        invalidates: str = "paint",
     ) -> float:
         """Current value of a named animation heading towards `target`.
 
@@ -196,10 +197,16 @@ class ElementMixin:
         animate *from*), and a later call with a different target retargets
         from wherever the value currently is.
 
-        The animation marks this element for **paint**, never layout. A widget
-        whose geometry genuinely animates must mark layout itself, and should
-        think hard about it first: this runs every frame.
+        Marks this element for **paint** each frame. Pass
+        `invalidates="layout"` only when the animated value genuinely changes
+        geometry -- it then relayouts on every frame of the transition, which
+        is affordable for a handful of children and not for a long list. The
+        parameter exists so that cost is visible at the call site rather than
+        hidden in a widget.
         """
+        if invalidates not in ("paint", "layout"):
+            raise ValueError(f"invalidates must be 'paint' or 'layout', not {invalidates!r}")
+        notify = self.mark_needs_layout if invalidates == "layout" else self.mark_needs_paint
         animation = self._animations.get(key)
         if animation is None:
             # A one-shot settles on its target at once -- there is nothing to
@@ -212,7 +219,7 @@ class ElementMixin:
                 duration=duration,
                 curve=curve,
                 repeat=repeat,
-                on_change=self.mark_needs_paint,
+                on_change=notify,
             )
             self._animations[key] = animation
             if repeat:

@@ -925,18 +925,39 @@ def test_carousel_baseline(render_scene, assert_golden) -> None:
                 strip("mb", "multi_browse"),
                 strip("hero", "hero"),
                 strip("adv", "multi_browse"),
+                strip("mid", "multi_browse"),
             ],
         }
     }
     _, engine = render_scene(
-        lambda dl: None, width=440, height=420, theme=Theme(seed=SEED, dark=True)
+        lambda dl: None, width=440, height=540, theme=Theme(seed=SEED, dark=True)
     )
     app = App(view, theme=Theme(seed=SEED, dark=True))
     app.attach(engine)
+
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
     app.mount()
-    app.update()
+    app.paint(DisplayList())
+
+    # Third strip: advanced two items and allowed to land, which is the layout
+    # M3 actually specifies. Fourth: the same advance caught in flight, where
+    # the items are between keyline sizes.
     app.root.find("adv").set_index(2)
+    app.root.find("mid").set_index(1)
+    app.paint(DisplayList())
+    for _ in range(12):
+        clock["t"] += 0.05
+        app.paint(DisplayList())
+        if app.root.find("adv").position >= 2.0:
+            break
+
+    # Restart the fourth strip's travel and stop part-way through it.
+    app.root.find("mid").set_index(2)
+    app.paint(DisplayList())
+    clock["t"] += 0.09
     engine.canvas.request_draw(engine.draw_frame)
+
     assert_golden("carousel", np.asarray(engine.canvas.draw()))
 
 

@@ -1252,10 +1252,26 @@ exactly what M3 specifies — it is the movement between rest states that is
 absent, along with the parallax on item visuals. The **medium item width
 (112dp) is not sourced**: M3 calls it "dynamic" and gives no figure.
 
-Motion exists as of §5.17 and this widget does not yet use it, deliberately:
-item widths depend on scroll position here, so a *travelling* carousel
-relayouts every frame rather than repainting. That is a cost to weigh, not an
-oversight.
+**The snap now travels** (§5.17). `position` is a continuous animated value
+and every width and offset derives from it, so items resize *as they move*.
+
+This is the single place in the framework where a transition invalidates
+**layout** rather than paint. Item widths genuinely depend on position here, so
+repainting alone would draw stale geometry — `animated(..., invalidates="layout")`
+makes that cost explicit at the call site rather than hiding it. Measured, one
+carousel layout per frame while travelling:
+
+| Items | ms/frame | Share of a 16.7 ms budget |
+|---|---|---|
+| 6 | 0.20 | 1.2% |
+| 100 | 0.79 | 4.8% |
+| 300 | 2.24 | 13.4% |
+
+Affordable at any sane carousel length — and precisely why `ScrollView`, which
+must assume a thousand rows, may never do the same thing. The timing is M3's
+"Standard | 300ms | Begin and end on screen" rather than the Emphasized/500ms
+row on the same table: a snap is driven by a wheel notch and repeats as fast as
+the user turns it, so half a second of emphasis would queue up behind itself.
 
 One fix this surfaced: a `CarouselItem` label used `on_surface` whatever its
 container, so it turned near-invisible the moment a view set a light

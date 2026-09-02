@@ -265,8 +265,11 @@ immediately on the first call and retargets on later ones. Durations and curves
 are M3 tokens (`motion/easing.py`) -- look the component's timing up rather
 than guessing, since M3 states many of them directly. Use `repeat=True` with
 `curve="linear"` for a continuous loop; an eased loop stutters at the wrap.
-`animated()` marks **paint** -- if a transition changes geometry you must mark
-layout yourself, and should weigh whether it is worth relaying out every frame.
+`animated()` marks **paint**. If a transition genuinely changes geometry, pass
+`invalidates="layout"` -- but measure first. The Carousel is the only widget
+that does, and it is affordable there only because a carousel holds a handful
+of items; the same choice in a `ScrollView` would relayout a thousand rows a
+frame.
 
 **Carousels exist**, and show the one case where relayout-on-scroll is right:
 a snapping layout's item widths depend on scroll position, so it marks layout,
@@ -315,8 +318,7 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
 - **Motion on some components.** Overlay fades, state-layer cross-fades, the
-  `Switch`, and indeterminate progress use it. A carousel's snap still has no
-  travel, and that one is not small: item widths depend on scroll position, so
-  a travelling carousel relayouts every frame. Wiring up a simple transition
-  is small — see the "Motion exists" note above.
+  `Switch`, indeterminate progress, and the carousel snap use it. Selection
+  controls other than the switch still change instantly. Wiring one up is
+  usually small — see the "Motion exists" note above.
 - **Tonal elevation.** Shadows only (see Step 2).

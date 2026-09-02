@@ -118,12 +118,26 @@ def test_the_large_item_never_collapses_below_a_small_one() -> None:
 # ------------------------------------------------- resize-and-snap layouts
 
 
+def settle(c) -> None:
+    """Run the snap animation to completion on a bare (un-hosted) element."""
+    for _ in range(40):
+        c.ticker.tick(0.05)
+        c.layout(Constraints.loose(Size(WIDTH, 300)))
+        if not c.ticker.active:
+            break
+
+
 def test_advancing_promotes_the_next_item_to_the_large_slot() -> None:
-    """M3: items "automatically change size and snap into place"."""
+    """M3: items "automatically change size and snap into place".
+
+    Asserted once the snap has landed -- the travel between states is covered
+    by the animation tests further down.
+    """
     c = carousel("multi_browse")
     first_large = c.children[0].size.width
     assert c.set_index(1) is True
     c.layout(Constraints.loose(Size(WIDTH, 300)))
+    settle(c)
 
     assert c.children[0].size.width == CarouselElement.SMALL_MAX
     assert c.children[1].size.width == first_large
@@ -334,3 +348,136 @@ def test_carousel_item_takes_the_box_the_strip_assigns() -> None:
     item.layout(Constraints(min_width=80, max_width=80, min_height=100, max_height=100))
     assert item.size == Size(80.0, 100.0)
     assert isinstance(item, CarouselItemElement)
+
+
+# ---------------------------------------------------------- snap animation
+
+
+def animated_carousel(n: int = 6, variant: str = "multi_browse"):
+    """A hosted carousel with a hand-driven clock."""
+    app = hosted(variant, n=n)
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
+    app.paint(DisplayList())
+    return app, app.root.find("c"), clock
+
+
+def test_the_strip_travels_instead_of_jumping() -> None:
+    """M3: items "automatically change size and snap into place". The snap now
+    has travel -- previously the layout was correct only at rest."""
+    app, c, clock = animated_carousel()
+    assert c.position == 0.0
+
+    c.set_index(1)
+    app.paint(DisplayList())
+    assert c.position == 0.0, "it teleported to the new item"
+
+    clock["t"] = 0.05
+    app.paint(DisplayList())
+    assert 0.0 < c.position < 1.0, "the strip did not move"
+
+    for _ in range(12):
+        clock["t"] += 0.05
+        app.paint(DisplayList())
+    assert c.position == pytest.approx(1.0)
+    assert not app.motion.active
+
+
+def test_items_resize_continuously_while_travelling() -> None:
+    """The defining behaviour: an item promoted from medium to large grows as
+    it moves, rather than switching size on arrival."""
+    app, c, clock = animated_carousel()
+    large, medium = widths(c)[0], widths(c)[1]
+
+    c.set_index(1)
+    app.paint(DisplayList())
+    clock["t"] = 0.06
+    app.paint(DisplayList())
+
+    shrinking, growing = widths(c)[0], widths(c)[1]
+    assert medium < growing < large, "the second item did not grow on its way in"
+    assert CarouselElement.SMALL_MAX < shrinking < large, "the first did not shrink"
+
+
+def test_it_lands_exactly_on_the_keyline() -> None:
+    """Interpolating the shift must not leave the strip a fraction off."""
+    app, c, clock = animated_carousel()
+    c.set_index(2)
+    for _ in range(16):
+        clock["t"] += 0.05
+        app.paint(DisplayList())
+    assert c.position == pytest.approx(2.0)
+    assert c.children[2].offset.x == pytest.approx(CarouselElement.PAD_X)
+    assert c.children[2].size.width == pytest.approx(widths(c)[2])
+
+
+def test_the_travel_invalidates_layout_not_just_paint() -> None:
+    """Item widths depend on position here, so paint alone would draw the old
+    geometry. This is the one place `invalidates="layout"` is used."""
+    app, c, _clock = animated_carousel()
+    c.set_index(1)
+    app.paint(DisplayList())
+    c._needs_paint = False
+    app.motion.tick(0.05)
+    assert c.needs_layout
+
+
+def test_a_travelling_carousel_costs_one_layout_per_frame() -> None:
+    """Relaying out every frame is the deliberate exception to the scrolling
+    rule; doing it *more* than once a frame would not be."""
+    app, c, clock = animated_carousel(n=20)
+    calls: list[int] = []
+    original = type(c).perform_layout
+    type(c).perform_layout = lambda self, k: (calls.append(1), original(self, k))[1]
+    try:
+        c.set_index(1)
+        frames = 0
+        while app.motion.active or frames == 0:
+            clock["t"] += 1 / 60
+            app.paint(DisplayList())
+            frames += 1
+            if frames > 60:
+                break
+        assert len(calls) == frames, "the carousel laid out more than once per frame"
+        assert frames < 30, "a 300ms snap took too many frames to settle"
+    finally:
+        type(c).perform_layout = original
+
+
+def test_reduce_motion_snaps_without_travel() -> None:
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Column",
+                "style": {"background": "surface"},
+                "children": [
+                    {
+                        "name": "c",
+                        "widget": "Carousel",
+                        "style": {"variant": "hero", "height": 120, "width": "expand"},
+                        "children": [{"name": f"i{j}", "widget": "CarouselItem"} for j in range(4)],
+                    }
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=int(WIDTH), height=300, reduce_motion=True),
+    )
+    app.mount()
+    app.paint(DisplayList())
+    c = app.root.find("c")
+    c.set_index(2)
+    app.paint(DisplayList())
+    assert c.position == 2.0
+    assert not app.motion.active
+
+
+def test_an_uncontained_carousel_still_does_not_relayout_to_scroll() -> None:
+    """Only the resizing layouts pay for animation; uncontained keeps the
+    cheap paint-time translation."""
+    _app, c, _clock = animated_carousel(variant="uncontained")
+    assert not c.snaps
+    c.set_scroll(60.0)
+    assert c.needs_paint
+    assert not c.needs_layout
