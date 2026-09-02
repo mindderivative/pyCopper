@@ -2194,8 +2194,9 @@ The architecture was shaped partly by testability; this is the payoff.
 | Reconciliation | Reload a mutated Spec; assert scroll/focus/text state survived. | No |
 | Spec validation | Malformed YAML corpus; assert error type, key path, and line number. | No |
 | Hit testing | Synthetic trees with overlaps and clips; assert the hit path. | No |
+| Intrinsic size | Lay every `WidgetKind` out with **no style at all** under loose constraints; assert a real size, with the legitimately-empty kinds listed individually alongside the reason. Every other suite hands its widgets an explicit size, so this is the only thing exercising the path. | No |
 | Text pipeline | Shaping against the **bundled** font: assert glyph IDs, advances, cluster mapping. Fallback chain resolution. Break opportunities and grapheme counts against UAX test data. | No |
-| Rendering | `rendercanvas.offscreen` → render → read texture → compare against a **committed baseline PNG**. Tolerance is 4/255 per channel with at most 0.2% of pixels allowed to exceed it — an exact match would be unmaintainable across drivers, anything looser stops catching real changes. `examples/gallery` is the corpus. | Yes |
+| Rendering | `rendercanvas.offscreen` → render → read texture → compare against a **committed baseline PNG**. Tolerance is 4/255 per channel with at most 0.2% of pixels allowed to exceed it — an exact match would be unmaintainable across drivers, anything looser stops catching real changes. `examples/gallery` is the corpus, plus an **unsized-widget** baseline that gives nothing a size and so catches a widget that draws nothing. | Yes |
 | Shader | Covered indirectly by goldens. WGSL is kept small and branch-light for this reason. | Yes |
 
 The overwhelming majority of the framework's logic is testable in CI with no GPU, on any runner. Golden tests run on a Linux runner with `lavapipe` (software Vulkan) for determinism, and are the only tests permitted to be platform-conditional.

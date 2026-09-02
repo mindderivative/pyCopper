@@ -1683,6 +1683,69 @@ def test_multiline_field_baseline(render_scene, assert_golden) -> None:
     assert_golden("multiline_field", np.asarray(engine.canvas.draw()))
 
 
+def test_unsized_widgets_baseline(render_scene, assert_golden) -> None:
+    """Every self-sizing widget, with no `style:` at all.
+
+    The corpus gap this fills: every other baseline gives its widgets an
+    explicit size or a stylesheet class, so nothing exercised the intrinsic
+    path. A Button laid out 0x0 and drew nothing for as long as that was true,
+    and no golden noticed. Anything here that disappears has done the same.
+
+    `cross_alignment: start` is the point of the arrangement -- stretched, each
+    row would take the column's width and the widths under test would vanish.
+    """
+    row = {
+        "name": "controls",
+        "widget": "Row",
+        "style": {"spacing": 8, "cross_alignment": "center"},
+        "children": [
+            {"name": "cb", "widget": "Checkbox", "value": "true"},
+            {"name": "rd", "widget": "Radio", "value": "true"},
+            {"name": "sw", "widget": "Switch", "value": "true"},
+            {"name": "ic", "widget": "Icon", "text": "home"},
+            {"name": "ib", "widget": "IconButton", "text": "star"},
+            {"name": "bg", "widget": "Badge", "value": "3"},
+            {"name": "cp", "widget": "CircularProgress", "value": "0.4"},
+        ],
+    }
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {
+                "background": "surface",
+                "padding": 16,
+                "spacing": 10,
+                "cross_alignment": "start",
+            },
+            "children": [
+                {"name": "label", "widget": "Text", "text": "Unsized, every one"},
+                {"name": "btn", "widget": "Button", "text": "Confirm"},
+                {"name": "short", "widget": "Button", "text": "OK"},
+                {
+                    "name": "chip",
+                    "widget": "Chip",
+                    "text": "Filter",
+                    "style": {"variant": "filter"},
+                },
+                row,
+                {"name": "fab", "widget": "Fab", "text": "add"},
+                {"name": "card", "widget": "Card"},
+                {"name": "seg", "widget": "Segment", "text": "Week"},
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=420, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("unsized_widgets", np.asarray(engine.canvas.draw()))
+
+
 def test_elevation_baseline(render_scene, assert_golden) -> None:
     """The six M3 elevation levels, on a light theme.
 
