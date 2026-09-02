@@ -17,6 +17,14 @@ open: "{{ open }}"
 style:
   modal: true
   scrim: true
+# Dismissable is the default, and `on_dismiss` is what makes it work: the
+# runtime closing this overlay is only a request, because `open:` is bound to
+# the application's signal and that is the only thing that truly closes it.
+# Without this the dialog would sit there dimmed and unclickable.
+#
+# For a dialog that cannot be dismissed by clicking away, drop this handler and
+# set `dismissable: false` -- the parent stays blocked and focus stays put.
+handlers: {on_dismiss: dismiss}
 children:
   - name: actions
     widget: Row

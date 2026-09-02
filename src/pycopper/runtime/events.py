@@ -54,6 +54,9 @@ class EventType(StrEnum):
     #: A control's value settled on something new. Posted by the widget, not
     #: by the canvas -- a text field is the only source so far.
     CHANGE = "change"
+    #: An overlay was closed by the runtime rather than by the application --
+    #: Escape, or a press outside a dismissable one.
+    DISMISS = "dismiss"
 
 
 class Phase(Enum):
@@ -182,6 +185,7 @@ HANDLER_KEYS = {
     EventType.FOCUS: "on_focus",
     EventType.BLUR: "on_blur",
     EventType.CHANGE: "on_change",
+    EventType.DISMISS: "on_dismiss",
 }
 
 

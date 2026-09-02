@@ -374,3 +374,122 @@ def test_column_sized_only_on_width_does_not_fill_vertically() -> None:
     app.mount()
     app.update()
     assert app.root.find("c").size.height == pytest.approx(112.0)
+
+
+# ------------------------------------------------- dismissal and the deadlock
+
+
+def _dialog_app(*, dismissable: bool = True, on_dismiss: bool = True):
+    """A modal dialog whose openness is bound, which is how one is written."""
+    from pycopper import App, Signal, Theme
+
+    style: dict = {"modal": True, "scrim": True}
+    if not dismissable:
+        style["dismissable"] = False
+    node: dict = {
+        "name": "confirm",
+        "widget": "Dialog",
+        "text": "Delete this?",
+        "supporting_text": "Cannot be undone.",
+        "open": "{{ confirming.get() }}",
+        "style": style,
+        "children": [
+            {"name": "ok", "widget": "Button", "text": "OK", "style": {"width": 80, "height": 40}}
+        ],
+    }
+    if on_dismiss:
+        node["handlers"] = {"on_dismiss": "close"}
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"width": "expand", "height": "expand"},
+            "children": [
+                {"name": "ask", "widget": "Button", "text": "Delete", "style": {"width": 100}}
+            ],
+        },
+        "overlays": [node],
+    }
+    confirming = Signal(False, name="confirming")
+    app = App(view, theme=Theme(dark=True))
+    app.expose(confirming=confirming)
+
+    def close(event: object) -> None:
+        confirming.set(False)
+
+    app.handler(close)
+    app.mount()
+    app.update()
+    confirming.set(True)
+    app.update()
+    return app, confirming
+
+
+def test_a_dismissed_overlay_is_never_left_painted_but_unclickable() -> None:
+    """The bug this fixes, in the state it produced.
+
+    A press outside marked the overlay dismissed, which removed it from hit
+    testing and modality -- but `showing` read only the `open:` binding, so it
+    kept painting at full opacity. The result was a dialog you could see, could
+    not click, and could not close, because the buttons that would clear its
+    signal were underneath it. Clicks landed on the tree behind instead.
+    """
+    app, _ = _dialog_app(on_dismiss=False)
+    host = app.overlays
+    host.handle_press(2.0, 2.0)
+    for _ in range(6):
+        app.update()
+    painted = [e.element.name for e in host.rendered()]
+    clickable = [e.element.name for e in host.visible()]
+    assert not (painted and not clickable), f"painted {painted} while hit testing saw {clickable}"
+
+
+def test_dismissing_a_bound_overlay_tells_the_application() -> None:
+    """`open:` is bound, so the runtime closing it is only a request -- the
+    binding still says open. Without `on_dismiss` there is nothing that can
+    actually close it, and it would come straight back."""
+    app, confirming = _dialog_app()
+    assert confirming.get() is True
+    app.overlays.handle_press(2.0, 2.0)
+    for _ in range(4):
+        app.update()
+    assert confirming.get() is False, "the handler never ran"
+    assert app.overlays.visible() == []
+
+
+def test_a_dismissed_dialog_can_be_reopened() -> None:
+    """The other half of the deadlock: a dismissal that outlived the signal
+    meant the button that opened it stopped working."""
+    app, confirming = _dialog_app()
+    app.overlays.handle_press(2.0, 2.0)
+    for _ in range(4):
+        app.update()
+    confirming.set(True)
+    for _ in range(3):
+        app.update()
+    assert [e.element.name for e in app.overlays.visible()] == ["confirm"]
+
+
+def test_a_locked_dialog_ignores_a_click_outside_and_keeps_focus() -> None:
+    """The other behaviour worth having: `dismissable: false` dims the parent,
+    blocks it, and closes only through the dialog's own buttons."""
+    from pycopper.runtime.events import EventType, PointerEvent
+
+    app, confirming = _dialog_app(dismissable=False, on_dismiss=False)
+    inside = app.overlays.entries[0].element.find("ok")
+    app.dispatcher.focus(inside)
+
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=2.0, y=2.0))
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=2.0, y=2.0))
+    app.dispatcher.drain()
+    app.update()
+
+    assert app.dispatcher.focused is inside, "focus escaped a locked dialog"
+    assert [e.element.name for e in app.overlays.visible()] == ["confirm"]
+    assert app.overlays.has_modal
+    assert confirming.get() is True
+
+
+def test_a_modal_swallows_clicks_meant_for_the_tree_beneath() -> None:
+    app, _ = _dialog_app(dismissable=False, on_dismiss=False)
+    assert app.dispatcher.hit_path(2.0, 2.0) == [], "a click reached the blocked tree"

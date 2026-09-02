@@ -24,6 +24,7 @@ from ..layout import OFFSET_ZERO, Constraints, Offset, Rect, Size
 from ..paint import DisplayList
 from ..spec import WidgetSpec
 from ..theme import Palette
+from .events import Event, EventType
 
 __all__ = ["SCRIM_OPACITY", "OverlayEntry", "OverlayHost"]
 
@@ -55,10 +56,24 @@ class OverlayEntry:
         spec: WidgetSpec = self.element.spec
         return spec
 
+    #: Set when the runtime has closed this overlay -- Escape, or a press
+    #: outside. Kept on the entry rather than only in the host's set, so that
+    #: `showing` can see it: an overlay the host has stopped hit-testing must
+    #: also stop being *painted*, or it sits on screen taking no clicks while
+    #: they land on whatever is behind it.
+    dismissed: bool = False
+
     @property
     def showing(self) -> bool:
-        """Whether the application wants this overlay up."""
-        return bool(self.element.is_open)
+        """Whether this overlay should be up.
+
+        Both sources have to agree. `open:` is the application's answer and a
+        dismissal is the runtime's, and when they disagreed the overlay was
+        drawn at full opacity while being excluded from hit testing -- a dialog
+        you could see, could not click, and could not close, because the only
+        buttons that would clear its signal were underneath it.
+        """
+        return bool(self.element.is_open) and not self.dismissed
 
     @property
     def opacity(self) -> float:
@@ -75,6 +90,11 @@ class OverlayEntry:
 
     @property
     def visible(self) -> bool:
+        """Whether the *application* wants this up, ignoring any dismissal.
+
+        `sync_dismissals` reads this to notice that the application has closed
+        an overlay itself, which is when a dismissal may be forgotten.
+        """
         return bool(self.element.is_open)
 
     @property
@@ -158,6 +178,8 @@ class OverlayHost:
                 element.set_ticker(ticker)
             self.entries.append(OverlayEntry(element))
         self._dismissed.clear()
+        for entry in self.entries:
+            entry.dismissed = False
 
     def bind(self, context: dict[str, Any]) -> None:
         for entry in self.entries:
@@ -211,8 +233,23 @@ class OverlayHost:
                 self.dismiss(entry)
 
     def dismiss(self, entry: OverlayEntry) -> None:
-        if entry.dismissable:
-            self._dismissed.add(entry.key)
+        """Close an overlay on the user's behalf, and say so.
+
+        The `on_dismiss` handler is the whole point. When `open:` is bound --
+        which is how any overlay an application controls is written -- the
+        runtime closing it locally is not enough: the binding still says open,
+        so the overlay could never be reopened, and before `showing` accounted
+        for dismissals it was left painted and unclickable. Telling the
+        application lets it clear its own signal, which is the only thing that
+        actually closes a bound overlay.
+        """
+        if not entry.dismissable or entry.dismissed:
+            return
+        self._dismissed.add(entry.key)
+        entry.dismissed = True
+        handler = entry.element.handlers.get("on_dismiss")
+        if handler is not None:
+            handler(Event(EventType.DISMISS, target=entry.element))
             entry.element.mark_needs_paint()
 
     def dismiss_top(self) -> bool:
@@ -225,6 +262,7 @@ class OverlayHost:
 
     def reopen(self, entry: OverlayEntry) -> None:
         self._dismissed.discard(entry.key)
+        entry.dismissed = False
 
     def sync_dismissals(self) -> None:
         """Forget dismissals for overlays the application has closed itself.
@@ -233,6 +271,8 @@ class OverlayHost:
         reopened by its signal: the dismissal would outlive the state change.
         """
         self._dismissed &= {e.key for e in self.entries if e.visible}
+        for entry in self.entries:
+            entry.dismissed = entry.key in self._dismissed
 
     # ------------------------------------------------------------------ layout
 

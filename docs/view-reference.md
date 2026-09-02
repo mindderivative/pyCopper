@@ -119,11 +119,15 @@ def save(event) -> None: ...
 
 Available keys: `on_click`, `on_context_menu`, `on_pointer_down`,
 `on_pointer_up`, `on_pointer_move`, `on_pointer_enter`, `on_pointer_leave`,
-`on_wheel`, `on_key_down`, `on_text`, `on_focus`, `on_blur`, `on_change`.
+`on_wheel`, `on_key_down`, `on_text`, `on_focus`, `on_blur`, `on_change`,
+`on_dismiss`.
 
 `on_change` is the odd one: it is posted by a widget rather than by the window,
 and its event carries `event.value` — the new text — so a handler does not have
-to reach back into the field to find out what it is.
+to reach back into the field to find out what it is. `on_dismiss` is posted by
+the overlay layer when the *runtime* closes an overlay — Escape, or a press
+outside a dismissable one — so an application can clear whatever signal its
+`open:` is bound to. See [Two ways for a dialog to behave](#two-ways-for-a-dialog-to-behave).
 
 An unknown handler name fails at mount, not at the first click.
 
@@ -201,6 +205,38 @@ overlays:
 | `scrim` | draws M3's 32% backdrop |
 | `dismissable` | closes on Escape or a click outside (default `true`) |
 | `offset` | gap from the anchor, in dp |
+
+### Two ways for a dialog to behave
+
+These three properties combine into the two behaviours a modal dialog usually
+wants, and the difference is only `dismissable`.
+
+**Dismissable** — clicking outside closes it. Wire `on_dismiss`, because that
+is what actually closes it:
+
+```yaml
+- name: confirm
+  widget: Dialog
+  open: "{{ confirming.get() }}"
+  style: {modal: true, scrim: true}          # dismissable defaults to true
+  handlers: {on_dismiss: close_confirm}      # sets confirming to false
+```
+
+**Locked** — the parent is dimmed and unclickable, focus cannot leave, and the
+dialog closes only through its own buttons:
+
+```yaml
+- name: confirm
+  widget: Dialog
+  open: "{{ confirming.get() }}"
+  style: {modal: true, scrim: true, dismissable: false}
+```
+
+**`on_dismiss` is not optional for a dismissable overlay whose `open:` is
+bound**, which is every overlay an application controls. The runtime closing it
+is a *request*: the binding still says open, so without a handler to clear the
+signal the overlay would reopen on the next frame. Escape goes through the same
+path, so one handler covers both.
 
 Most components know where they belong: `BottomSheet` and `Snackbar` default to
 `bottom`, `SideSheet` to `right`, `Dialog` to `center`. Setting `anchor:` alone
