@@ -294,6 +294,23 @@ application keeps focus, scroll, and text.
 Selectors are structured rather than CSS-like strings, deliberately: a `#name`
 selector would need quoting in every rule, because YAML reads `#` as a comment.
 
+## Dragging
+
+Two things respond to a drag, and both are affordances that would otherwise be
+decoration:
+
+- **A scrollbar's thumb.** Grab it anywhere it is drawn — plus a few pixels
+  either side, because a 4dp target is unusable with a mouse — and the content
+  keeps pace with the pointer.
+- **A bottom sheet's drag handle.** Drag the sheet down; release past about a
+  third of its height to dismiss it, or short of that to let it settle back.
+  Clicking the handle closes the sheet, which is the single-pointer alternative
+  M3 requires: *"selecting the drag handle should toggle through preset heights
+  or close the sheet"*. Preset heights are not implemented.
+
+A sheet without `handle: true` cannot be dragged. Drawing the affordance is
+what promises the gesture.
+
 ## Disabled controls
 
 `disabled:` marks a control inert. It is templated like `value:`, so it tracks
@@ -504,9 +521,6 @@ Stated plainly so you can design around it:
   `label-large` and friends are not modelled.
 - **Tonal elevation.** M3 elevation is a tonal surface shift *plus* a shadow;
   only the shadow is modelled.
-- **Drag gestures.** A bottom sheet's drag handle and a scrollbar's thumb are
-  drawn but do not respond to a drag; both are affordances for a gesture that
-  is not wired to the pointer yet.
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
   expressed on a smaller visible control. This is deliberate — pyCopper is
   pointer-only.

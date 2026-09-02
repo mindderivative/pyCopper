@@ -196,6 +196,17 @@ class OverlayHost:
     def has_modal(self) -> bool:
         return any(e.modal for e in self.visible())
 
+    def _collect_dismiss_requests(self) -> None:
+        """Honour an overlay that has asked to close itself.
+
+        A widget cannot reach the host, and giving it one would let any element
+        reach into the runtime. It raises a flag on its own state instead and
+        the host reads it here, once a frame.
+        """
+        for entry in self.entries:
+            if entry.element.state.data.pop("dismiss_requested", False):
+                self.dismiss(entry)
+
     def dismiss(self, entry: OverlayEntry) -> None:
         if entry.dismissable:
             self._dismissed.add(entry.key)
@@ -225,6 +236,7 @@ class OverlayHost:
     def layout(self, window: Size, root: Any) -> None:
         """Size and place every visible overlay against the window."""
         self.sync_dismissals()
+        self._collect_dismiss_requests()
         for entry in self.rendered():
             element = entry.element
             element.layout(Constraints.loose(window))
@@ -234,6 +246,8 @@ class OverlayHost:
         style = entry.element.style
         size = entry.element.size
         placement = entry.placement
+        #: A dragged overlay is displaced from wherever placement puts it.
+        drag = getattr(entry.element, "drag_offset", OFFSET_ZERO)
         #: A docked overlay (a sheet) is flush with its edge; a floating one
         #: (snackbar, menu, tooltip) keeps clear of it.
         margin = 0.0 if entry.element.DOCKED else MARGIN
@@ -241,14 +255,18 @@ class OverlayHost:
         if placement == "anchor" and style.anchor:
             return self._anchored(entry, window, root)
         if placement == "top":
-            return Offset((window.width - size.width) / 2, margin)
+            return Offset((window.width - size.width) / 2, margin) + drag
         if placement == "bottom":
-            return Offset((window.width - size.width) / 2, window.height - size.height - margin)
+            return (
+                Offset((window.width - size.width) / 2, window.height - size.height - margin) + drag
+            )
         if placement == "left":
-            return Offset(margin, (window.height - size.height) / 2)
+            return Offset(margin, (window.height - size.height) / 2) + drag
         if placement == "right":
-            return Offset(window.width - size.width - margin, (window.height - size.height) / 2)
-        return Offset((window.width - size.width) / 2, (window.height - size.height) / 2)
+            return (
+                Offset(window.width - size.width - margin, (window.height - size.height) / 2) + drag
+            )
+        return Offset((window.width - size.width) / 2, (window.height - size.height) / 2) + drag
 
     def _anchored(self, entry: OverlayEntry, window: Size, root: Any) -> Offset:
         """Below the anchor, flipping above it when it would overflow.

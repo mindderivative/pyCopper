@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import Any, Final
 
 from ..layout import INF, Axis, Constraints, Offset, Padding, Size
-from ..runtime.events import WheelEvent
+from ..runtime.events import PointerEvent, WheelEvent
 from ..spec import WidgetSpec
 from ..tree.element import PaintContext
 from .base import _StyledMixin
@@ -58,6 +58,12 @@ class ScrollViewElement(_StyledMixin, Padding):
     #: One wheel notch is ~100 units from the backend; scrolling a full 100px
     #: per notch is jarring on a short list, so it is scaled to a line-ish step.
     WHEEL_SCALE: Final = 0.5
+
+    #: How far either side of the 4dp thumb still counts as grabbing it. A 4dp
+    #: target is unusable with a mouse, let alone a trackpad -- this is a
+    #: pointer-precision allowance, not M3's finger-sized touch target, which
+    #: pyCopper deliberately does not implement (ARCHITECTURE.md 1.2.1).
+    THUMB_GRAB_SLOP: Final = 6.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, spec.style.padding)
@@ -154,6 +160,51 @@ class ScrollViewElement(_StyledMixin, Padding):
             self._followers.append(element)
 
     # ---------------------------------------------------------------- events
+
+    # ------------------------------------------------------------ dragging
+
+    def grabs_thumb(self, x: float, y: float) -> bool:
+        """Whether a press at this point is a grab of the scrollbar thumb."""
+        if not self.scrollable or not self.style.scrollbar:
+            return False
+        rect = self.absolute_rect()
+        tx, ty, tw, th = self.thumb_rect(Offset(rect.x, rect.y))
+        slop = self.THUMB_GRAB_SLOP
+        return (tx - slop <= x <= tx + tw + slop) and (ty - slop <= y <= ty + th + slop)
+
+    @property
+    def dragging(self) -> bool:
+        return "drag_from" in self.state.data
+
+    def on_pointer_down(self, event: PointerEvent) -> None:
+        """Begin a thumb drag, and claim the pointer for it.
+
+        The claim matters: the thumb is drawn over the content, so the press
+        lands on whatever row is underneath and capture would go there. Without
+        taking it, the thumb would move for exactly one frame and then stop.
+        """
+        if not self.grabs_thumb(event.x, event.y):
+            return
+        self.state.data["drag_from"] = event.y if not self.horizontal else event.x
+        self.state.data["drag_scroll"] = self.scroll_offset
+        event.capture()
+        event.stop_propagation()
+
+    def on_pointer_move(self, event: PointerEvent) -> None:
+        if not self.dragging:
+            return
+        track, thumb, _along = self.thumb_geometry()
+        travel = track - thumb
+        if travel <= 0.0:
+            return
+        # Thumb travel maps to scroll travel, so the content keeps pace with
+        # the pointer instead of running ahead of it.
+        moved = (event.x if self.horizontal else event.y) - self.state.data["drag_from"]
+        self.set_scroll(self.state.data["drag_scroll"] + moved * (self.max_scroll / travel))
+
+    def on_pointer_up(self, event: PointerEvent) -> None:
+        self.state.data.pop("drag_from", None)
+        self.state.data.pop("drag_scroll", None)
 
     def on_wheel(self, event: WheelEvent) -> None:
         """Consume the wheel, but only as far as this viewport can actually go.
@@ -273,27 +324,45 @@ class ScrollViewElement(_StyledMixin, Padding):
         if self.style.scrollbar and self.scrollable:
             self._paint_scrollbar(ctx, absolute)
 
-    def _paint_scrollbar(self, ctx: PaintContext, absolute: Any) -> None:
+    def thumb_geometry(self) -> tuple[float, float, float]:
+        """(track length, thumb length, thumb offset along the track).
+
+        Shared by painting and hit testing rather than recomputed for each --
+        two copies of this would drift, and a thumb you can see but not grab is
+        the exact failure that produces.
+        """
         track = self._main(self.size) - self.BAR_MARGIN * 2
         if track <= 0.0:
-            return
+            return (0.0, 0.0, 0.0)
         content = self._main(self._content)
         visible = self._main(self.size)
         thumb = max(self.BAR_MIN_LENGTH, track * (visible / content)) if content else track
         thumb = min(thumb, track)
-        travel = track - thumb
         progress = (self.scroll_offset / self.max_scroll) if self.max_scroll else 0.0
-        along = self.BAR_MARGIN + travel * progress
+        return (track, thumb, self.BAR_MARGIN + (track - thumb) * progress)
 
+    def thumb_rect(self, absolute: Any) -> tuple[float, float, float, float]:
+        """The thumb in absolute logical coordinates: (x, y, w, h)."""
+        _track, thumb, along = self.thumb_geometry()
         if self.horizontal:
-            x = absolute.x + along
-            y = absolute.y + self.size.height - self.BAR_THICKNESS - self.BAR_MARGIN
-            w, h = thumb, self.BAR_THICKNESS
-        else:
-            x = absolute.x + self.size.width - self.BAR_THICKNESS - self.BAR_MARGIN
-            y = absolute.y + along
-            w, h = self.BAR_THICKNESS, thumb
+            return (
+                absolute.x + along,
+                absolute.y + self.size.height - self.BAR_THICKNESS - self.BAR_MARGIN,
+                thumb,
+                self.BAR_THICKNESS,
+            )
+        return (
+            absolute.x + self.size.width - self.BAR_THICKNESS - self.BAR_MARGIN,
+            absolute.y + along,
+            self.BAR_THICKNESS,
+            thumb,
+        )
 
+    def _paint_scrollbar(self, ctx: PaintContext, absolute: Any) -> None:
+        track, _thumb, _along = self.thumb_geometry()
+        if track <= 0.0:
+            return
+        x, y, w, h = self.thumb_rect(absolute)
         _box(
             ctx,
             x,

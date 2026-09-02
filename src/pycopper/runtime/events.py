@@ -55,6 +55,10 @@ class Phase(Enum):
 class Event:
     type: EventType
     target: Any = None
+    #: The element whose handler is running right now, which during capture or
+    #: bubble is an *ancestor* of `target`. A handler shared between elements
+    #: needs this to tell which one it is running for.
+    current: Any = None
     phase: Phase = Phase.TARGET
     _stopped: bool = False
 
@@ -72,6 +76,17 @@ class PointerEvent(Event):
     y: float = 0.0
     button: int = 0
     modifiers: frozenset[str] = field(default_factory=frozenset)
+    _capture: Any = None
+
+    def capture(self) -> None:
+        """Claim the drag: every pointer event until release comes here.
+
+        Without this, capture goes to whatever was topmost under the press --
+        so a scrollbar thumb drawn over a list could never be dragged, because
+        the row beneath it would take the press and keep it. An ancestor
+        handling the press on the way up claims it instead.
+        """
+        self._capture = self.current
 
 
 @dataclass(slots=True)
@@ -272,6 +287,12 @@ class EventDispatcher:
 
         self._propagate(path, event)
 
+        # An element that claimed the drag during the press takes capture from
+        # whatever happened to be topmost. Applied after propagation, so a
+        # handler on the way up can still claim it.
+        if event.type is EventType.POINTER_DOWN and event._capture is not None:
+            self._captured = event._capture
+
         # A click is press and release over the same element. The live path is
         # filtered the same way, or a press that landed on an enabled ancestor
         # of a disabled child would never match and no click would fire.
@@ -333,6 +354,7 @@ class EventDispatcher:
         ]
         for phase, element in sequence:
             event.phase = phase
+            event.current = element
             self._invoke(element, event)
             if event.stopped:
                 return

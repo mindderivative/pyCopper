@@ -295,6 +295,13 @@ change *behaviour*, not appearance.
 *before* them, which is right for a background and wrong for a label over an
 image -- the carousel item's caption was invisible until this existed.
 
+**Dragging** needs `PointerEvent.capture()` in `on_pointer_down`: capture
+otherwise goes to whatever was topmost under the press, so a control drawn over
+something else (a scrollbar thumb over rows) would move for one frame and stop.
+Track the pointer exactly while it is down and animate only the release. Give a
+thin affordance a grab band wider than its visual -- pointer precision, not M3's
+finger target.
+
 **Not all motion is timed.** A collapsing app bar is a direct function of a
 scroll offset, not of a clock -- so it tracks a drag exactly and never touches
 the ticker. If you build another scroll-linked widget, register it with

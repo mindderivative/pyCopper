@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any, ClassVar, Final
 
 from ..layout import (
+    OFFSET_ZERO,
     Axis,
     Constraints,
     EdgeInsets,
@@ -26,10 +27,18 @@ from ..layout import (
     Padding,
     Size,
 )
+from ..motion import Animation
+from ..runtime.events import PointerEvent
 from ..spec import StyleSpec, WidgetSpec
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
 from .material import _box, _emit_state_layer
+
+#: Settling a released drag back to rest. The same pair the overlay host uses
+#: for an overlay entering the screen ("Emphasized decelerate | 400ms"), since
+#: returning to rest is the same motion as arriving there.
+SNAP_DURATION: Final = "medium4"
+SNAP_CURVE: Final = "emphasized_decelerate"
 
 __all__ = [
     "BottomSheetElement",
@@ -573,10 +582,18 @@ class BottomSheetElement(_PaddedFlex):
     max width. Only the top corners round, because the sheet is flush with the
     bottom edge of the window.
 
-    The handle is drawn but **not draggable**: dragging it needs pointer
-    capture wired to the sheet's height, which is not built. Motion exists
-    (5.17), so this is now a gesture gap rather than an animation one.
-    `handle:` is off by default for that reason.
+    **The handle is draggable.** M3: "the drag handle can be dragged or
+    selected to change the bottom sheet height", and a sheet is dismissed by
+    swiping it down. Dragging moves the sheet; releasing past a threshold
+    dismisses it, and releasing short of one snaps it back.
+
+    **Clicking the handle closes the sheet.** M3 requires a single-pointer
+    alternative to dragging -- "selecting the drag handle should toggle through
+    preset heights or close the sheet". Preset heights are not implemented, so
+    a click closes, which is the other half of that sentence.
+
+    `handle:` remains off by default: a sheet without one cannot be dragged,
+    and drawing an affordance is what promises the gesture.
     """
 
     RADIUS: Final = 28.0
@@ -584,6 +601,15 @@ class BottomSheetElement(_PaddedFlex):
     HANDLE_WIDTH: Final = 32.0
     HANDLE_HEIGHT: Final = 4.0
     HANDLE_PAD: Final = 22.0
+    #: "an optional drag handle with an accessible 48dp hit target". Quoted,
+    #: and justified here on pointer grounds rather than M3's finger rule: the
+    #: handle is 4dp tall, which no mouse can reliably hit.
+    HANDLE_TARGET: Final = 48.0
+    #: Fraction of its own height a sheet must be dragged down to dismiss on
+    #: release. **Not sourced** -- M3 describes the gesture, not a threshold.
+    DISMISS_FRACTION: Final = 0.35
+    #: Movement below this is a click, not a drag.
+    CLICK_SLOP: Final = 4.0
     DEFAULT_PLACEMENT = "bottom"
     DOCKED = True
     axis = Axis.VERTICAL
@@ -614,6 +640,78 @@ class BottomSheetElement(_PaddedFlex):
         )
         inner = constraints.copy_with(min_width=width, max_width=width)
         return super().perform_layout(inner)
+
+    # ------------------------------------------------------------ dragging
+
+    @property
+    def drag_offset(self) -> Offset:
+        """How far the sheet is displaced from its resting place.
+
+        Read by the overlay host when it places the sheet, so dragging moves
+        the whole thing -- container, handle and content together -- without
+        any of them knowing they are being dragged.
+
+        While a finger is down this is the raw pointer delta: a drag must track
+        the pointer exactly, and easing it would make the sheet lag behind the
+        thing moving it. Only the release is animated.
+        """
+        if "drag_start" in self.state.data:
+            return Offset(0.0, float(self.state.data.get("drag_dy", 0.0)))
+        snap = self.state.data.get("snap_back")
+        if snap is not None:
+            if snap.done:
+                del self.state.data["snap_back"]
+                return OFFSET_ZERO
+            return Offset(0.0, float(snap.value))
+        return OFFSET_ZERO
+
+    def grabs_handle(self, x: float, y: float) -> bool:
+        if not self.style.handle:
+            return False
+        rect = self.absolute_rect()
+        band = self.HANDLE_TARGET
+        return (rect.x <= x <= rect.right) and (rect.y <= y <= rect.y + band)
+
+    def on_pointer_down(self, event: PointerEvent) -> None:
+        if not self.grabs_handle(event.x, event.y):
+            return
+        self.state.data["drag_start"] = event.y
+        self.state.data["drag_dy"] = 0.0
+        event.capture()
+        event.stop_propagation()
+
+    def on_pointer_move(self, event: PointerEvent) -> None:
+        if "drag_start" not in self.state.data:
+            return
+        # Downwards only: a sheet is docked to the bottom edge, so dragging it
+        # up would lift it off the edge its square corners sit against.
+        self.state.data["drag_dy"] = max(0.0, event.y - self.state.data["drag_start"])
+        self.mark_needs_paint()
+
+    def on_pointer_up(self, event: PointerEvent) -> None:
+        if "drag_start" not in self.state.data:
+            return
+        travelled = self.state.data.pop("drag_dy", 0.0)
+        self.state.data.pop("drag_start", None)
+        if travelled <= self.CLICK_SLOP:
+            # A select, not a drag. M3 requires this alternative to exist.
+            self.state.data["dismiss_requested"] = True
+        elif travelled >= self.size.height * self.DISMISS_FRACTION:
+            self.state.data["dismiss_requested"] = True
+        elif travelled > 0.0:
+            # Short of the threshold: settle back rather than jump. Emphasized
+            # decelerate is M3's "enter the screen" pair, and returning to rest
+            # is the same motion as arriving.
+            self.state.data["snap_back"] = self.ticker.add(
+                Animation(
+                    travelled,
+                    0.0,
+                    duration=SNAP_DURATION,
+                    curve=SNAP_CURVE,
+                    on_change=self.mark_needs_paint,
+                )
+            )
+        self.mark_needs_paint()
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         _surface(

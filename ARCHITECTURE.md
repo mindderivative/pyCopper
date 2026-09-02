@@ -1298,6 +1298,37 @@ Every sheet is registered in `sources`, so hot reload watches the whole graph �
 editing a theme restyles a running application, and because reload reconciles,
 it keeps focus, scroll and text. `examples/gallery` uses one.
 
+### 5.17.2 Drag gestures
+
+Two affordances were drawn long before they did anything: a scrollbar thumb and
+a bottom sheet's handle. Both now work, and both needed the same missing piece.
+
+**Claiming a drag.** Capture went to whatever was topmost under the press, which
+is wrong for a control drawn *over* something else — a scrollbar thumb sits on
+top of the rows, so the press lands on a row and the thumb would move for one
+frame and then stop. `PointerEvent.capture()` lets an element handling the press
+on the way up take the drag instead. `Event.current` was added alongside it: the
+element whose handler is running, which during bubble is an ancestor of the
+target, and which a shared handler needs in order to know which element it is
+running for.
+
+**A widget cannot reach the overlay host**, and giving it one would let any
+element reach into the runtime. A sheet that wants to close raises
+`dismiss_requested` on its own state and the host reads it once a frame.
+
+| | |
+|---|---|
+| Thumb grab | its painted rect plus 6dp of slop — **pointer** precision, not M3's finger target (§1.2.1), since 4dp is unhittable with a mouse |
+| Thumb travel | maps to scroll travel, so content keeps pace with the pointer |
+| Cost | paint only, like every other scroll |
+| Sheet handle | 48dp band, quoted from M3 |
+| Sheet drag | downwards only — it is docked, and lifting it exposes the square corners the edge hides |
+| Release | past 35% of its height dismisses (**not sourced**), short of it settles back on Emphasized decelerate |
+| Click | closes, which is M3's required single-pointer alternative |
+
+A drag tracks the pointer **exactly** — only the release is animated. Easing a
+drag would make the sheet lag behind the thing moving it.
+
 ### 5.18 Disabled state
 
 M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity
