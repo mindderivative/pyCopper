@@ -477,10 +477,30 @@ character rather than its accent, and the caret never lands inside a flag
 emoji. Word boundaries are whitespace-delimited, not UAX #29 — the same rule
 double-click uses, so the two always agree.
 
-A field is one line. Text longer than the box scrolls sideways to follow the
-caret and scrolls back rather than leaving empty space when you delete. There
-is no multi-line field. Copy and paste use the system clipboard — see
-[The clipboard](#the-clipboard).
+**Three shapes, and M3 names all three.** A plain field is one line: text
+longer than the box scrolls sideways to follow the caret, and scrolls back
+rather than leaving empty space when you delete.
+
+```yaml
+- {name: note, widget: TextField, text: "Note", style: {multiline: true}}
+- {name: body, widget: TextField, text: "Body",
+   style: {multiline: true, height: 140}}
+```
+
+`multiline: true` gives M3's **multi-line field**, which "grows to accommodate
+multiple lines of text" and "initially appears as a single-line field" — so an
+empty one is exactly 56dp and it expands by a line at a time as the text wraps.
+Adding a `height:` gives M3's **text area**: "fixed-height fields" that "scroll
+vertically when the cursor reaches the bottom". The difference between the two
+forms is only whether you fixed a height, so there is no second property.
+
+In a multi-line field **Enter inserts a newline**; in a single-line one it is
+left alone, so a view can put a handler on it. **Up and Down move by a line as
+drawn**, preserving the column, so arrowing down from the end of a short line
+lands at the same horizontal position on the next one rather than at its start.
+Home and End become line-relative, and End stops before the newline.
+
+Copy and paste use the system clipboard — see [The clipboard](#the-clipboard).
 
 ## Text selection
 
@@ -813,6 +833,7 @@ scrolls by pixels.
 | `border` | `{width, color}` |
 | `shadow` | `{blur, offset_x, offset_y, color, opacity}` — hand-tuned; prefer `elevation` |
 | `elevation` | M3 level 0–5. Omit to use the component's own resting level |
+| `multiline` | a `TextField` takes more than one line — see [Text fields](#text-fields) |
 | `selectable` | `Text` only — can its content be selected with the mouse |
 | `cursor` | pointer shape: `default`, `pointer`, `text`, `crosshair`, `ns-resize`, `ew-resize`, `nesw-resize`, `nwse-resize`, `not-allowed`, `none` |
 | `opacity` | 0–1 |
@@ -868,10 +889,11 @@ Stated plainly so you can design around it:
   content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
   make timed transitions arrive at once — it does not affect app-bar collapse
   or carousel parallax, which follow a position rather than a clock.
-- **Multi-line text entry.** A `TextField` is one line: it scrolls sideways
-  rather than wrapping, and Enter does nothing.
 - **IME preedit.** Committed characters only, so an input method that composes
   before committing — CJK, in practice — is not supported.
+- **Bidirectional carets.** Text reorders correctly for display, but a caret or
+  selection spanning a left-to-right / right-to-left boundary is contiguous in
+  character order, which is not what a bidi caret should do.
 - **Reading the clipboard without focus.** Copy and paste use the system
   clipboard, but Wayland only lets a client read the selection while it has
   keyboard focus, and only accept a *new* selection when a real input event is

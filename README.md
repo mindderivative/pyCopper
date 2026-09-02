@@ -124,7 +124,9 @@ token source rather than the spec page, which serves a JavaScript shell with no
 extractable table. A view can override the scale role by role.
 
 **Text is editable.** `TextField` is M3's filled and outlined text field with a
-floating label, supporting text and an error state. Arrows and Ctrl+arrows,
+floating label, supporting text and an error state, in all three of the shapes
+M3 names: single-line, multi-line that grows with its content, and a
+fixed-height text area that scrolls. Arrows and Ctrl+arrows,
 shift-selection, cut/copy/paste, and undo that takes back a word rather than a
 letter. Editing is by grapheme cluster, so backspace removes an accented
 character and not its accent.
@@ -133,7 +135,6 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 
 | Absent | Consequence |
 |---|---|
-| Multi-line text entry | `TextField` is one line; it scrolls sideways rather than wrapping |
 | IME preedit | Committed characters only, so CJK input methods are unsupported |
 | Clipboard access without focus | Copy and paste use the system clipboard, but Wayland grants that only to a focused window with a real keypress behind it — true of Ctrl+C/Ctrl+V, not of a background thread |
 

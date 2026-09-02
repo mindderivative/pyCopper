@@ -1684,9 +1684,10 @@ frame: the in-process copy happens first and exceptions are swallowed.
 
 #### Not implemented, and stated
 
-Editable text, selection across widgets, and bidirectional selection. That last
-is risk R9: the highlight is contiguous in character order, which is not what a
-caret should do across a direction boundary. Double-click uses whitespace
+Selection across widgets, and bidirectional selection. The second is risk R9:
+the highlight is contiguous in character order, which is not what a caret
+should do across a direction boundary. (Editable text was listed here until
+`TextField` shipped -- see 5.9.1.) Double-click uses whitespace
 delimiting rather than UAX #29 word segmentation — simple and predictable, and
 labelled as such rather than presented as Unicode-correct.
 

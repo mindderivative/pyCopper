@@ -355,3 +355,181 @@ def test_short_text_never_scrolls() -> None:
 def test_both_m3_variants_render(variant: str) -> None:
     element = field(text="Name", value="Ada", style={"variant": variant})
     assert len(painted(element)) > 0
+
+
+# ---------------------------------------------------------------- multiline
+
+LONG = "This is a long value that will certainly wrap onto several lines here."
+
+
+def relayout(element, width: float = 240.0) -> None:
+    element.layout(Constraints(0.0, width, 0.0, 600.0))
+
+
+def test_a_multiline_field_starts_the_height_of_a_single_line_one() -> None:
+    """COMPONENT_TEXT_FIELDS: multi-line fields "initially appear as
+    single-line fields", which is what makes them usable in a compact layout."""
+    assert field(text="Notes", style={"multiline": True}).size.height == 56.0
+
+
+def test_a_multiline_field_grows_with_its_content() -> None:
+    """ "Multi-line text fields grow to accommodate multiple lines of text" --
+    quoted. The container is padding, the floated label line, one line per
+    wrapped line, and padding."""
+    grown = field(text="Notes", value=LONG, style={"multiline": True})
+    lines = len(grown._paragraph().lines)
+    assert lines > 1, "the value has to actually wrap for this to test anything"
+    expected = TextFieldElement.PAD_Y * 2 + TextFieldElement.FLOAT_ROLE.line_height
+    expected += lines * TextFieldElement.INPUT_ROLE.line_height
+    assert grown.size.height == expected
+
+
+def test_a_single_line_field_never_wraps_however_long_the_value() -> None:
+    plain = field(value=LONG)
+    assert plain.size.height == 56.0
+    assert len(plain._paragraph().lines) == 1, "it scrolls sideways instead"
+
+
+def test_a_height_makes_it_a_text_area_that_scrolls() -> None:
+    """M3's other form: "text areas are fixed-height fields" that "scroll
+    vertically when the cursor reaches the bottom". The difference between the
+    two forms is exactly whether the author fixed a height, so no second
+    property invents it."""
+    area = field(value=LONG * 4, style={"multiline": True, "height": 140})
+    assert area.size.height == 140.0
+    area.editor.set_caret(len(area.content))
+    area._scroll_to_caret()
+    assert area._scroll_y > 0.0, "the caret at the end must have scrolled it down"
+    assert area._scroll_x == 0.0, "a wrapped field has nowhere to scroll sideways"
+
+
+def test_enter_inserts_a_newline_only_in_a_multiline_field() -> None:
+    """On a single-line field Enter is left to bubble, so a view can handle it
+    -- swallowing it to insert an invisible newline would be worse than
+    useless."""
+    multi = field(style={"multiline": True})
+    dispatcher = driver(multi)
+    type_text(dispatcher, "one")
+    press(dispatcher, "Enter")
+    type_text(dispatcher, "two")
+    assert multi.content == "one\ntwo"
+
+    single = field()
+    single_driver = driver(single)
+    type_text(single_driver, "one")
+    press(single_driver, "Enter")
+    assert single.content == "one"
+
+
+def test_a_newline_makes_the_field_taller() -> None:
+    element = field(style={"multiline": True})
+    dispatcher = driver(element)
+    before = element.size.height
+    type_text(dispatcher, "one")
+    press(dispatcher, "Enter")
+    type_text(dispatcher, "two")
+    relayout(element)
+    assert element.size.height == before + TextFieldElement.INPUT_ROLE.line_height
+
+
+def test_up_and_down_move_by_a_line_as_drawn() -> None:
+    """Which character sits a line above is a question about wrapping, not
+    about the string, so it is resolved against the laid-out paragraph."""
+    element = field(style={"multiline": True})
+    dispatcher = driver(element)
+    type_text(dispatcher, "first")
+    press(dispatcher, "Enter")
+    type_text(dispatcher, "second")
+    relayout(element)
+    press(dispatcher, "ArrowUp")
+    assert element.editor.state.caret <= 5, "it landed on the first line"
+    press(dispatcher, "ArrowDown")
+    assert element.editor.state.caret > 5, "and back down to the second"
+
+
+def test_the_column_is_preserved_across_lines() -> None:
+    """Down from the end of a short line lands at the same *x* on the next one,
+    not at its start -- which is what makes arrow navigation feel like a text
+    editor rather than like walking the string."""
+    element = field(style={"multiline": True})
+    dispatcher = driver(element)
+    type_text(dispatcher, "abc")
+    press(dispatcher, "Enter")
+    type_text(dispatcher, "abcdefghij")
+    relayout(element)
+    press(dispatcher, "Home")
+    press(dispatcher, "ArrowUp")
+    press(dispatcher, "End")
+    assert element.editor.state.caret == 3, "end of the first line"
+    press(dispatcher, "ArrowDown")
+    assert 4 <= element.editor.state.caret <= 8, "same column on the longer line"
+
+
+def test_home_and_end_are_line_relative_when_wrapped() -> None:
+    """And End stops *before* the newline. `TextLine.end` is where the next
+    line starts, so using it directly puts the caret on the line below and
+    typing appears on the wrong one."""
+    element = field(style={"multiline": True})
+    dispatcher = driver(element)
+    type_text(dispatcher, "first")
+    press(dispatcher, "Enter")
+    type_text(dispatcher, "second")
+    relayout(element)
+    press(dispatcher, "ArrowUp")
+    press(dispatcher, "Home")
+    assert element.editor.state.caret == 0
+    press(dispatcher, "End")
+    assert element.editor.state.caret == 5, "before the newline at 5, not after it"
+
+
+def test_shift_with_a_vertical_arrow_selects() -> None:
+    element = field(style={"multiline": True})
+    dispatcher = driver(element)
+    type_text(dispatcher, "first")
+    press(dispatcher, "Enter")
+    type_text(dispatcher, "second")
+    relayout(element)
+    press(dispatcher, "ArrowUp", SHIFT)
+    assert element.editor.state.has_selection
+
+
+def test_clicking_a_wrapped_line_uses_the_y_as_well_as_the_x() -> None:
+    element = field(value=LONG, style={"multiline": True})
+    relayout(element)
+    rect = element.absolute_rect()
+    first = element._offset_at(rect.x + TextFieldElement.PAD_X + 4.0, rect.y + 30.0)
+    second = element._offset_at(
+        rect.x + TextFieldElement.PAD_X + 4.0,
+        rect.y + 30.0 + TextFieldElement.INPUT_ROLE.line_height,
+    )
+    assert second > first, "the lower click landed further into the text"
+
+
+def test_a_multiline_field_paints_at_the_width_it_measured() -> None:
+    """The bug this catches shipped for an hour: `_paragraph` wrapped to the
+    inner width and `paint_text` was never given one, so layout sized a
+    container for two lines and paint drew a single unwrapped one.
+
+    The paragraph cache keys on the wrap width, so measuring and painting at
+    different widths leaves two entries. A single-line field legitimately has
+    one width -- None -- so this asks the question the same way for both.
+    """
+    from pycopper.layout import Offset
+    from pycopper.text import TextEngine
+
+    for multiline in (True, False):
+        engine = TextEngine()
+        style = {"width": 240, "multiline": multiline}
+        element = build_element(
+            parse_view({"name": "f", "widget": "TextField", "value": LONG, "style": style}).root
+        )
+        element.set_text_engine(engine)
+        relayout(element)
+        ctx = PaintContext(
+            display_list=DisplayList(), palette=Palette(Theme()), text=engine, pixel_ratio=1.0
+        )
+        element.paint(ctx, Offset(0.0, 0.0))
+        widths = {key[2] for key in engine._layouts if key[0] == LONG}
+        assert len(widths) == 1, f"multiline={multiline}: measured and painted at {widths}"
+        if multiline:
+            assert widths != {None}, "a multiline field must wrap to a real width"

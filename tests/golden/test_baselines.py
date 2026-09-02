@@ -1632,6 +1632,57 @@ def test_text_field_baseline(render_scene, assert_golden) -> None:
     assert_golden("text_field", np.asarray(engine.canvas.draw()))
 
 
+def test_multiline_field_baseline(render_scene, assert_golden) -> None:
+    """The three shapes M3 names, side by side and to scale.
+
+    A single-line field with a value too long for it, a multi-line field grown
+    to fit the same value, and a fixed-height text area holding more than it
+    can show. The differences are entirely geometric, which is exactly what a
+    property assertion cannot check.
+    """
+    long = "A value long enough that it has to wrap when the field lets it."
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 12},
+            "children": [
+                {
+                    "name": "single",
+                    "widget": "TextField",
+                    "text": "Single line",
+                    "value": long,
+                    "style": {"width": 288},
+                },
+                {
+                    "name": "grown",
+                    "widget": "TextField",
+                    "text": "Multi-line",
+                    "value": long,
+                    "supporting_text": "Grows as it wraps",
+                    "style": {"width": 288, "multiline": True},
+                },
+                {
+                    "name": "area",
+                    "widget": "TextField",
+                    "text": "Text area",
+                    "value": long * 3,
+                    "style": {"width": 288, "multiline": True, "height": 120},
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=380, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("multiline_field", np.asarray(engine.canvas.draw()))
+
+
 def test_elevation_baseline(render_scene, assert_golden) -> None:
     """The six M3 elevation levels, on a light theme.
 

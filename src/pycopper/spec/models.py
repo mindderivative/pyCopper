@@ -377,6 +377,16 @@ class StyleSpec(_Frozen):
     #: Which M3 variant of the component to render.
     variant: Variant = "filled"
     #: Whether a `Text` widget's content can be selected with the mouse.
+    #: Whether a `TextField` accepts more than one line.
+    #:
+    #: M3 names two forms and this covers both, because the difference between
+    #: them is exactly whether the author fixed a height. "Multi-line text
+    #: fields grow to accommodate multiple lines"; they "initially appear as
+    #: single-line fields" and expand as text wraps -- that is `multiline: true`
+    #: alone. "Text areas are fixed-height fields" that "scroll vertically when
+    #: the cursor reaches the bottom" -- that is `multiline: true` with a
+    #: `height:`. Both quoted from COMPONENT_TEXT_FIELDS.
+    multiline: bool = False
     #: Off by default: a selectable label shows a text cursor and swallows
     #: drags, which is wrong for the labels most text in an interface is.
     selectable: bool = False

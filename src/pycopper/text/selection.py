@@ -27,7 +27,18 @@ from dataclasses import dataclass
 from .layout import Paragraph, TextLine
 from .segment import cluster_boundaries
 
-__all__ = ["SelectionRect", "caret_at", "index_at", "line_index_at", "rects_for", "word_at"]
+__all__ = [
+    "SelectionRect",
+    "caret_at",
+    "index_at",
+    "line_end",
+    "line_index_at",
+    "rects_for",
+    "word_at",
+]
+
+#: Hard terminators, as `layout.HARD_BREAK_CHARS` spells them.
+_BREAKS = "\n\r\v\f\u2028\u2029\u0085"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +61,20 @@ def line_index_at(para: Paragraph, y: float) -> int:
             return index
         top += line.height
     return len(para.lines) - 1
+
+
+def line_end(para: Paragraph, line: TextLine) -> int:
+    """Where a caret goes at the end of *line*.
+
+    Not `line.end`, which is where the *next* line starts and therefore sits
+    after a newline. Pressing End on the first of two lines has to leave the
+    caret before the break, or it lands at the start of the line below and
+    typing appears on the wrong one.
+    """
+    end = line.end
+    while end > line.start and para.text[end - 1] in _BREAKS:
+        end -= 1
+    return end
 
 
 def _snap(text: str, offset: int) -> int:
@@ -81,7 +106,7 @@ def index_at(para: Paragraph, x: float, y: float) -> int:
                 return _snap(para.text, char + int(run.clusters[i]))
             pen += advance
         char += len(run.text)
-    return _snap(para.text, line.end)
+    return _snap(para.text, line_end(para, line))
 
 
 def _span_x(line: TextLine, para: Paragraph, start: int, end: int) -> tuple[float, float]:

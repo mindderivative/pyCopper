@@ -35,7 +35,7 @@ from ..text.editing import (
     move,
     word_bounds,
 )
-from ..text.selection import caret_at, index_at, rects_for
+from ..text.selection import caret_at, index_at, line_end, rects_for
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
 from .material import _box, _emit_state_layer
@@ -50,6 +50,17 @@ _MOTIONS: Final = {
     "left": "left",
     "arrowright": "right",
     "right": "right",
+}
+
+#: Motions that need the laid-out paragraph rather than the string: which
+#: character sits a line above this one is a question about wrapping, not about
+#: text, so these resolve to an offset in the widget and the editing model
+#: never learns what a visual line is.
+_VISUAL: Final = {
+    "arrowup": "up",
+    "up": "up",
+    "arrowdown": "down",
+    "down": "down",
     "home": "home",
     "end": "end",
 }
@@ -68,6 +79,8 @@ class TextFieldElement(_StyledMixin, Padding):
     accented character rather than its accent.
     """
 
+    #: A single-line container, and the height a multi-line one starts at:
+    #: "these fields initially appear as single-line fields".
     HEIGHT: Final = 56.0
     PAD_X: Final = 16.0
     PAD_Y: Final = 8.0
@@ -104,6 +117,7 @@ class TextFieldElement(_StyledMixin, Padding):
         #: changed this" without a controlled/uncontrolled flag.
         self._external = spec.value or ""
         self._scroll_x = 0.0
+        self._scroll_y = 0.0
 
     def configure(self) -> None:
         self._adopt_external()
@@ -115,7 +129,7 @@ class TextFieldElement(_StyledMixin, Padding):
         if self._value != self._external:
             self._external = self._value
             self._editor.set_text(self._value)
-            self._scroll_x = 0.0
+            self._scroll_x = self._scroll_y = 0.0
 
     @property
     def editor(self) -> Editor:
@@ -144,25 +158,54 @@ class TextFieldElement(_StyledMixin, Padding):
             if handler is not None:
                 handler(ChangeEvent(EventType.CHANGE, target=self, value=self._editor.text))
         self._scroll_to_caret()
-        self.mark_needs_paint()
+        # A multi-line field's height follows its content, so an edit that adds
+        # or removes a line changes geometry rather than just pixels.
+        if changed and self.multiline:
+            self.mark_needs_layout()
+        else:
+            self.mark_needs_paint()
 
     # --------------------------------------------------------------- layout
 
     def _inner_width(self) -> float:
         return max(0.0, float(self.size.width) - 2 * self.PAD_X)
 
-    def _paragraph(self) -> Any:
-        """The input text, laid out unwrapped.
+    @property
+    def multiline(self) -> bool:
+        return bool(self.style.multiline)
 
-        A text field is one line: `max_width=None` so a long value scrolls
-        sideways instead of wrapping into a box that cannot show it.
+    def _paragraph(self) -> Any:
+        """The input text, laid out.
+
+        A single-line field passes `max_width=None`, so a long value scrolls
+        sideways instead of wrapping into a box that cannot show it. A
+        multi-line one wraps to the inner width and grows or scrolls instead.
         """
+        width = self._inner_width()
         return self.text_engine.layout(
             self.content,
             px=self.INPUT_ROLE.size,
+            max_width=width if (self.multiline and width > 0) else None,
             tracking=self.INPUT_ROLE.tracking,
             line_height=self.INPUT_ROLE.line_height,
         )
+
+    def _line_height(self) -> float:
+        return float(self.INPUT_ROLE.line_height)
+
+    def _text_height(self) -> float:
+        """Height of the input area: one line, or as many as the value needs.
+
+        "Multi-line text fields grow to accommodate multiple lines of text" and
+        "initially appear as single-line fields" -- so an empty one is exactly
+        as tall as a single-line field, and it expands from there. Giving the
+        node a `height:` instead fixes it, which is M3's other form: a text
+        area, which scrolls rather than grows.
+        """
+        if not self.multiline:
+            return self._line_height()
+        lines = max(1, len(self._paragraph().lines))
+        return lines * self._line_height()
 
     def _supporting_height(self) -> float:
         if not self._supporting.strip():
@@ -173,7 +216,19 @@ class TextFieldElement(_StyledMixin, Padding):
         outer = self.sized(constraints, self.style)
         width = outer.max_width if outer.has_bounded_width else self.MIN_WIDTH
         width = max(width, min(self.MIN_WIDTH, outer.max_width))
-        return outer.constrain(Size(width, self.HEIGHT + self._supporting_height()))
+        # The width has to be known before the text can wrap, and wrapping
+        # decides the height -- so it is set first and read back by
+        # `_text_height` through `_inner_width`.
+        self._size = Size(width, self.size.height)
+        container = self.PAD_Y + self.FLOAT_ROLE.line_height + self._text_height() + self.PAD_Y
+        return outer.constrain(Size(width, container + self._supporting_height()))
+
+    def _container_height(self) -> float:
+        """Height of the box itself, without the supporting line beneath it."""
+        return max(0.0, float(self.size.height) - self._supporting_height())
+
+    def _visible_text_height(self) -> float:
+        return max(0.0, self._container_height() - self.PAD_Y * 2 - self.FLOAT_ROLE.line_height)
 
     # ---------------------------------------------------------------- paint
 
@@ -187,14 +242,28 @@ class TextFieldElement(_StyledMixin, Padding):
         Both halves matter: without the first the caret walks off the end of a
         long value, and without the second deleting from the end leaves the
         field showing empty space where the text used to be.
+
+        The two forms scroll on different axes, and only one at a time: a
+        single-line field wraps nothing so it slides sideways, and a wrapped
+        one has nothing to slide sideways *to*, so it slides vertically.
         """
         para = self._paragraph()
+        caret = caret_at(para, self.editor.state.caret)
+        if self.multiline:
+            self._scroll_x = 0.0
+            visible = self._visible_text_height()
+            if caret.y + caret.height - self._scroll_y > visible:
+                self._scroll_y = caret.y + caret.height - visible
+            if caret.y - self._scroll_y < 0.0:
+                self._scroll_y = caret.y
+            self._scroll_y = max(0.0, min(self._scroll_y, max(0.0, para.size.height - visible)))
+            return
+        self._scroll_y = 0.0
         inner = self._inner_width()
-        caret = caret_at(para, self.editor.state.caret).x
-        if caret - self._scroll_x > inner:
-            self._scroll_x = caret - inner
-        if caret - self._scroll_x < 0.0:
-            self._scroll_x = caret
+        if caret.x - self._scroll_x > inner:
+            self._scroll_x = caret.x - inner
+        if caret.x - self._scroll_x < 0.0:
+            self._scroll_x = caret.x
         self._scroll_x = max(0.0, min(self._scroll_x, max(0.0, para.size.width - inner)))
 
     def _inner_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
@@ -214,7 +283,7 @@ class TextFieldElement(_StyledMixin, Padding):
                 (absolute.x + self.PAD_X) * dpr,
                 (absolute.y + origin.y) * dpr,
                 self._inner_width() * dpr,
-                self.INPUT_ROLE.line_height * dpr,
+                self._visible_text_height() * dpr,
             ),
             clip_radii=(0.0, 0.0, 0.0, 0.0),
         )
@@ -242,7 +311,7 @@ class TextFieldElement(_StyledMixin, Padding):
                 absolute.x + stroke / 2,
                 absolute.y + stroke / 2,
                 width - stroke,
-                self.HEIGHT - stroke,
+                self._container_height() - stroke,
                 token=ctx.palette.index("surface"),
                 radius=self.RADIUS,
                 alpha=0.0,
@@ -257,7 +326,7 @@ class TextFieldElement(_StyledMixin, Padding):
                 absolute.x * dpr,
                 absolute.y * dpr,
                 width * dpr,
-                self.HEIGHT * dpr,
+                self._container_height() * dpr,
                 token=ctx.palette.index(style.background or "surface_container_highest"),
                 color=(1.0, 1.0, 1.0, 1.0),
                 radii=(self.RADIUS * dpr, self.RADIUS * dpr, 0.0, 0.0),
@@ -268,7 +337,7 @@ class TextFieldElement(_StyledMixin, Padding):
             _box(
                 ctx,
                 absolute.x,
-                absolute.y + self.HEIGHT - stroke,
+                absolute.y + self._container_height() - stroke,
                 width,
                 stroke,
                 token=accent,
@@ -285,7 +354,7 @@ class TextFieldElement(_StyledMixin, Padding):
         origin = self._text_origin()
         inner = self._inner_context(ctx, absolute)
         x = absolute.x + origin.x - self._scroll_x
-        y = absolute.y + origin.y
+        y = absolute.y + origin.y - self._scroll_y
         state = self.editor.state
         para = self._paragraph()
 
@@ -304,7 +373,20 @@ class TextFieldElement(_StyledMixin, Padding):
                 )
 
         if self.content:
-            paint_text(inner, x, y, self.content, self.INPUT_ROLE, on_surface)
+            # The wrap width has to be the one `_paragraph` used. Without it
+            # the paint pass lays the value out unwrapped and draws a single
+            # line under a container sized for several -- the same
+            # measure-and-paint disagreement that a mismatched font weight
+            # caused, in a third place.
+            paint_text(
+                inner,
+                x,
+                y,
+                self.content,
+                self.INPUT_ROLE,
+                on_surface,
+                max_width=self._inner_width() if self.multiline else None,
+            )
 
         if self.state.focused and not self.effective_disabled and self._caret_visible():
             caret = caret_at(para, state.caret)
@@ -342,6 +424,7 @@ class TextFieldElement(_StyledMixin, Padding):
         tracking = (
             self.INPUT_ROLE.tracking + (self.FLOAT_ROLE.tracking - self.INPUT_ROLE.tracking) * t
         )
+        # The label rests centred on the FIRST line, not on a grown box.
         resting = (self.HEIGHT - self.INPUT_ROLE.line_height) / 2
         y = resting + (self.PAD_Y - resting) * t
         token = (
@@ -390,7 +473,7 @@ class TextFieldElement(_StyledMixin, Padding):
         paint_text(
             ctx,
             absolute.x + self.PAD_X,
-            absolute.y + self.HEIGHT + self.SUPPORTING_GAP,
+            absolute.y + self._container_height() + self.SUPPORTING_GAP,
             supporting,
             self.FLOAT_ROLE,
             token,
@@ -398,15 +481,46 @@ class TextFieldElement(_StyledMixin, Padding):
 
     # --------------------------------------------------------------- events
 
-    def _offset_at(self, x: float) -> int:
+    def _visual_offset(self, motion: str) -> int:
+        """Resolve a visual motion against the laid-out text.
+
+        Up and down move by a *line as drawn*, which after wrapping has nothing
+        to do with the string -- so the caret's own x is carried to the line
+        above or below and the paragraph is asked what is there. That is how
+        the column is preserved across lines of different lengths, and it falls
+        out of reusing the same `index_at` a click goes through.
+
+        Home and End are line-relative once wrapped, and document-relative when
+        there is only one line, which is the same rule stated once.
+        """
+        para = self._paragraph()
+        state = self.editor.state
+        caret = caret_at(para, state.caret)
+        if motion in ("up", "down"):
+            step = self._line_height() * (-1 if motion == "up" else 1)
+            return index_at(para, caret.x, caret.y + self._line_height() / 2 + step)
+        line = None
+        top = 0.0
+        for candidate in para.lines:
+            if top <= caret.y < top + candidate.height:
+                line = candidate
+                break
+            top += candidate.height
+        if line is None:
+            return 0 if motion == "home" else len(self.content)
+        return int(line.start if motion == "home" else line_end(para, line))
+
+    def _offset_at(self, x: float, y: float) -> int:
+        """The character under a point. `y` decides which line, once wrapped."""
         rect = self.absolute_rect()
-        local = x - rect.x - self.PAD_X + self._scroll_x
-        return index_at(self._paragraph(), local, 0.0)
+        local_x = x - rect.x - self.PAD_X + self._scroll_x
+        local_y = y - rect.y - self._text_origin().y + self._scroll_y
+        return index_at(self._paragraph(), local_x, local_y if self.multiline else 0.0)
 
     def on_pointer_down(self, event: Any) -> None:
         if self.effective_disabled:
             return
-        offset = self._offset_at(event.x)
+        offset = self._offset_at(event.x, event.y)
         if self.state.data.pop("field_double", False):
             self.editor.select(*word_bounds(self.content, offset))
         else:
@@ -419,7 +533,9 @@ class TextFieldElement(_StyledMixin, Padding):
         if self.effective_disabled or "field_anchor" not in self.state.data:
             return
         if event.button or self.state.pressed:
-            self.editor.select(int(self.state.data["field_anchor"]), self._offset_at(event.x))
+            self.editor.select(
+                int(self.state.data["field_anchor"]), self._offset_at(event.x, event.y)
+            )
             self._commit(False)
 
     def on_click(self, event: Any) -> None:
@@ -457,6 +573,17 @@ class TextFieldElement(_StyledMixin, Padding):
                 motion = f"word_{motion}"
             editor.state = move(state, motion, extend=shift)
             self._commit(False)
+        elif key in _VISUAL:
+            target = self._visual_offset(_VISUAL[key])
+            editor.state = (
+                state.selecting(state.anchor, target) if shift else state.collapsed(target)
+            )
+            self._commit(False)
+        elif key == "enter" and self.multiline:
+            # Only a multi-line field takes it. On a single-line one Enter is
+            # left to bubble, so a view can put a handler on it -- swallowing
+            # it to insert an invisible newline would be worse than useless.
+            self._commit(editor.edit(insert(state, "\n"), "type"))
         elif key == "backspace":
             self._commit(editor.edit(delete_backward(state, word=word), "delete"))
         elif key == "delete":
