@@ -14,7 +14,7 @@ from .config import Settings
 from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
 from .paint import DisplayList
 from .runtime.engine import Engine
-from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent
+from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
 from .runtime.hotreload import HotReloader
 from .runtime.overlay import OverlayHost
 from .runtime.signals import batch, bind_thread
@@ -232,6 +232,17 @@ class App:
                     x=float(event.get("x", 0.0)),
                     y=float(event.get("y", 0.0)),
                     button=int(event.get("button", 0) or 0),
+                    modifiers=frozenset(event.get("modifiers", ())),
+                )
+            )
+        elif kind == "wheel":
+            self.dispatcher.post(
+                WheelEvent(
+                    EventType.WHEEL,
+                    x=float(event.get("x", 0.0)),
+                    y=float(event.get("y", 0.0)),
+                    dx=float(event.get("dx", 0.0)),
+                    dy=float(event.get("dy", 0.0)),
                     modifiers=frozenset(event.get("modifiers", ())),
                 )
             )

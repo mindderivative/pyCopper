@@ -759,3 +759,64 @@ def test_bottom_sheet_baseline(render_scene, assert_golden) -> None:
     app.attach(engine)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("bottom_sheet", np.asarray(engine.canvas.draw()))
+
+
+def test_scroll_baseline(render_scene, assert_golden) -> None:
+    """A scrolled viewport: rows clipped at both edges, scrollbar part-way down.
+
+    The mid-scroll position is the point -- it proves the clip is real (the
+    first visible row is cut off at the top, not merely absent) and that the
+    scrollbar thumb tracks the offset.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 10},
+            "children": [
+                {
+                    "name": "heading",
+                    "widget": "Text",
+                    "text": "Scrollable list",
+                    "style": {"font_size": 16},
+                },
+                {
+                    "name": "sv",
+                    "widget": "ScrollView",
+                    "style": {
+                        "height": 180,
+                        "width": "expand",
+                        "background": "surface_container",
+                        "corner_radius": 12,
+                    },
+                    "children": [
+                        {
+                            "name": "col",
+                            "widget": "Column",
+                            "style": {"width": "expand"},
+                            "children": [
+                                {
+                                    "name": f"row{i}",
+                                    "widget": "ListItem",
+                                    "text": f"Item {i}",
+                                    "supporting_text": "Supporting text",
+                                    "style": {"width": "expand"},
+                                }
+                                for i in range(10)
+                            ],
+                        }
+                    ],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=380, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    app.root.find("sv").set_scroll(90.0)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("scroll", np.asarray(engine.canvas.draw()))

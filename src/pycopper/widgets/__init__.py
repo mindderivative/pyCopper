@@ -44,6 +44,7 @@ from .overlays import (
     SnackbarElement,
     TooltipElement,
 )
+from .scroll import ScrollViewElement
 
 __all__ = [
     "BadgeElement",
@@ -68,6 +69,7 @@ __all__ = [
     "NavigationRailElement",
     "RadioElement",
     "RowElement",
+    "ScrollViewElement",
     "SegmentElement",
     "SegmentedButtonElement",
     "SideSheetElement",

@@ -445,6 +445,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import material as m
     from . import navigation as n
     from . import overlays as o
+    from . import scroll as sc
 
     return {
         WidgetKind.CARD: m.CardElement,
@@ -473,6 +474,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.SNACKBAR: o.SnackbarElement,
         WidgetKind.BOTTOM_SHEET: o.BottomSheetElement,
         WidgetKind.SIDE_SHEET: o.SideSheetElement,
+        WidgetKind.SCROLL_VIEW: sc.ScrollViewElement,
     }
 
 

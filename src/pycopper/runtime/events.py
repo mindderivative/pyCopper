@@ -26,6 +26,7 @@ __all__ = [
     "KeyEvent",
     "Phase",
     "PointerEvent",
+    "WheelEvent",
 ]
 
 
@@ -36,6 +37,7 @@ class EventType(StrEnum):
     POINTER_ENTER = "pointer_enter"
     POINTER_LEAVE = "pointer_leave"
     CLICK = "click"
+    WHEEL = "wheel"
     KEY_DOWN = "key_down"
     KEY_UP = "key_up"
     TEXT = "text"
@@ -73,6 +75,22 @@ class PointerEvent(Event):
 
 
 @dataclass(slots=True)
+class WheelEvent(Event):
+    """A scroll wheel or trackpad gesture.
+
+    `dy` is positive when scrolling **down**, matching the direction a scroll
+    offset grows. The backend already negates the raw platform value, and one
+    wheel notch is about 100 units.
+    """
+
+    x: float = 0.0
+    y: float = 0.0
+    dx: float = 0.0
+    dy: float = 0.0
+    modifiers: frozenset[str] = field(default_factory=frozenset)
+
+
+@dataclass(slots=True)
 class KeyEvent(Event):
     key: str = ""
     text: str = ""
@@ -87,6 +105,7 @@ HANDLER_KEYS = {
     EventType.POINTER_ENTER: "on_pointer_enter",
     EventType.POINTER_LEAVE: "on_pointer_leave",
     EventType.CLICK: "on_click",
+    EventType.WHEEL: "on_wheel",
     EventType.KEY_DOWN: "on_key_down",
     EventType.TEXT: "on_text",
     EventType.FOCUS: "on_focus",
@@ -187,10 +206,21 @@ class EventDispatcher:
     # -------------------------------------------------------------- dispatch
 
     def dispatch(self, event: Event) -> None:
-        if isinstance(event, PointerEvent):
+        if isinstance(event, WheelEvent):
+            self._dispatch_wheel(event)
+        elif isinstance(event, PointerEvent):
             self._dispatch_pointer(event)
         elif isinstance(event, KeyEvent):
             self._dispatch_to_focused(event)
+
+    def _dispatch_wheel(self, event: WheelEvent) -> None:
+        """Send a wheel event to whatever is under the pointer.
+
+        Position, not focus, decides the target: the wheel scrolls what the
+        pointer is over, which is the desktop convention every toolkit follows
+        and is why this does not go through `_dispatch_to_focused`.
+        """
+        self._propagate(self.hit_path(event.x, event.y), event)
 
     def _dispatch_pointer(self, event: PointerEvent) -> None:
         # A captured pointer keeps receiving events outside its own bounds,
@@ -296,6 +326,15 @@ class EventDispatcher:
         handler = element.handlers.get(HANDLER_KEYS.get(event.type, ""))
         if handler is not None:
             handler(event)
+        if event.stopped:
+            return
+        # Some widgets respond to an event natively rather than through a
+        # view-declared handler -- a scroll view consumes the wheel whether or
+        # not anyone wrote `on_wheel:`. The view's handler runs first so it can
+        # stop propagation and pre-empt the built-in behaviour.
+        native = getattr(element, HANDLER_KEYS.get(event.type, ""), None)
+        if native is not None and event.phase is not Phase.CAPTURE:
+            native(event)
 
     # ----------------------------------------------------------------- focus
 

@@ -57,9 +57,11 @@ should be built before mobile-shaped components:
 
 - **Hover** is a first-class state, not a progressive enhancement.
 - **Focus rings and keyboard traversal** are how a desktop application is
-  navigated — currently the largest real gap.
-- **Right-click and context menus**, **cursor shape**, **visible scrollbars**,
-  and **mouse text selection** are desktop conventions with no mobile analogue.
+  navigated (§5.11.1, built).
+- **Visible scrollbars** and wheel-driven scrolling (§5.14, built).
+- **Right-click and context menus**, **cursor shape**, and **mouse text
+  selection** are desktop conventions with no mobile analogue, and are not
+  built yet.
 
 ### 1.3 Design principles
 
@@ -998,6 +1000,59 @@ Two gaps these components inherit, both stated rather than approximated:
 M3's 48dp minimum touch target is deliberately **not** implemented: it is a
 finger-precision rule and pyCopper is pointer-only (§1.2.1).
 
+### 5.14 Scrolling — `widgets/scroll.py`
+
+**Scrolling is a paint-time translation, not a relayout.** That single decision
+shapes everything else here. Content is measured once against *unbounded* space
+on the scroll axis and keeps the offsets layout gave it; moving the scroll
+position only changes the origin its subtree is painted from
+(`ElementMixin.child_origin`). A wheel notch costs one paint of the viewport,
+not a layout pass over every row.
+
+That matters more here than in a typical toolkit. Python, not the GPU, is this
+framework's bottleneck (§12) — relaying out a thousand-row list per wheel event
+would be plainly visible, while re-emitting its instances is the operation the
+display list is already built for.
+
+```yaml
+- name: list
+  widget: ScrollView
+  style: {height: 300, width: expand}   # bounded on the scroll axis
+  children:
+    - widget: Column
+      children: [ ... ]
+```
+
+| Concern | Behaviour |
+|---|---|
+| Extent | content measured unbounded along the axis, bounded across it, so text still wraps |
+| Bounds | `max_scroll = content + padding − viewport`; the offset is clamped every layout |
+| Clipping | in-shader, via the paint context — never scissor, which would break the single draw call (§5.8) |
+| Hit testing | threads the same translated origin, so the pointer follows the pixels |
+| Wheel | goes to whatever is under the **pointer**, not to the focused element |
+| Chaining | propagation stops only if the content actually moved |
+| State | the offset lives in `WidgetState.scroll`, so it survives hot reload like focus does |
+
+Three decisions worth recording:
+
+- **An unbounded scroll axis raises.** A `ScrollView` that shrink-wrapped would
+  be exactly as tall as the content it is meant to be scrolling, and would
+  simply never scroll. The error names the fix, matching what `Flex` already
+  does for flexible children in unbounded space.
+- **`scroll_by` returns whether it moved**, and the wheel handler stops
+  propagation only then. At the end of an inner list the wheel keeps
+  travelling outwards — swallowing it unconditionally would trap the pointer
+  in a fully-scrolled pane.
+- **The offset is re-clamped during layout**, not only when set. A hot reload
+  that deletes rows would otherwise leave the view scrolled past the new end.
+
+**The scrollbar is not Material.** M3 specifies none — the catalogue only notes
+that a scrolling menu "shows a persistent scrollbar" — so its 4dp thickness and
+32dp minimum thumb are pyCopper's own, and it is drawn as an indicator rather
+than a drag target, since dragging it needs pointer capture wiring that is not
+built. Visible scrollbars are a desktop convention with no mobile analogue
+(§1.2), which is why one exists at all.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -1107,10 +1162,11 @@ pyCopper/
 │       │   ├── tokens.py        # frozen TOKEN_ORDER (versioned!)
 │       │   └── palette.py       # materialyoucolor -> float32 palette buffer
 │       └── widgets/
-│           ├── base.py          # Widget protocol: layout() + paint()
-│           ├── container.py     ├── text.py       ├── button.py
-│           ├── row.py           ├── column.py     ├── stack.py
-│           └── scroll.py
+│           ├── base.py          # primitives: container, row/column, stack, text, button, icon
+│           ├── material.py      # M3 catalogue: card, checkbox, chip, fab, ...
+│           ├── navigation.py    # rail, drawer, app bar, tabs, list item, progress
+│           ├── overlays.py      # dialog, menu, tooltip, snackbar, sheets
+│           └── scroll.py        # clipped viewport + wheel handling
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers

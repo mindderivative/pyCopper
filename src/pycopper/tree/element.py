@@ -315,9 +315,10 @@ class ElementMixin:
         start = len(ctx.display_list)
         self.paint_self(ctx, absolute)
         child_ctx = self.child_paint_context(ctx, absolute)
+        child_origin = self.child_origin(absolute)
         for child in self.children:
             if isinstance(child, ElementMixin):
-                child.paint(child_ctx, absolute)
+                child.paint(child_ctx, child_origin)
 
         self.paint_focus_ring(ctx, absolute)
         self._cached = ctx.display_list.snapshot(start)
@@ -397,6 +398,17 @@ class ElementMixin:
     def child_paint_context(self, ctx: PaintContext, absolute: Offset) -> PaintContext:
         """Override to introduce a clip for children (scroll views, cards)."""
         return ctx
+
+    def child_origin(self, absolute: Offset) -> Offset:
+        """Origin children are positioned from. Default: this element's own.
+
+        A scroll view returns `absolute - scroll`, which is what makes
+        scrolling a **paint-time** translation rather than a relayout: the
+        content keeps the offsets layout gave it and the whole subtree simply
+        draws somewhere else. Hit testing threads the same origin, so the
+        pointer follows the pixels.
+        """
+        return absolute
 
     def paint_self(self, ctx: PaintContext, absolute: Offset) -> None:
         """Emit this element's own primitives. Default: background, border, shadow."""
@@ -479,9 +491,10 @@ class ElementMixin:
         rect = Rect.from_offset_size(absolute, self.size)
         if not rect.contains(x, y):
             return []
+        child_origin = self.child_origin(absolute)
         for child in reversed(self.children):
             if isinstance(child, ElementMixin):
-                found = child.hit_test(x, y, absolute)
+                found = child.hit_test(x, y, child_origin)
                 if found:
                     return [*found, self]
         return [self]

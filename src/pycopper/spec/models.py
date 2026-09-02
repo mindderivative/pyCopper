@@ -75,6 +75,7 @@ class WidgetKind(StrEnum):
     SNACKBAR = "Snackbar"
     BOTTOM_SHEET = "BottomSheet"
     SIDE_SHEET = "SideSheet"
+    SCROLL_VIEW = "ScrollView"
 
 
 class SizeSpec:
@@ -292,6 +293,11 @@ class StyleSpec(_Frozen):
     dismissable: bool = True
     #: Gap between an anchored overlay and its anchor, in logical px.
     offset: float = Field(default=4.0, ge=0)
+    #: Which way a ScrollView scrolls. Row/Column encode their axis in the
+    #: widget kind, but a viewport's axis is independent of its content's.
+    axis: Literal["vertical", "horizontal"] = "vertical"
+    #: Draw a ScrollView's scrollbar when its content overflows.
+    scrollbar: bool = True
     #: Draw a bottom sheet's drag handle. Off by default: the handle is an
     #: affordance for a drag gesture that needs a motion system to implement,
     #: so showing one by default would promise behaviour that does not exist.

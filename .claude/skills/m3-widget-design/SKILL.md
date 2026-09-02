@@ -165,7 +165,7 @@ what to close before implementing.
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
 (Padding, Align, SizedBox, ConstrainedBox, Flex/Row/Column, Stack, Flexible,
-Spacer); the single instanced SDF pipeline with per-corner radii, borders,
+Spacer, ScrollView); the single instanced SDF pipeline with per-corner radii, borders,
 shadows, analytic antialiasing and rounded in-shader clipping; the full 59-token
 MD3 palette with one-upload theme switching; events with hit testing,
 capture/bubble, pointer capture, hover and focus.
@@ -251,6 +251,13 @@ along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.
 
+**Scrolling exists.** Wrap content in a `ScrollView` with a bounded size on its
+scroll axis (`style: {height: 300}` for the default vertical axis, or
+`axis: horizontal`). It clips in-shader, handles the wheel natively with no
+declared handler, and chains to an outer view at its limit. Scrolling marks
+**paint only** -- if you write a widget that scrolls, never mark layout for it.
+A `ScrollView` given unbounded space on its scroll axis raises, by design.
+
 **Building an overlay component:** declare it in the top-level `overlays:` list
 and let `runtime/overlay.py` own placement, scrim, modality and dismissal --
 the widget supplies anatomy only. Give it a `DEFAULT_PLACEMENT` so the view
@@ -276,8 +283,6 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   Arabic or Hebrew glyphs, and caret/selection across a direction boundary is
   unimplemented (risk R9).
 
-- **Scrolling / viewports.** No scroll element; `state.scroll` exists but
-  nothing consumes it.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
 - **Motion.** No animation or transition system; every state change is instant
