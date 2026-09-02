@@ -182,3 +182,15 @@ def test_the_very_first_frame_is_never_declined(offscreen_engine) -> None:
         engine.draw_frame()
     except DrawCancelled:
         pytest.fail("the first frame of the application was declined")
+
+
+def test_wayland_decorations_defaults_to_the_portable_choice() -> None:
+    """`server` is opt-in on purpose. GNOME offers no server-side decorations
+    for xdg-shell, so defaulting to it would leave those users with a window
+    that has no title bar and no way to close it."""
+    from pycopper import Settings
+
+    assert Settings().wayland_decorations == "auto"
+    assert Settings(wayland_decorations="server").wayland_decorations == "server"
+    with pytest.raises(ValueError):
+        Settings(wayland_decorations="client")

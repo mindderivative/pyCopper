@@ -32,6 +32,21 @@ class Settings(BaseSettings):
     #: for a framework that must handle full-window resizes at 60fps.
     power_preference: Literal["high-performance", "low-power"] = "high-performance"
 
+    #: Who draws the window frame on Wayland.
+    #:
+    #: 'auto' leaves it to GLFW, which prefers libdecor -- client-side
+    #: decorations drawn by a plugin. That is the right default because it is
+    #: the only thing that works everywhere: GNOME does not offer server-side
+    #: decorations for xdg-shell, so disabling libdecor there leaves a window
+    #: with no title bar and no close button.
+    #:
+    #: 'server' asks the compositor for the frame instead, by disabling
+    #: libdecor before GLFW initialises. On KDE Plasma -- which does offer
+    #: server-side decorations -- that avoids libdecor entirely, including the
+    #: "Failed to load plugin 'libdecor-gtk.so'" fallback that a missing GTK
+    #: causes. Opt in only if you know your target offers them.
+    wayland_decorations: Literal["auto", "server"] = "auto"
+
     #: Override the OS device-pixel-ratio. 0 means "use the OS value".
     force_pixel_ratio: float = Field(default=0.0, ge=0)
 

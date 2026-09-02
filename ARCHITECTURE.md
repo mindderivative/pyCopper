@@ -828,6 +828,10 @@ loop.run()
 
 `power_preference` is `"high-performance"`, not `"low-power"`: on hybrid-GPU laptops `"low-power"` selects the integrated GPU, which is the correct default for a compositor but the wrong one for a framework that must handle full-window resizes at 60fps. It is exposed as configuration.
 
+`wayland_decorations` chooses who draws the window frame. `"auto"` leaves it to GLFW, which prefers libdecor — client-side decorations drawn by a plugin — and is the default because it is the only thing that works everywhere: GNOME does not offer server-side decorations for xdg-shell, so disabling libdecor there leaves a window with no title bar and no close button. `"server"` disables libdecor before GLFW initialises, which on a compositor that does offer server-side decorations (KDE Plasma) avoids the libdecor path entirely, including the `Failed to load plugin 'libdecor-gtk.so'` fallback a missing GTK produces. It must be set before `glfw.init()`, and rendercanvas defers that until the first canvas is constructed, so `_make_canvas` is the last moment it can take effect.
+
+It is **not** a performance setting, and measurement says so: the same drag under both modes gave a 4.30 ms and a 4.17 ms median frame, the same p95 band, and one over-budget frame each. libdecor was never the cost.
+
 ### 5.11 Hot reload — `runtime/hotreload.py`
 
 `watchfiles` runs in a background thread. On a change to a watched YAML file it posts a reload request to the engine thread — it never touches the trees itself.

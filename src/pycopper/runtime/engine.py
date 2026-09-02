@@ -83,6 +83,14 @@ class Engine:
         from rendercanvas.glfw import RenderCanvas
 
         s = self.settings
+        if s.wayland_decorations == "server":
+            # Must precede GLFW's init, which rendercanvas defers until the
+            # first canvas is constructed -- so this is the last moment it can
+            # be set, and setting it after would silently do nothing. The hint
+            # is ignored on platforms where it does not apply.
+            import glfw
+
+            glfw.init_hint(glfw.WAYLAND_LIBDECOR, glfw.WAYLAND_DISABLE_LIBDECOR)
         return RenderCanvas(
             title=s.title,
             size=(s.width, s.height),
