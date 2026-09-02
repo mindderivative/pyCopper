@@ -26,6 +26,7 @@ from ..layout import (
 from ..paint import NO_TOKEN
 from ..spec import StyleSpec, WidgetKind, WidgetSpec
 from ..text import TextEngine
+from ..text.fontdb import FontRequest
 from ..text.layout import Alignment as TextAlignment
 from ..tree.element import ElementMixin, PaintContext, default_text_engine
 
@@ -218,9 +219,17 @@ def measure_text(
     *,
     engine: TextEngine | None = None,
     max_width: float | None = None,
+    weight: int = 400,
 ) -> Size:
-    """Shaped metrics for *text*. Memoised by the engine."""
-    return (engine or default_text_engine()).measure(text, px=font_size, max_width=max_width)
+    """Shaped metrics for *text*. Memoised by the engine.
+
+    `weight` selects a real face, so metrics differ between weights -- which is
+    why layout and paint must pass the same one or they will disagree about
+    how wide a label is.
+    """
+    return (engine or default_text_engine()).measure(
+        text, px=font_size, max_width=max_width, request=FontRequest(weight=weight)
+    )
 
 
 def paint_text(
@@ -233,13 +242,20 @@ def paint_text(
     *,
     max_width: float | None = None,
     alignment: str = TextAlignment.START,
+    weight: int = 400,
 ) -> int:
     """Emit shaped glyphs at logical position ``(x, y)``.
 
     ``x``/``y`` are the top-left of the text block; the baseline offset comes
     from the font's own ascent, so lines sit correctly whatever face is used.
     """
-    paragraph = ctx.text.layout(text, px=font_size, max_width=max_width, alignment=alignment)
+    paragraph = ctx.text.layout(
+        text,
+        px=font_size,
+        max_width=max_width,
+        alignment=alignment,
+        request=FontRequest(weight=weight),
+    )
     return ctx.text.emit(
         ctx.display_list,
         paragraph,
@@ -263,6 +279,11 @@ class ButtonElement(ContainerElement):
     HEIGHT: Final = 40.0
     MIN_WIDTH: Final = 64.0
     CURSOR = "pointer"
+
+    #: "Typography: md.sys.typescale.label-large (14sp / 20dp line height,
+    #: medium weight)" -- quoted, and the reason a button label is Medium
+    #: rather than Regular.
+    LABEL_WEIGHT: Final = 500
 
     #: Only the `elevated` variant rests above the surface; M3 puts filled,
     #: tonal and outlined buttons at level 0.
@@ -354,7 +375,9 @@ class ButtonElement(ContainerElement):
 
         if self._text.strip():
             font = style.font_size
-            label = measure_text(self._text, font, engine=self.text_engine)
+            label = measure_text(
+                self._text, font, engine=self.text_engine, weight=self.LABEL_WEIGHT
+            )
             paint_text(
                 ctx,
                 absolute.x + (size.width - label.width) / 2,
@@ -362,6 +385,7 @@ class ButtonElement(ContainerElement):
                 self._text,
                 font,
                 token,
+                weight=self.LABEL_WEIGHT,
             )
 
 
@@ -426,6 +450,7 @@ class TextElement(_StyledMixin, Padding):
             self._text,
             px=self.style.font_size,
             max_width=width if width > 0 else None,
+            request=FontRequest(weight=self.style.font_weight),
         )
 
     def _offset_at(self, x: float, y: float) -> int:
@@ -505,6 +530,7 @@ class TextElement(_StyledMixin, Padding):
             self.style.font_size,
             engine=self.text_engine,
             max_width=wrap,
+            weight=self.style.font_weight,
         )
 
     def perform_layout(self, constraints: Constraints) -> Size:
@@ -552,6 +578,7 @@ class TextElement(_StyledMixin, Padding):
             self.style.font_size,
             content_token(ctx, self.style, "on_surface"),
             max_width=max(0.0, self.size.width - self._padding.horizontal) or None,
+            weight=self.style.font_weight,
         )
 
 

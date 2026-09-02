@@ -219,3 +219,75 @@ def test_the_example_documents_its_provenance() -> None:
     text = path.read_text()
     assert "material-web" in text
     assert "34.0.21" in text
+
+
+# ------------------------------------------------------------------ weight
+
+
+def test_a_role_carries_its_weight() -> None:
+    """Roboto ships Regular and Medium, so `title-medium` is genuinely Medium
+    rather than emboldened Regular."""
+    assert view(None, {"text_style": "title-medium"}).root.style.font_weight == 500
+    assert view(None, {"text_style": "body-large"}).root.style.font_weight == 400
+
+
+def test_an_explicit_weight_beats_the_role() -> None:
+    """Naming a role states an intent; writing a weight beside it states a more
+    specific one."""
+    parsed = view(None, {"text_style": "body-large", "font_weight": 500})
+    assert parsed.root.style.font_weight == 500
+
+
+def test_weight_defaults_to_regular() -> None:
+    assert view(None, {"font_size": 20}).root.style.font_weight == 400
+
+
+def test_the_weights_match_the_recorded_tokens() -> None:
+    for role in TYPE_ROLES:
+        assert view(None, {"text_style": role}).root.style.font_weight == TYPE_SCALE[role].weight
+
+
+def test_weight_changes_the_measured_metrics() -> None:
+    """A different weight is a different face, not a synthetic thickening --
+    which is why layout and paint must pass the same one."""
+    from pycopper.widgets.base import measure_text
+
+    regular = measure_text("Sample text", 20.0, weight=400)
+    medium = measure_text("Sample text", 20.0, weight=500)
+    assert regular.width != medium.width
+
+
+def test_a_missing_weight_resolves_to_the_nearest_available() -> None:
+    """Roboto has no Bold here, so 700 renders as Medium rather than as a
+    smeared Regular."""
+    from pycopper.text import TextEngine
+    from pycopper.text.fontdb import FontRequest
+
+    db = TextEngine().db
+    assert db.face_for(FontRequest(weight=700)).weight == 500
+    assert db.face_for(FontRequest(weight=400)).weight == 400
+
+
+def test_components_use_the_weight_their_m3_role_specifies() -> None:
+    """M3_COMPONENT_SPECS: a common button is `label-large` "(14sp / 20dp line
+    height, medium weight)" -- quoted, not inferred."""
+    from pycopper.widgets.base import ButtonElement
+    from pycopper.widgets.navigation import LABEL_WEIGHT, TAB_LABEL_WEIGHT
+
+    assert ButtonElement.LABEL_WEIGHT == TYPE_SCALE["label-large"].weight == 500
+    assert LABEL_WEIGHT == TYPE_SCALE["label-medium"].weight == 500
+    assert TAB_LABEL_WEIGHT == TYPE_SCALE["title-small"].weight == 500
+
+
+def test_label_layout_and_paint_agree_on_weight() -> None:
+    """They measure separately, so a mismatch would size a label for one face
+    and draw it in another -- clipping it. This caught a real bug."""
+    import re
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1] / "src/pycopper/widgets/navigation.py"
+    ).read_text()
+    for call in re.findall(r"(?:measure_text|paint_text)\((.{0,400}?)\)\n", source, re.S):
+        if "LABEL_SIZE" in call:
+            assert "weight=" in call, f"a label call carries no weight: {call[:80]!r}"

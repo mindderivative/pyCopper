@@ -1493,10 +1493,30 @@ Two independent checks make that trustworthy rather than merely convenient:
 Tests pin both, so a future change to the table that broke either would fail
 rather than pass quietly.
 
-`line_height`, `weight` and `tracking` are recorded per role — they belong to
-the same token set and an application will want them — but only `size` is
-applied: pyCopper has no line-height or per-run weight override to resolve the
-rest into.
+**Size and weight are both applied.** A role resolves to `font_size` and
+`font_weight`, and the bundled Roboto ships the Regular and Medium faces the
+scale asks for, so `title-medium` is genuinely Medium rather than emboldened
+Regular. The font database resolves an unavailable weight to the nearest within
+the family, so a request for 700 renders as Medium instead of a smeared
+Regular.
+
+A weight is a **different face with different metrics**, which makes one rule
+non-negotiable: a label's `measure_text` and its `paint_text` must pass the
+same weight, or the box is sized for one face and drawn in another. Applying
+this caught exactly that bug mid-change — a partial edit had left one widget
+measuring at 400 and painting at 500 — and a test now walks the widget source
+asserting every label call carries a weight.
+
+Components take the weight their own M3 role specifies, where the reference
+library documents one: a common button is `label-large`, quoted as "(14sp /
+20dp line height, **medium weight**)"; nav labels are `label-medium`; tabs are
+`title-small`. A segmented button reuses the tab's constants — only the tab's
+role is sourced, and looking different from its sibling control would be worse
+than following it.
+
+`line_height` and `tracking` remain recorded but unapplied: paragraph line
+height comes from the font's own metrics, and there is no letter-spacing
+control to resolve tracking into.
 
 ### 5.18 Disabled state
 

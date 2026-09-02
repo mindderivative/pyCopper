@@ -343,6 +343,10 @@ class StyleSpec(_Frozen):
 
     # text
     font_size: float = Field(default=14.0, gt=0)
+    #: Font weight. Roboto ships 400 and 500; the font database resolves to
+    #: the nearest available within the family rather than synthesising one,
+    #: so 700 renders as Medium rather than as smeared Regular.
+    font_weight: int = Field(default=400, ge=1, le=1000)
     #: An M3 type-scale role, resolved to `font_size` at load against the
     #: view's `type_scale:`. Naming a role with no scale defined is an error,
     #: not a silent fallback -- pyCopper ships no figures for these (see

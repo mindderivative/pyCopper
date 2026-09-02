@@ -21,10 +21,14 @@ as both 32sp and 36sp in the same file: it is **32**.
 
 Sizes are converted from the source's `rem` at the CSS default of 16px/rem.
 
-`line_height`, `weight` and `tracking` are recorded because they are part of
-the same token set and an application will want them, but only `size` is
-applied today: `text_style:` resolves to `font_size`, and pyCopper has no
-line-height or per-run weight override to resolve the rest into.
+`size` and `weight` are both applied: a role resolves to `font_size` and
+`font_weight`, and Roboto ships the Regular and Medium faces the scale asks
+for, so `title-medium` is genuinely Medium rather than emboldened Regular.
+
+`line_height` and `tracking` are recorded but not applied -- pyCopper's
+paragraph layout takes its line height from the font's own metrics and has no
+letter-spacing control to resolve tracking into. Recorded rather than dropped,
+because they belong to the same token set and an application will want them.
 """
 
 from __future__ import annotations
@@ -85,6 +89,12 @@ def _resolve(node: WidgetSpec, scale: dict[str, float]) -> WidgetSpec:
             name: getattr(node.style, name) for name in node.style.model_fields_set
         }
         fields["font_size"] = float(scale[role])
+        # An explicit `font_weight:` on the node wins: naming a role states the
+        # intent, but writing a weight beside it states a more specific one.
+        if "font_weight" not in node.style.model_fields_set:
+            known = TYPE_SCALE.get(role)
+            if known is not None:
+                fields["font_weight"] = known.weight
         style = StyleSpec(**fields)
 
     if style is None and all(a is b for a, b in zip(children, node.children, strict=True)):
