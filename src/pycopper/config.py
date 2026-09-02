@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     width: int = Field(default=1024, gt=0)
     height: int = Field(default=768, gt=0)
 
+    #: Honour a user who has asked for less movement: animations still run and
+    #: settle on their target, they simply arrive at once. Widget code needs no
+    #: branch, so it cannot forget the case.
+    reduce_motion: bool = False
+
     #: 'ondemand' draws only when requested -- see ARCHITECTURE.md 5.10.
     update_mode: Literal["ondemand", "continuous", "manual"] = "ondemand"
     #: 0 means a truly idle app renders zero frames.

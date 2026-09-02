@@ -76,5 +76,5 @@ def test_the_docs_do_not_promise_unbuilt_subsystems() -> None:
     """The reference has a "what does not exist yet" section; it must actually
     list the things that do not exist, or it is marketing."""
     tail = REFERENCE.split("## What does not exist yet")[-1]
-    for absent in ("Motion", "theme engine", "Disabled state", "type scale"):
+    for absent in ("Motion on most components", "theme engine", "Disabled state", "type scale"):
         assert absent in tail

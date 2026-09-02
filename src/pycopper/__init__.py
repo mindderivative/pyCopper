@@ -16,16 +16,20 @@ from __future__ import annotations
 
 from .app import App, run
 from .config import Settings
+from .motion import DURATION, EASING, Animation, Ticker
 from .runtime import Engine
 from .runtime.events import Event, EventType, KeyEvent, PointerEvent, WheelEvent
 from .runtime.signals import Computed, Effect, Signal, batch, untrack
 from .spec import SpecError, ViewSpec, WidgetKind, WidgetSpec, load_view
 from .theme import TOKEN_ORDER, Palette, Theme, is_token
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
+    "DURATION",
+    "EASING",
     "TOKEN_ORDER",
+    "Animation",
     "App",
     "Computed",
     "Effect",
@@ -39,6 +43,7 @@ __all__ = [
     "Signal",
     "SpecError",
     "Theme",
+    "Ticker",
     "ViewSpec",
     "WheelEvent",
     "WidgetKind",

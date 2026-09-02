@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ..layout import OFFSET_ZERO, Offset, Rect
+from ..motion import Animation, Ticker, default_ticker
 from ..paint import NO_TOKEN, DisplayList
 from ..runtime.signals import Effect
 from ..spec import StyleSpec, Template, WidgetSpec
@@ -107,6 +108,8 @@ class ElementMixin:
     _cached_origin: Offset | None
     _needs_paint: bool
     _text_engine: TextEngine | None
+    _ticker: Ticker | None
+    _animations: dict[str, Animation]
 
     def init_element(self, spec: WidgetSpec) -> None:
         self.spec = spec
@@ -125,6 +128,11 @@ class ElementMixin:
         self._cached_origin = None
         self._needs_paint = True
         self._text_engine = None
+        self._ticker = None
+        #: Named animations owned by this element. They survive `update_spec`
+        #: with the rest of the runtime state, so a hot reload does not restart
+        #: a transition that is mid-flight.
+        self._animations = {}
 
     def update_spec(self, spec: WidgetSpec) -> None:
         """Adopt a new spec, keeping all runtime state. The reconciler's core
@@ -159,6 +167,69 @@ class ElementMixin:
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.set_text_engine(engine)
+
+    # -------------------------------------------------------------- motion
+
+    @property
+    def ticker(self) -> Ticker:
+        return self._ticker if self._ticker is not None else default_ticker()
+
+    def set_ticker(self, ticker: Ticker) -> None:
+        self._ticker = ticker
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.set_ticker(ticker)
+
+    def animated(
+        self,
+        key: str,
+        target: float,
+        *,
+        duration: str | float = "short4",
+        curve: str = "standard",
+        repeat: bool = False,
+    ) -> float:
+        """Current value of a named animation heading towards `target`.
+
+        Call it wherever the value is needed and use what comes back -- the
+        first call settles on the target immediately (there is nothing to
+        animate *from*), and a later call with a different target retargets
+        from wherever the value currently is.
+
+        The animation marks this element for **paint**, never layout. A widget
+        whose geometry genuinely animates must mark layout itself, and should
+        think hard about it first: this runs every frame.
+        """
+        animation = self._animations.get(key)
+        if animation is None:
+            # A one-shot settles on its target at once -- there is nothing to
+            # animate *from* on the first frame. A repeating one must sweep,
+            # so it starts at zero; created like a one-shot it would
+            # interpolate from a value to itself and never move.
+            animation = Animation(
+                0.0 if repeat else target,
+                target,
+                duration=duration,
+                curve=curve,
+                repeat=repeat,
+                on_change=self.mark_needs_paint,
+            )
+            self._animations[key] = animation
+            if repeat:
+                self.ticker.add(animation)
+                return animation.value
+            return target
+        if repeat:
+            self.ticker.add(animation)
+            return animation.value
+        if animation.end != target:
+            animation.retarget(target)
+            self.ticker.add(animation)
+        return animation.value
+
+    def animation(self, key: str) -> Animation | None:
+        """The named animation, for tests and for widgets that need its state."""
+        return self._animations.get(key)
 
     # ------------------------------------------------------------- identity
 

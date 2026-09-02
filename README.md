@@ -89,15 +89,16 @@ pip install pycopper
 
 ## Status
 
-**v1.0 — the public API is frozen.** `pycopper.__all__` is covered by semantic
+**v1.1 — the public API is frozen.** `pycopper.__all__` is covered by semantic
 versioning and pinned by a test; adding to it is a minor release, changing or
-removing anything in it is a major one.
+removing anything in it is a major one. (1.1 is that rule in action: motion
+added four names and nothing else moved.)
 
 Frozen does not mean finished. What is deliberately **not** built yet:
 
 | Absent | Consequence |
 |---|---|
-| Motion / animation | State changes are instant; progress indicators are determinate-only; a carousel snaps without travel |
+| Motion on most components | The animation system exists (M3 easing and duration tokens, an injectable clock, `reduce_motion`), and drives the `Switch` and indeterminate progress. Most other transitions are not wired to it yet |
 | Theme engine and stylesheet | `classes` is a reserved selector target with no consumer |
 | Disabled state | M3's 12%/38% disabled opacities have nowhere to attach |
 | M3 type scale as named roles | Widgets take a raw `font_size` |

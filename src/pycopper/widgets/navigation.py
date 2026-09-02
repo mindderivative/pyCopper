@@ -605,11 +605,20 @@ class ListItemElement(_StyledMixin, Padding):
 # --------------------------------------------------------------- progress
 
 
+#: Indeterminate cycle length. **Not sourced** -- M3 describes the behaviour
+#: ("move along a fixed track, growing and shrinking in size") but the scrape
+#: carries no cycle duration, so this is the longest M3 duration token.
+INDETERMINATE_CYCLE: Final = "extra_long4"
+
+
 class LinearProgressElement(_StyledMixin, Padding):
     """M3 Linear Progress: 4dp high with rounded ends.
 
-    Determinate only -- `value:` is the fraction complete, 0 to 1. The
-    indeterminate form is an animation and pyCopper has no motion system.
+    Omitting `value:` selects the **indeterminate** form, which M3 describes as
+    moving "along a fixed track, growing and shrinking in size". Supplying a
+    value makes it determinate -- and M3 notes an indicator should change from
+    indeterminate to determinate as information arrives, which here is just
+    binding `value:` to a signal that starts empty.
 
     Colour roles are shared with `CircularProgress`: active `primary`, track
     `secondary_container`. This widget originally used `surface_variant` for
@@ -628,6 +637,11 @@ class LinearProgressElement(_StyledMixin, Padding):
         return (self.HEIGHT / 2,) * 4
 
     @property
+    def indeterminate(self) -> bool:
+        """No `value:` at all means the wait time is unknown."""
+        return self.spec.value is None
+
+    @property
     def progress(self) -> float:
         return max(0.0, min(1.0, self.number))
 
@@ -635,6 +649,23 @@ class LinearProgressElement(_StyledMixin, Padding):
         outer = self.sized(constraints, self.style)
         width = outer.max_width if outer.has_bounded_width else 0.0
         return outer.constrain(Size(width, self.HEIGHT))
+
+    def _indeterminate_span(self) -> tuple[float, float]:
+        """Leading edge and length of the travelling bar, as fractions.
+
+        One repeating value drives both, so the bar grows out of the leading
+        edge, crosses, and shrinks into the trailing one -- "growing and
+        shrinking in size" without a second animation to keep in step.
+        """
+        # Linear, not eased: a looping animation on an ease curve decelerates
+        # into the wrap and jumps back to full speed, which reads as a stutter
+        # once a second. Eased curves are for transitions that end.
+        t = self.animated(
+            "indeterminate", 1.0, duration=INDETERMINATE_CYCLE, curve="linear", repeat=True
+        )
+        head = min(1.0, t * 2.0)
+        tail = max(0.0, t * 2.0 - 1.0)
+        return tail, head - tail
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         radius = self.HEIGHT / 2
@@ -647,11 +678,15 @@ class LinearProgressElement(_StyledMixin, Padding):
             token=ctx.palette.index(self.style.background or "secondary_container"),
             radius=radius,
         )
-        filled = self.size.width * self.progress
+        if self.indeterminate:
+            start, length = self._indeterminate_span()
+            offset, filled = self.size.width * start, self.size.width * length
+        else:
+            offset, filled = 0.0, self.size.width * self.progress
         if filled > 0:
             _box(
                 ctx,
-                absolute.x,
+                absolute.x + offset,
                 absolute.y,
                 filled,
                 self.size.height,
@@ -663,9 +698,9 @@ class LinearProgressElement(_StyledMixin, Padding):
 class CircularProgressElement(_StyledMixin, Padding):
     """M3 Circular Progress: a 4dp ring, filled clockwise from 12 o'clock.
 
-    Determinate only -- `value:` is the fraction complete, 0 to 1. The
-    indeterminate form is an animation and pyCopper has no motion system, the
-    same reason `LinearProgress` is determinate only.
+    Omitting `value:` selects the **indeterminate** form: a fixed-length arc
+    that rotates continuously, since a circular track has no leading or
+    trailing edge for a bar to grow out of.
 
     Sourced from `COMPONENT_PROGRESS_INDICATORS.md`: "Track thickness: Fixed
     (4dp)", the shared colour roles (active `primary`, track
@@ -683,6 +718,13 @@ class CircularProgressElement(_StyledMixin, Padding):
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
+
+    #: How much of the ring the spinning arc covers.
+    INDETERMINATE_SWEEP: Final = 0.75
+
+    @property
+    def indeterminate(self) -> bool:
+        return self.spec.value is None
 
     @property
     def progress(self) -> float:
@@ -732,7 +774,13 @@ class CircularProgressElement(_StyledMixin, Padding):
             start=0.0,
             sweep=TAU,
         )
-        sweep = TAU * self.progress
+        if self.indeterminate:
+            turn = self.animated(
+                "spin", 1.0, duration=INDETERMINATE_CYCLE, curve="linear", repeat=True
+            )
+            start, sweep = TAU * turn, TAU * self.INDETERMINATE_SWEEP
+        else:
+            start, sweep = 0.0, TAU * self.progress
         if sweep > 0.0:
             _arc(
                 ctx,
@@ -742,6 +790,6 @@ class CircularProgressElement(_StyledMixin, Padding):
                 side,
                 token=content_token(ctx, style, "primary"),
                 thickness=thickness,
-                start=0.0,
+                start=start,
                 sweep=sweep,
             )

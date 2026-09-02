@@ -306,7 +306,7 @@ class StyleSpec(_Frozen):
     #: Draw a ScrollView's scrollbar when its content overflows.
     scrollbar: bool = True
     #: Draw a bottom sheet's drag handle. Off by default: the handle is an
-    #: affordance for a drag gesture that needs a motion system to implement,
+    #: affordance for a drag gesture that is not wired to the pointer yet,
     #: so showing one by default would promise behaviour that does not exist.
     handle: bool = False
 

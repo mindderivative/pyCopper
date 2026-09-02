@@ -6,12 +6,14 @@ described in ARCHITECTURE.md 6.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from .config import Settings
 from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
+from .motion import Ticker
 from .paint import DisplayList
 from .runtime.engine import Engine
 from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
@@ -59,6 +61,15 @@ class App:
 
         self.text = TextEngine()
         self.root.set_text_engine(self.text)
+
+        self.motion = Ticker(reduce_motion=self.settings.reduce_motion)
+        self.root.set_ticker(self.motion)
+        #: Time source for animation, in seconds. Replaceable so that anything
+        #: needing a reproducible frame -- a golden image, a timing test -- can
+        #: drive time itself instead of racing the wall clock. Without this an
+        #: animated baseline advances by however long the test setup took.
+        self.clock: Callable[[], float] = time.perf_counter
+        self._last_tick: float | None = None
 
         self.overlays = OverlayHost()
         self.overlays.build(self.view.overlays, text_engine=self.text)
@@ -171,6 +182,17 @@ class App:
 
     # ----------------------------------------------------------------- frame
 
+    def _frame_delta(self) -> float:
+        """Seconds since the previous frame.
+
+        Measured once per frame and handed to the ticker, rather than sampled
+        by whoever asks: a widget reading the clock itself would see a
+        different value at layout time than at paint time.
+        """
+        now = self.clock()
+        previous, self._last_tick = self._last_tick, now
+        return 0.0 if previous is None else now - previous
+
     def logical_size(self) -> Size:
         if self.engine is not None:
             w, h = self.engine.canvas.get_logical_size()
@@ -178,9 +200,10 @@ class App:
         return Size(float(self.settings.width), float(self.settings.height))
 
     def update(self) -> None:
-        """Frame steps 1-5: drain events, flush signals, relayout."""
+        """Frame steps 1-5: drain events, advance motion, flush signals, relayout."""
         self.poll_reload()
         self.dispatcher.drain()
+        self.motion.tick(self._frame_delta())
         self.layout_owner.flush()
         size = self.logical_size()
         self.root.layout(Constraints.tight(size))
@@ -197,6 +220,10 @@ class App:
         )
         self.root.paint(ctx, OFFSET_ZERO)
         self.overlays.paint(ctx, self.palette, self.logical_size())
+        # The one legitimate reason to ask for another frame unprompted. An
+        # application with nothing animating still renders nothing.
+        if self.motion.active and self.engine is not None:
+            self.engine.request_draw()
 
     def set_theme(self, theme: Theme) -> None:
         """One palette upload. No relayout, no display-list rebuild."""

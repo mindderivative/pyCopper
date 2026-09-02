@@ -112,8 +112,7 @@ handlers:
 
 ```python
 @app.handler
-def save(event) -> None:
-    ...
+def save(event) -> None: ...
 ```
 
 Available keys: `on_click`, `on_pointer_down`, `on_pointer_up`,
@@ -247,8 +246,12 @@ A selection container carries `value:` naming the selected child by `name`.
 | `LinearProgress` | 4dp, rounded ends. |
 | `CircularProgress` | 4dp ring, clockwise from 12 o'clock. |
 
-Both are **determinate only** — `value:` is the fraction, 0 to 1. The
-indeterminate forms are animations and pyCopper has no motion system.
+Supplying `value:` (the fraction, 0 to 1) gives the determinate form.
+**Omitting `value:` entirely** gives the indeterminate form, which animates
+continuously — a bar that grows, travels and shrinks, or a rotating arc. An
+indicator bound to a signal that starts empty therefore changes from
+indeterminate to determinate on its own as information arrives, which is what
+M3 asks for.
 
 ### Carousel
 
@@ -333,9 +336,11 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 
 Stated plainly so you can design around it:
 
-- **Motion.** No animation or transition system. Every state change is instant,
-  which is why progress indicators are determinate-only and a carousel's snap
-  has no travel.
+- **Motion on most components.** The animation system exists — a `Switch`
+  slides and indeterminate progress runs — but most transitions are not wired
+  to it yet: a carousel snaps without travel, overlays appear without a fade,
+  and state layers change instantly. Set `reduce_motion` in `Settings` to
+  disable what does animate.
 - **A theme engine / stylesheet.** `classes` is a reserved selector target with
   no consumer yet.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% opacities have

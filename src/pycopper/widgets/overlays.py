@@ -573,9 +573,10 @@ class BottomSheetElement(_PaddedFlex):
     max width. Only the top corners round, because the sheet is flush with the
     bottom edge of the window.
 
-    The handle is drawn but **not draggable** -- there is no motion system, so
-    it is an affordance for a gesture that is not implemented yet. `handle:`
-    is off by default for that reason.
+    The handle is drawn but **not draggable**: dragging it needs pointer
+    capture wired to the sheet's height, which is not built. Motion exists
+    (5.17), so this is now a gesture gap rather than an animation one.
+    `handle:` is off by default for that reason.
     """
 
     RADIUS: Final = 28.0

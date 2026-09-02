@@ -938,3 +938,86 @@ def test_carousel_baseline(render_scene, assert_golden) -> None:
     app.root.find("adv").set_index(2)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("carousel", np.asarray(engine.canvas.draw()))
+
+
+def test_motion_baseline(render_scene, assert_golden) -> None:
+    """Animated states, sampled at a fixed point rather than at rest.
+
+    Determinism comes from ticking an exact delta instead of using wall-clock
+    time: the switches are caught part-way through their 200ms travel and the
+    indeterminate indicators part-way through a cycle, so the frame is
+    reproducible while still showing motion actually applied.
+    """
+    from pycopper import Signal
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 14},
+            "children": [
+                {
+                    "name": "switches",
+                    "widget": "Row",
+                    "style": {"height": 32, "spacing": 16},
+                    "children": [
+                        {"name": "off", "widget": "Switch", "value": "false"},
+                        {"name": "mid", "widget": "Switch", "value": "{{ flip.get() }}"},
+                        {"name": "on", "widget": "Switch", "value": "true"},
+                    ],
+                },
+                {
+                    "name": "lin_i",
+                    "widget": "LinearProgress",
+                    "style": {"width": "expand"},
+                },
+                {
+                    "name": "lin_d",
+                    "widget": "LinearProgress",
+                    "value": "0.6",
+                    "style": {"width": "expand"},
+                },
+                {
+                    "name": "circles",
+                    "widget": "Row",
+                    "style": {"height": 48, "spacing": 20},
+                    "children": [
+                        {"name": "cir_i", "widget": "CircularProgress"},
+                        {"name": "cir_d", "widget": "CircularProgress", "value": "0.6"},
+                    ],
+                },
+            ],
+        }
+    }
+    flip = Signal(False)
+    _, engine = render_scene(
+        lambda dl: None, width=360, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(flip=flip)
+    app.attach(engine)
+
+    # Drive time by hand. `update()` ticks with a real frame delta, so a
+    # wall-clock baseline would advance by however long the setup took and the
+    # transition would be over before the frame was captured.
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
+    app.mount()
+
+    # Paint the resting state first: `animated()` settles immediately on its
+    # first call, having nothing to animate *from*, so a switch flipped before
+    # it was ever painted arrives with no transition.
+    app.paint(DisplayList())
+
+    # Flipping and painting *starts* the transition -- this frame still shows
+    # the resting position, because the retarget begins from it. The movement
+    # happens on the frame after.
+    flip.set(True)
+    app.paint(DisplayList())
+
+    # 30ms into a 200ms standard-eased transition. Sampled early on purpose:
+    # `standard` is front-loaded, so by halfway the thumb is already ~85%
+    # across and the frame would not look mid-transition at all.
+    clock["t"] = 0.030
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("motion", np.asarray(engine.canvas.draw()))

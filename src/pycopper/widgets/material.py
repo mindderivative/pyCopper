@@ -362,14 +362,22 @@ class RadioElement(_StyledMixin, Padding):
 class SwitchElement(_StyledMixin, Padding):
     """M3 Switch: 52x32dp track; thumb 16dp unselected, 24dp selected.
 
-    The thumb jumps between positions -- M3 animates this, and pyCopper has no
-    motion system yet.
+    The thumb slides and grows rather than jumping. M3 states the timing for
+    this directly -- "Selection controls have a short duration of 200ms with
+    Standard easing" -- so it is `short4` and `standard`, not a guess.
+
+    Position and size animate on separate curves-in-name-only (both are the
+    same token) but as separate values, because they travel different
+    distances and interrupting one must not disturb the other.
     """
 
     TRACK_W: Final = 52.0
     TRACK_H: Final = 32.0
     THUMB_OFF: Final = 16.0
     THUMB_ON: Final = 24.0
+    #: "Selection controls have a short duration of 200ms with Standard easing"
+    MOTION: Final = "short4"
+    CURVE: Final = "standard"
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
@@ -403,9 +411,19 @@ class SwitchElement(_StyledMixin, Padding):
         )
         _emit_state_layer(ctx, self, absolute, track, (radius,) * 4)
 
-        size = self.THUMB_ON if on else self.THUMB_OFF
+        size = self.animated(
+            "thumb_size",
+            self.THUMB_ON if on else self.THUMB_OFF,
+            duration=self.MOTION,
+            curve=self.CURVE,
+        )
+        # Travel is expressed as 0..1 and mapped to pixels afterwards, so the
+        # thumb keeps ending flush with the track however its size animates.
+        travel = self.animated(
+            "thumb_pos", 1.0 if on else 0.0, duration=self.MOTION, curve=self.CURVE
+        )
         margin = (self.TRACK_H - size) / 2
-        x = absolute.x + (self.TRACK_W - size - margin if on else margin)
+        x = absolute.x + margin + (self.TRACK_W - size - margin * 2) * travel
         _box(ctx, x, absolute.y + margin, size, size, token=thumb, radius=size / 2)
 
 

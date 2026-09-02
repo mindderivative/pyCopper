@@ -33,6 +33,11 @@ PUBLIC_API = frozenset(
         "Effect",
         "batch",
         "untrack",
+        # motion (added in 1.1 -- a new name is a minor release)
+        "Animation",
+        "Ticker",
+        "EASING",
+        "DURATION",
         # theming
         "Theme",
         "Palette",

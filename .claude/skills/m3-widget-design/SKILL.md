@@ -258,6 +258,15 @@ along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.
 
+**Motion exists.** Use `self.animated("key", target, duration="short4",
+curve="standard")` inside `paint_self` and render what it returns; it settles
+immediately on the first call and retargets on later ones. Durations and curves
+are M3 tokens (`motion/easing.py`) -- look the component's timing up rather
+than guessing, since M3 states many of them directly. Use `repeat=True` with
+`curve="linear"` for a continuous loop; an eased loop stutters at the wrap.
+`animated()` marks **paint** -- if a transition changes geometry you must mark
+layout yourself, and should weigh whether it is worth relaying out every frame.
+
 **Carousels exist**, and show the one case where relayout-on-scroll is right:
 a snapping layout's item widths depend on scroll position, so it marks layout,
 while the uncontained layout translates at paint time like any viewport. If a
@@ -304,6 +313,9 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
-- **Motion.** No animation or transition system; every state change is instant
-  — a Switch thumb jumps rather than sliding.
+- **Motion on most components.** The system exists and the `Switch` and
+  indeterminate progress use it, but most transitions are not wired to it yet:
+  overlays appear without a fade, state layers change instantly, and a carousel
+  snaps without travel. Wiring one up is usually a small change — see the
+  "Motion exists" note above.
 - **Tonal elevation.** Shadows only (see Step 2).

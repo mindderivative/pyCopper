@@ -13,10 +13,15 @@ list, and it is why this is a widget of its own instead of a styled
 `ScrollView`.
 
 **What is missing is the transition, not the layout.** M3 resizes items
-continuously as they travel and snaps them home; with no motion system the
-snap is instantaneous and the resize happens in one step. At rest the geometry
-is exactly what M3 specifies -- it is the movement between rest states that is
-absent. The parallax on item visuals is likewise unimplemented.
+continuously as they travel and snaps them home; here the snap is
+instantaneous and the resize happens in one step. At rest the geometry is
+exactly what M3 specifies -- it is the movement between rest states that is
+absent, along with the parallax on item visuals.
+
+Motion now exists (ARCHITECTURE.md 5.17) and this widget does not yet use it.
+Animating the snap is not a matter of easing one value: item *widths* depend
+on scroll position here, so a travelling carousel relayouts every frame rather
+than repainting. That is a real cost to weigh, not an oversight to tidy up.
 
 Dimensions are quoted from `COMPONENT_CAROUSEL.md`. The medium item width is
 the one exception and is marked where it is defined.

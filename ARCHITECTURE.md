@@ -956,7 +956,7 @@ can be checked:
   horizontal inset and the vertical one is whatever centres the label.
 - **The menu implemented is M3's *baseline* menu, not the vertical menu** M3
   now leads with. The newer variant's shape morphing and vibrant colour need a
-  motion system and a theme engine, neither of which exists yet.
+  theme engine, which does not exist yet.
 
 **Bottom-anchored navigation is deliberately absent.** M3's Navigation Bar and
 Bottom App Bar are mobile patterns (§1.2.1); the rail and drawer are their
@@ -1104,6 +1104,58 @@ Three details that are not obvious:
   `(thickness, start, sweep, _)`. No struct growth: the instance stays 144
   bytes, and every field stays vec4-aligned.
 
+### 5.17 Motion — `motion/`
+
+One property governs the whole design: **an idle pyCopper application renders
+zero frames** (§5.10). Animation is the one thing that legitimately needs
+continuous frames, so it has to ask for them precisely while it is running and
+stop the instant it is not. `Ticker.active` is that signal, and `App.paint`
+requests the next frame only while it is true. A finished animation is dropped
+from the ticker, so the application falls silent on its own.
+
+**Easing and duration are M3's, not invented.** Six named curves and sixteen
+duration tokens, quoted from the spec. The `emphasized` curve is the
+interesting one: it is not a cubic bezier at all but a **two-segment path**,
+and M3's own CSS row says "N/A (use Standard as a fallback)" because
+`cubic-bezier()` cannot express two segments. pyCopper is not bound by CSS's
+limits, so it implements the real curve — a test asserts the join lands on
+0.4 at x=0.166666, exactly where the spec's path data puts it.
+
+Solving a curve means finding the Bezier parameter `t` for a given x before
+reading y. Newton-Raphson does that, with a bisection fallback where the slope
+is flat — which it is at both ends of every M3 curve, so the fallback is not
+hypothetical.
+
+| Concern | Behaviour |
+|---|---|
+| Interruption | **retarget, not restart** — a new animation begins from the current value, so a switch toggled twice glides rather than snapping back |
+| Frame delta | measured **once per frame** and handed to the ticker, never sampled by whoever asks — otherwise layout and paint disagree about where a moving thing is |
+| Stalls | a delta over 100 ms is clamped: a debugger pause would otherwise teleport every animation to its end |
+| Repeat | wraps instead of finishing, for indeterminate indicators |
+| Accessibility | `Settings.reduce_motion` makes animations *arrive immediately* rather than not exist — widget code needs no branch, so it cannot forget the case |
+| Invalidation | `animated()` marks **paint**, never layout. It runs every frame |
+
+`ElementMixin.animated(key, target)` is the whole widget-facing API: call it
+where the value is needed and use what comes back. The first call settles on
+its target at once — there is nothing to animate *from* — and a later call with
+a different target retargets. Animations live in element state, so a hot reload
+does not restart a transition mid-flight.
+
+**Time is injectable.** `App.clock` defaults to `time.perf_counter` and can be
+replaced. This is not a testing nicety: without it an animated golden image
+advances by however long the test setup happened to take, and the transition is
+over before the frame is captured. That is exactly what happened while building
+the motion baseline.
+
+Two widgets are wired to it so far. The `Switch` thumb slides and grows on
+timing M3 states directly — "Selection controls have a short duration of 200ms
+with Standard easing" — and **indeterminate progress** now works: omitting
+`value:` selects it, which is also how M3 describes an indicator changing from
+indeterminate to determinate as information arrives. Both use `linear` easing
+for the looping animations, because an eased loop decelerates into the wrap and
+jumps back to full speed, reading as a stutter once a second. Eased curves are
+for transitions that end.
+
 ### 5.16.1 The frozen surface
 
 `pycopper.__all__` is the whole public API — 24 names — and is covered by
@@ -1155,11 +1207,16 @@ Widths per layout, with the leftover going to the large item (M3 calls it
 | `uncontained` | each item's own `width:` |
 
 **What is missing is the transition, not the layout.** M3 resizes items
-continuously as they travel and snaps them home; with no motion system the
-snap is instantaneous and the resize happens in one step. At rest the geometry
-is exactly what M3 specifies — it is the movement between rest states that is
+continuously as they travel and snaps them home; here the snap is
+instantaneous and the resize happens in one step. At rest the geometry is
+exactly what M3 specifies — it is the movement between rest states that is
 absent, along with the parallax on item visuals. The **medium item width
 (112dp) is not sourced**: M3 calls it "dynamic" and gives no figure.
+
+Motion exists as of §5.17 and this widget does not yet use it, deliberately:
+item widths depend on scroll position here, so a *travelling* carousel
+relayouts every frame rather than repainting. That is a cost to weigh, not an
+oversight.
 
 One fix this surfaced: a `CarouselItem` label used `on_surface` whatever its
 container, so it turned near-invisible the moment a view set a light
