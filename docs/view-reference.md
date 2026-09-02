@@ -244,6 +244,45 @@ uses. **Rules merge rather than replace:** each contributes only the properties
 it actually sets, so a `widget:` rule setting `height` and a `classes:` rule
 setting `background` both apply.
 
+### Sharing a sheet across files
+
+A `styles:` entry of the form `- source:` splices in the rules that file names,
+so a theme lives in one place:
+
+```yaml
+# theme.yaml -- a bare list of rules
+- classes: action
+  style: {width: 100, height: 40, variant: outlined}
+- classes: action primary
+  style: {variant: filled}
+```
+
+```yaml
+# view.yaml
+styles:
+  - source: theme.yaml
+  - widget: Button          # a local override: later, so it wins the tie
+    style: {height: 48}
+```
+
+Rules land **in place**, so ordering reads as written — an import placed after
+a local rule overrides it, not the other way round. A sheet may import another.
+
+Every file is watched by hot reload, so editing a theme restyles a running
+application without losing focus, scroll, or text.
+
+A stylesheet is a **list**; a widget fragment is a **mapping**. Including one
+where the other belongs says so directly rather than failing later as a
+confusing error about a file that was perfectly valid. The same guards apply as
+to widget includes: no escaping the view directory, no cycles, and a depth
+limit.
+
+**Do not use a selector-less rule to set `corner_radius` or other shape
+properties globally.** It would override each component's own M3 shape — a
+`Button` is a pill at half its height, a `Card` is 12dp — and flatten the
+catalogue to one radius. A stylesheet is for the choices an application makes,
+not for overwriting the design system beneath it.
+
 ### What it costs
 
 Nothing per frame. Rules are folded into each node's style once, at load, so

@@ -33,10 +33,15 @@ from typing import Any, Final
 
 import yaml
 
-__all__ = ["IncludeError", "resolve_includes"]
+__all__ = [
+    "IncludeError",
+    "expand_styles",
+    "resolve_includes",
+]
 
 #: Keys that control inclusion rather than describing a widget.
 SOURCE_KEY: Final = "source"
+STYLES_KEY: Final = "styles"
 PARAMS_KEY: Final = "params"
 WITH_KEY: Final = "with"
 
@@ -138,6 +143,70 @@ def _load_fragment(path: Path, chain: tuple[Path, ...]) -> dict[str, Any]:
     return raw
 
 
+def _load_rules(path: Path, chain: tuple[Path, ...]) -> list[Any]:
+    """Read a stylesheet file: a bare YAML list of rules.
+
+    A sheet is a list, not a mapping, which is what distinguishes it from a
+    widget fragment. Checking that here means a file included in the wrong
+    place says so, instead of failing later as a confusing validation error on
+    a widget that was never a widget.
+    """
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise IncludeError(f"{_chain_text((*chain, path))}: invalid YAML: {exc}") from exc
+    except OSError as exc:
+        raise IncludeError(f"{_chain_text(chain)}: cannot read {path}: {exc}") from exc
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise IncludeError(
+            f"{_chain_text((*chain, path))}: a stylesheet must be a list of rules, "
+            f"got {type(raw).__name__}"
+        )
+    return raw
+
+
+def expand_styles(
+    entries: Any,
+    base: Path,
+    root: Path,
+    sources: set[Path],
+    chain: tuple[Path, ...] = (),
+) -> list[Any]:
+    """Splice every `- source:` in a `styles:` list into the rules it names.
+
+    Included rules land **in place**, so document order -- and with it the
+    tie-breaking half of the cascade -- reads exactly as written: a view that
+    pulls in a base theme and then adds its own rules overrides it, because
+    its rules come later.
+    """
+    if not isinstance(entries, list):
+        raise IncludeError("`styles:` must be a list of rules")
+    if len(chain) >= MAX_DEPTH:
+        raise IncludeError(f"{_chain_text(chain)}: stylesheets nested more than {MAX_DEPTH} deep")
+
+    out: list[Any] = []
+    for entry in entries:
+        if not (isinstance(entry, dict) and SOURCE_KEY in entry):
+            out.append(entry)
+            continue
+        extra = set(entry) - {SOURCE_KEY}
+        if extra:
+            raise IncludeError(
+                f"{_chain_text(chain)}: a stylesheet include takes only `source:`, "
+                f"got {', '.join(sorted(extra))}"
+            )
+        path = _resolve_path(str(entry[SOURCE_KEY]), base, root, chain)
+        if path in chain:
+            raise IncludeError(f"stylesheet cycle: {_chain_text((*chain, path))}")
+        sources.add(path)
+        out.extend(
+            expand_styles(_load_rules(path, chain), path.parent, root, sources, (*chain, path))
+        )
+    return out
+
+
 def _expand(
     node: dict[str, Any],
     base: Path,
@@ -224,10 +293,11 @@ def resolve_includes(
     includes (defaults to *base*). Every file touched is added to ``sources``,
     which is what lets hot reload watch the whole graph rather than one file.
     """
-    return _walk(
-        data,
-        base,
-        root if root is not None else base,
-        sources if sources is not None else set(),
-        (),
-    )
+    confine = root if root is not None else base
+    touched = sources if sources is not None else set()
+    # `styles:` is a top-level key and holds rules, not widgets, so it is
+    # expanded on its own path -- handing a rule list to the widget-fragment
+    # expander would report a mapping error about a file that is correct.
+    if isinstance(data, dict) and STYLES_KEY in data:
+        data = {**data, STYLES_KEY: expand_styles(data[STYLES_KEY], base, confine, touched)}
+    return _walk(data, base, confine, touched, ())

@@ -1281,8 +1281,22 @@ rest of the format.
 **Restyling a running application is a reload**, and reload reconciles rather
 than replaces (§5.3) — so changing a stylesheet keeps focus, scroll, and text.
 
-Not yet built: sharing a sheet across files. `source:` composes widget
-fragments (§5.1.1) and the equivalent for `styles:` is the obvious next step.
+**Sheets share across files.** A `styles:` entry of the form `- source:`
+splices in the rules that file names, and a sheet may import another. Rules
+land in place, so ordering reads as written and an import placed after a local
+rule overrides it.
+
+This is a separate expansion path from widget includes, not a reuse of
+`_expand`. A stylesheet is a **list** and a fragment is a **mapping**, so
+including one where the other belongs reports that directly instead of failing
+later as a validation error about a file that was perfectly valid. The guards
+are the same, because a stylesheet reached from a view file is exactly as
+untrusted as the view: confinement to the view directory, cycle detection, a
+depth limit, and `yaml.safe_load` only.
+
+Every sheet is registered in `sources`, so hot reload watches the whole graph —
+editing a theme restyles a running application, and because reload reconciles,
+it keeps focus, scroll and text. `examples/gallery` uses one.
 
 ### 5.18 Disabled state
 

@@ -102,7 +102,8 @@ added four names and nothing else moved.)
 
 **Stylesheets are built.** A `styles:` list selects on widget kind, `classes:`,
 and `name:`, with CSS-like precedence, resolved once at load so nothing is paid
-per frame.
+per frame. Sheets are shareable across files and watched by hot reload, so
+editing a theme restyles a running application.
 
 **Motion is built.** M3 easing curves and duration tokens, an injectable clock,
 and a `reduce_motion` setting. It drives overlay fades, state layers, every

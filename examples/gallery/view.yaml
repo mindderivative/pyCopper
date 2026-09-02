@@ -2,6 +2,11 @@
 #
 # Demonstrates view composition: shared pieces live in parts/ and are pulled
 # in with `source:`, parameterised with `with:`.
+styles:
+  # Shared rules live in their own file and are pulled in here. Anything after
+  # this import overrides it, because ties go to document order.
+  - source: theme.yaml
+
 root:
   # pyCopper widget gallery.
   #
@@ -145,15 +150,13 @@ root:
           handlers: {on_click: ask}
         - name: reset_btn
           widget: Button
-          classes: action
+          classes: action          # size and variant come from theme.yaml
           text: "Reset"
-          style: {width: 100, height: 40, variant: outlined}
           handlers: {on_click: reset}
         - name: confirm_btn
           widget: Button
-          classes: action primary
+          classes: action primary  # ...and the primary rule widens it
           text: "Confirm"
-          style: {width: 130, height: 40, variant: filled}
           handlers: {on_click: confirm}
 overlays:
   - name: confirm
