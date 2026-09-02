@@ -24,6 +24,8 @@ PUBLIC_API = frozenset(
     {
         # application
         "App",
+        "ViewModel",
+        "ViewModelError",
         "run",
         "Settings",
         "Engine",

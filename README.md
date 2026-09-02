@@ -100,6 +100,11 @@ versioning and pinned by a test; adding to it is a minor release, changing or
 removing anything in it is a major one. (1.1 was that rule in action: motion
 added four names and nothing else moved.)
 
+**v1.3 — ViewModels.** `ViewModel` and `ViewModelError` join `__all__`, which
+by the rule above is a minor release. A view file can now have its own logic:
+one view, one ViewModel, bound explicitly, so an entry point stays an entry
+point instead of accumulating every handler in the application.
+
 **v1.2 — the view format grew, `__all__` did not.** Type-scale weight, letter
 spacing and line height; `hit_padding` and `min_hit_size`; an `error:` state,
 an `on_change` handler, and the `TextField` widget. All additive, none of it in

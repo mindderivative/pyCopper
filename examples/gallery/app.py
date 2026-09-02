@@ -1,18 +1,27 @@
-"""pyCopper widget gallery.
+"""pyCopper widget gallery -- the entry point, and nothing else.
 
     python examples/gallery/app.py
 
-Exercises every widget kind, and doubles as the corpus for the golden-image
-suite. Hot reload is on: edit view.yaml while it runs and the window updates
-without losing the click count or which button has focus.
+This file builds the window and says which ViewModel drives which view. The
+behaviour lives in `gallery_ViewModel.py`, beside the view it belongs to.
+Moving one handler back in here would be the first step towards a single
+global namespace, which is what a ViewModel exists to avoid.
+
+The gallery exercises every widget kind and doubles as the corpus for the
+golden-image suite. Hot reload is on: edit `gallery_View.yaml` while it runs
+and the window updates without losing the click count or which button has
+focus.
 """
 
 from pathlib import Path
 
-from pycopper import App, Settings, Signal, Theme
+from gallery_ViewModel import SEED, Gallery
+from parts.confirm_dialog_ViewModel import ConfirmDialog
+from parts.locked_dialog_ViewModel import LockedDialog
 
-VIEW = Path(__file__).parent / "view.yaml"
-SEED = "#6750A4"
+from pycopper import App, Settings, Theme
+
+VIEW = Path(__file__).parent / "gallery_View.yaml"
 
 app = App(
     VIEW,
@@ -33,61 +42,15 @@ app = App(
     ),
 )
 
-clicks = Signal(0, name="clicks")
-dark = Signal(True, name="dark")
-confirming = Signal(False, name="confirming")
-locking = Signal(False, name="locking")
-app.expose(clicks=clicks, dark=dark, confirming=confirming, locking=locking)
-
-
-@app.handler
-def confirm(event) -> None:
-    clicks.update(lambda n: n + 1)
-
-
-@app.handler
-def ask(event) -> None:
-    """Opens the dialog defined in parts/confirm_dialog.yaml."""
-    confirming.set(True)
-
-
-@app.handler
-def lock(event) -> None:
-    """Opens the locked dialog defined in parts/locked_dialog.yaml."""
-    locking.set(True)
-
-
-@app.handler
-def unlock(event) -> None:
-    """Closes the locked dialog. Its only button, and the only way out.
-
-    There is no `on_dismiss` counterpart: with `dismissable: false` the runtime
-    never closes that overlay, so there is nothing to be told about.
-    """
-    locking.set(False)
-
-
-@app.handler
-def dismiss(event) -> None:
-    """Closes the dialog. Both of its buttons use this.
-
-    The overlay host also closes it on Escape or a click outside, but a
-    dialog's own actions must work without relying on that.
-    """
-    confirming.set(False)
-
-
-@app.handler
-def reset(event) -> None:
-    clicks.set(0)
-
-
-@app.handler
-def toggle_theme(event) -> None:
-    """A theme switch is a single palette-buffer upload -- no relayout."""
-    dark.update(lambda d: not d)
-    app.set_theme(Theme(seed=SEED, dark=dark.peek()))
-
+#: One view file, one ViewModel -- for fragments too. This file is the
+#: composition root: it builds each ViewModel and hands the dialogs the gallery
+#: signal they act on, because whether a dialog is open is the gallery's state
+#: rather than the dialog's. A child view cannot be passed an object through
+#: `with:` (parameters are textual substitution into YAML), so sharing between
+#: ViewModels happens here, in Python, where it is visible.
+gallery = app.bind_view_model("gallery_View.yaml", Gallery())
+app.bind_view_model("parts/confirm_dialog_View.yaml", ConfirmDialog(gallery.confirming))
+app.bind_view_model("parts/locked_dialog_View.yaml", LockedDialog(gallery.locking))
 
 if __name__ == "__main__":
     app.run()

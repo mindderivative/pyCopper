@@ -236,7 +236,7 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
         lambda dl: None, width=620, height=720, theme=Theme(seed=SEED, dark=True)
     )
     demo.app.attach(engine)
-    demo.clicks.set(3)
+    demo.gallery.clicks.set(3)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("gallery", np.asarray(engine.canvas.draw()))
 

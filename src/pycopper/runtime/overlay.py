@@ -17,6 +17,7 @@ consulted **first** during hit testing because it is on top.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -181,10 +182,21 @@ class OverlayHost:
         for entry in self.entries:
             entry.dismissed = False
 
-    def bind(self, context: dict[str, Any]) -> None:
+    def bind(
+        self,
+        context: dict[str, Any],
+        context_for: Callable[[str | None], dict[str, Any]] | None = None,
+    ) -> None:
+        """Subscribe every overlay element's bindings.
+
+        `context_for` resolves a view file to the names visible inside it, so
+        an overlay written in its own file sees its own ViewModel. Overlays are
+        commonly whole fragments -- a dialog is the obvious one -- which makes
+        this the case the scoping exists for.
+        """
         for entry in self.entries:
             for element in entry.element.walk_elements():
-                element.bind(context)
+                element.bind(context if context_for is None else context_for(element.spec.view))
 
     def elements(self) -> list[Any]:
         """Every element in every overlay, for handler resolution."""

@@ -429,6 +429,11 @@ class WidgetSpec(_Frozen):
     #: written by an author -- it exists so every node has *some* identity for
     #: reconciliation, and it changes when the node moves among its siblings.
     id: str = ""
+    #: The view file this node was written in, relative to the view root.
+    #: **Assigned by the loader.** Never author one. Includes are flattened
+    #: into a single tree, and this is what survives that -- it is how a
+    #: fragment can have its own ViewModel.
+    view: str | None = None
     widget: WidgetKind
     #: The designer's handle: unique, optional, and stable across a reorder.
     #: Referenced by `find()`, `anchor:`, and a selection container's `value:`,

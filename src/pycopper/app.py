@@ -20,6 +20,7 @@ from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent, 
 from .runtime.hotreload import HotReloader
 from .runtime.overlay import OverlayHost
 from .runtime.signals import batch, bind_thread
+from .runtime.viewmodel import ViewModel, check_naming
 from .spec import SpecError, ViewSpec, load_view, parse_view
 from .text import TextEngine
 from .theme import Palette, Theme
@@ -84,6 +85,9 @@ class App:
 
         self.context: dict[str, Any] = {}
         self._handlers: dict[str, Callable[[Any], None]] = {}
+        #: view file -> the ViewModel bound to it. One per file: including a
+        #: fragment five times gives five copies of the view and one ViewModel.
+        self._view_models: dict[str, ViewModel] = {}
         self.engine: Engine | None = None
         self.reloader: HotReloader | None = None
         self.reload_errors: list[str] = []
@@ -105,19 +109,50 @@ class App:
         return fn
 
     def expose(self, **values: Any) -> None:
-        """Publish names visible to ``{{ }}`` expressions in the view."""
+        """Publish names visible to ``{{ }}`` expressions in every view."""
         self.context.update(values)
+
+    def bind_view_model(self, view: str, model: ViewModel) -> ViewModel:
+        """Attach a ViewModel to one view file, by its path from the view root.
+
+        Explicit rather than discovered from the filename: a view file naming
+        its own module would let data decide what gets imported, and view files
+        are untrusted input here. The application imports its own code and says
+        what pairs with what; the `_View.yaml` / `_ViewModel.py` convention is
+        then enforced so a mistake is an error rather than a silent no-op.
+
+        This is what lets `app.py` stay an entry point. Signals and handlers
+        belong to the view that uses them, including the root view.
+        """
+        check_naming(view, model)
+        model._app = self
+        self._view_models[view] = model
+        return model
+
+    def _context_for(self, view: str | None) -> dict[str, Any]:
+        """Names visible to one view: the application's, then its own on top.
+
+        A nested view can read what the application shares without ceremony,
+        and shadow it deliberately where it needs to.
+        """
+        model = self._view_models.get(view or "")
+        if model is None:
+            return self.context
+        return {**self.context, **model.names()}
 
     def mount(self) -> None:
         """Resolve handlers and subscribe bindings. Idempotent."""
-        missing = self.dispatcher.bind_handlers(self._handlers, extra=self.overlays.elements())
+        scoped = {view: vm.handlers() for view, vm in self._view_models.items()}
+        missing = self.dispatcher.bind_handlers(
+            self._handlers, extra=self.overlays.elements(), scoped=scoped
+        )
         if missing:
             raise SpecError(
                 "view references handlers that are not registered:\n  " + "\n  ".join(missing)
             )
         for element in self.root.walk_elements():
-            element.bind(self.context)
-        self.overlays.bind(self.context)
+            element.bind(self._context_for(element.spec.view))
+        self.overlays.bind(self.context, context_for=self._context_for)
         self._mounted = True
 
     # ------------------------------------------------------------ hot reload

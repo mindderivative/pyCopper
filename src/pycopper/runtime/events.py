@@ -555,8 +555,15 @@ class EventDispatcher:
         self,
         registry: dict[str, Callable[[Any], None]],
         extra: list[Any] | None = None,
+        scoped: dict[str, dict[str, Callable[[Any], None]]] | None = None,
     ) -> list[str]:
         """Resolve handler names from view files against *registry*.
+
+        `scoped` maps a view file to the handlers its own ViewModel publishes.
+        A node resolves against its view's ViewModel first and the application
+        registry second, so a fragment can name a handler without knowing what
+        the rest of the application calls things -- and can deliberately shadow
+        one.
 
         Returns the names that could not be resolved, so the caller can fail at
         load rather than silently ignoring a typo'd handler.
@@ -564,11 +571,13 @@ class EventDispatcher:
         missing: list[str] = []
         if self.root is None:
             return missing
+        by_view = scoped or {}
         targets = list(self.root.walk_elements()) + list(extra or [])
         for element in targets:
             element.handlers = {}
+            local = by_view.get(element.spec.view or "", {})
             for event_key, name in element.spec.handlers.items():
-                fn = registry.get(name)
+                fn = local.get(name) or registry.get(name)
                 if fn is None:
                     label = element.spec.name or element.spec.id
                     missing.append(f"{label}.{event_key} -> {name!r}")

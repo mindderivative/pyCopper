@@ -42,6 +42,7 @@ Every node accepts these. Only `widget` is required.
 | `name` | string | Optional, **unique** handle. Used by `find()`, `anchor:`, and reconciliation. |
 | `classes` | string or list | Optional, repeatable categories. Selected on by [stylesheets](#stylesheets). |
 | `id` | — | **Assigned by the loader.** Never author one. |
+| `view` | — | **Assigned by the loader.** The view file this node was written in. |
 | `style` | mapping | See [Style properties](#style-properties). |
 | `text` | string | Label, or an icon name for `Icon`/`IconButton`/`Fab`. |
 | `value` | string | State binding — what a control *is*. See [Bindings](#bindings). |
@@ -434,6 +435,72 @@ positioned from its *top* does move, by half the difference.
 A line height shorter than the font's own is allowed and does occur in the
 scale; the leading is simply negative, and lines close up rather than the
 glyphs being cropped.
+
+## ViewModels
+
+A view file can own its logic. One view, one ViewModel — the familiar MVVM
+shape, with the naming convention enforced rather than suggested.
+
+```python
+# parts/swatch_ViewModel.py
+from pycopper import Signal, ViewModel
+
+
+class Swatch(ViewModel):
+    picked = Signal(False)
+
+    def pick(self, event) -> None:
+        self.picked.set(True)
+```
+
+```yaml
+# parts/swatch_View.yaml
+name: swatch
+widget: Container
+style: {background: "{{ 'primary' if picked.get() else 'surface' }}"}
+handlers: {on_click: pick}
+```
+
+```python
+# app.py -- the entry point, and the composition root
+app.bind_view_model("parts/swatch_View.yaml", Swatch())
+```
+
+Public attributes become names the view's `{{ }}` can read; public methods
+become handlers its `handlers:` can name. Nothing is registered twice.
+
+**Binding is explicit, and deliberately not by filename.** A view file naming
+its own Python module would let data decide what gets imported, and view files
+are untrusted input here — `yaml.safe_load` only, includes confined to the view
+directory, no `eval`. The application imports its own code and says what pairs
+with what. The convention is then *checked*: a bound view must be
+`*_View.yaml` and its ViewModel must live in `*_ViewModel.py`, or binding
+raises. Views without a ViewModel need no suffix.
+
+**Resolution order** is the view's own ViewModel, then the application's
+`expose`/`handler` registry. Local wins, so a fragment can name things without
+knowing what the rest of the application calls them, and an application-wide
+signal still reaches a nested view without being threaded through every
+include.
+
+**One view file, one ViewModel.** Including a fragment five times gives five
+copies of the *view* and one ViewModel behind them — right for logic belonging
+to the view, so per-instance state stays on the widget's own `state`.
+
+**Sharing between ViewModels is Python's job.** A parameter is textual
+substitution into YAML, so a child cannot be handed an object through `with:`.
+Pass it to the child's constructor where the application composes them — the
+gallery's `app.py` hands its dialogs the signal each one opens on, and each
+dialog publishes it under its own view's name.
+
+Two consequences worth knowing:
+
+- An expression written at a *call site* and passed through `with:` is
+  evaluated in the *fragment's* scope, because that is where the node ends up.
+  Give the fragment's ViewModel the name instead of borrowing the parent's.
+- `self.app` reaches the application for the few things that genuinely are its
+  own — switching the theme is the honest example. It is deliberately not
+  visible to `{{ }}` expressions.
 
 ## Hit targets
 

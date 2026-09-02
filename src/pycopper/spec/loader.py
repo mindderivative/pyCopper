@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .include import IncludeError, resolve_includes
+from .include import IncludeError, resolve_includes, stamp_view
 from .models import ViewSpec, WidgetSpec
 from .stylesheet import apply_stylesheet
 from .typescale import TypeScaleError, apply_type_scale
@@ -117,6 +117,8 @@ def load_view(path: str | Path, *, sources: set[Path] | None = None) -> ViewSpec
     touched.add(p.resolve())
     try:
         data = resolve_includes(data, base=p.parent, root=p.parent, sources=touched)
+        # Whatever the includes did not claim belongs to this file.
+        data = stamp_view(data, p.name)
     except IncludeError as exc:
         raise SpecError(f"{p}: {exc}") from exc
     return parse_view(data, origin=str(p))

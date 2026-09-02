@@ -10,12 +10,14 @@
 # `open:` is bound to the application's signal and the runtime closing the
 # overlay is only a request. There is deliberately no handler here: nothing can
 # dismiss this one, so there is nothing to be told about.
-params: [title, body, open]
+params: [title, body]
 name: dialog
 widget: Dialog
 text: "{{ title }}"
 supporting_text: "{{ body }}"
-open: "{{ open }}"
+# Not a parameter any more: this view's own ViewModel owns whether
+# it is up, so the call site does not have to pass it in.
+open: "{{ is_open.get() }}"
 style:
   modal: true
   scrim: true

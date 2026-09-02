@@ -48,7 +48,7 @@ root:
 
     # --- elevated card containing wrapped body text ---
     - name: card
-      source: parts/info_card.yaml
+      source: parts/info_card_View.yaml
       with:
         body: "Shaped text with real kerning and ligatures: fi fl ffi. Shared pieces live in parts/ and are pulled in with source:."
 
@@ -65,11 +65,11 @@ root:
       widget: Row
       style: {height: 56, spacing: 10, width: expand}
       children:
-        - {name: sw_primary,   source: parts/swatch.yaml, with: {token: primary}}
-        - {name: sw_secondary, source: parts/swatch.yaml, with: {token: secondary}}
-        - {name: sw_tertiary,  source: parts/swatch.yaml, with: {token: tertiary}}
-        - {name: sw_error,     source: parts/swatch.yaml, with: {token: error}}
-        - {name: sw_surface,   source: parts/swatch.yaml, with: {token: surface_container_highest}}
+        - {name: sw_primary,   source: parts/swatch_View.yaml, with: {token: primary}}
+        - {name: sw_secondary, source: parts/swatch_View.yaml, with: {token: secondary}}
+        - {name: sw_tertiary,  source: parts/swatch_View.yaml, with: {token: tertiary}}
+        - {name: sw_error,     source: parts/swatch_View.yaml, with: {token: error}}
+        - {name: sw_surface,   source: parts/swatch_View.yaml, with: {token: surface_container_highest}}
 
     # --- icons: Material Symbols, with the FILL axis driving selected state ---
     - name: icons
@@ -172,14 +172,12 @@ overlays:
   # Two dialogs, one component, one property apart. The first closes when you
   # click away from it; the second refuses to.
   - name: confirm
-    source: parts/confirm_dialog.yaml
+    source: parts/confirm_dialog_View.yaml
     with:
       title: "Delete this item?"
       body: "This cannot be undone."
-      open: "{{ confirming.get() }}"
   - name: locked
-    source: parts/locked_dialog.yaml
+    source: parts/locked_dialog_View.yaml
     with:
       title: "This one is locked"
       body: "Clicking outside does nothing. Use the button."
-      open: "{{ locking.get() }}"

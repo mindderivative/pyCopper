@@ -50,6 +50,11 @@ WITH_KEY: Final = "with"
 #: caught separately and reported precisely.
 MAX_DEPTH: Final = 32
 
+#: Key stamped onto every widget node recording the view file it came from.
+#: Loader-assigned, never authored -- it is what lets a fragment have its own
+#: ViewModel after includes have been flattened into one tree.
+VIEW_KEY: Final = "view"
+
 _PARAM_RE: Final = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 
 
@@ -59,6 +64,19 @@ class IncludeError(ValueError):
 
 def _chain_text(chain: tuple[Path, ...]) -> str:
     return " -> ".join(p.name for p in chain) if chain else "<root>"
+
+
+def _view_id(path: Path, root: Path) -> str:
+    """A view file's stable name: its path relative to the view root.
+
+    Relative rather than absolute so the identifier does not change with the
+    checkout directory, and POSIX-separated so it does not change with the
+    platform -- an application binds a ViewModel against this string.
+    """
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.name
 
 
 def _resolve_path(raw: str, base: Path, root: Path, chain: tuple[Path, ...]) -> Path:
@@ -235,6 +253,27 @@ def expand_type_scale(
     return raw
 
 
+def stamp_view(node: Any, view: str) -> Any:
+    """Record *view* as the origin of every widget node that has no origin yet.
+
+    Innermost wins: a fragment's own includes are expanded and stamped first,
+    so this only fills in the nodes that belong to *this* file. Without it the
+    include tree is flattened and there is no way back to which file a node was
+    written in -- which is the whole basis of binding a ViewModel per view.
+    """
+    if isinstance(node, list):
+        return [stamp_view(v, view) for v in node]
+    if not isinstance(node, dict):
+        return node
+    out = {
+        k: (stamp_view(v, view) if k in ("root", "children", "overlays") else v)
+        for k, v in node.items()
+    }
+    if "widget" in out and VIEW_KEY not in out:
+        out[VIEW_KEY] = view
+    return out
+
+
 def _expand(
     node: dict[str, Any],
     base: Path,
@@ -278,6 +317,8 @@ def _expand(
     # Resolve the fragment's own includes relative to ITS directory.
     resolved = _walk(fragment, path.parent, root, sources, (*chain, path))
     fragment = resolved if isinstance(resolved, dict) else fragment
+    stamped = stamp_view(fragment, _view_id(path, root))
+    fragment = stamped if isinstance(stamped, dict) else fragment
 
     call_name = node.get("name")
     if isinstance(call_name, str):
