@@ -69,6 +69,10 @@ class App:
         #: drive time itself instead of racing the wall clock. Without this an
         #: animated baseline advances by however long the test setup took.
         self.clock: Callable[[], float] = time.perf_counter
+        #: Last cursor pushed to the canvas. Tracked because the backend
+        #: destroys and recreates a native cursor object on every call --
+        #: setting it each frame would churn GLFW resources 60 times a second.
+        self._cursor = "default"
         self._last_tick: float | None = None
 
         self.overlays = OverlayHost()
@@ -208,6 +212,14 @@ class App:
         size = self.logical_size()
         self.root.layout(Constraints.tight(size))
         self.overlays.layout(size, self.root)
+        self._sync_cursor()
+
+    def _sync_cursor(self) -> None:
+        shape = self.dispatcher.cursor
+        if shape == self._cursor or self.engine is None:
+            return
+        self._cursor = shape
+        self.engine.canvas.set_cursor(shape)
 
     def paint(self, display_list: DisplayList) -> None:
         """Frame step 6: walk the element tree into the display list."""

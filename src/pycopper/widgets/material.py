@@ -344,6 +344,7 @@ class CheckboxElement(_StyledMixin, Padding):
 
     BOX: Final = 18.0
     RADIUS: Final = 2.0
+    CURSOR = "pointer"
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
@@ -418,6 +419,7 @@ class RadioElement(_StyledMixin, Padding):
 
     OUTER: Final = 20.0
     INNER: Final = 10.0
+    CURSOR = "pointer"
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
@@ -490,6 +492,7 @@ class SwitchElement(_StyledMixin, Padding):
 
     TRACK_W: Final = 52.0
     TRACK_H: Final = 32.0
+    CURSOR = "pointer"
     THUMB_OFF: Final = 16.0
     THUMB_ON: Final = 24.0
     MOTION: Final = SELECTION_MOTION
@@ -556,6 +559,7 @@ class ChipElement(_StyledMixin, Padding):
     HEIGHT: Final = 32.0
     RADIUS: Final = 8.0
     ICON: Final = 18.0
+    CURSOR = "pointer"
     GAP: Final = 6.0
     PAD_X: Final = 12.0
 

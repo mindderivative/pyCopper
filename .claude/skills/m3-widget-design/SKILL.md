@@ -299,6 +299,10 @@ change *behaviour*, not appearance.
 *before* them, which is right for a background and wrong for a label over an
 image -- the carousel item's caption was invisible until this existed.
 
+**Cursor shapes** come from a widget's `CURSOR` class attribute (or
+`cursor_at(x, y)` when the shape varies by region). Anything clickable should
+set `CURSOR = "pointer"`; disabled is handled centrally.
+
 **Right-click** is `on_context_menu:`, synthesised in the dispatcher; pair it
 with an overlay using `placement: pointer` to open a menu where the click
 happened. Mouse buttons are one-based (1 primary, 2 secondary).

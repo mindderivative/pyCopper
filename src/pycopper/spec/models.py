@@ -318,6 +318,24 @@ class StyleSpec(_Frozen):
 
     #: Which M3 variant of the component to render.
     variant: Variant = "filled"
+    #: Pointer shape over this element. `None` means "this widget's default".
+    #: Names are the backend's own (CSS-style); an unknown one fails at load
+    #: rather than raising from inside a frame.
+    cursor: (
+        Literal[
+            "default",
+            "text",
+            "crosshair",
+            "pointer",
+            "ew-resize",
+            "ns-resize",
+            "nesw-resize",
+            "nwse-resize",
+            "not-allowed",
+            "none",
+        ]
+        | None
+    ) = None
     #: M3 elevation level, 0-5. `None` means "this component's resting level".
     #: A level is a *relationship*, not a shadow: it says where a surface sits
     #: relative to others. The dp height it maps to is what produces a shadow.

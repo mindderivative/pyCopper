@@ -518,6 +518,24 @@ class ElementMixin:
             return "anchor"
         return self.DEFAULT_PLACEMENT or str(style.placement)
 
+    #: Pointer shape this widget asks for when nothing overrides it. `None`
+    #: means "no opinion" -- the shape then comes from whatever is underneath.
+    CURSOR: str | None = None
+
+    def cursor_at(self, x: float, y: float) -> str | None:
+        """Pointer shape over this element at a point, or None for no opinion.
+
+        Takes a position because some widgets want different shapes in
+        different regions -- a scroll view is a resize cursor over its thumb
+        and nothing over its content.
+        """
+        if self.style.cursor is not None:
+            return str(self.style.cursor)
+        if self.effective_disabled:
+            # A control that cannot be used should say so before it is clicked.
+            return "not-allowed"
+        return self.CURSOR
+
     #: This component's M3 resting elevation level, from the spec's own table.
     #: A view's `elevation:` overrides it. Override `resting_elevation` instead
     #: where the level depends on the variant, as it does for Card and Button.

@@ -166,6 +166,11 @@ class EventDispatcher:
         self.overlays: Any = None
         self._queue: deque[Event] = deque()
         self._hover_path: list[Any] = []
+        #: Last pointer position, so the cursor shape can be resolved for a
+        #: widget that wants different shapes in different regions.
+        self._pointer: tuple[float, float] = (0.0, 0.0)
+        #: Unfiltered hit path, for cursor resolution only.
+        self._cursor_path: list[Any] = []
         self._pressed: Any = None
         self._captured: Any = None
         self._focused: Any = None
@@ -237,6 +242,21 @@ class EventDispatcher:
         return self._focused
 
     @property
+    def cursor(self) -> str:
+        """Pointer shape for whatever is under the pointer right now.
+
+        Topmost element with an opinion wins, so a button inside a card gets
+        the button's shape and a plain container defers to whatever encloses
+        it. Falls back to the platform default.
+        """
+        x, y = self._pointer
+        for element in self._cursor_path:
+            shape = element.cursor_at(x, y)
+            if shape is not None:
+                return str(shape)
+        return "default"
+
+    @property
     def hovered(self) -> Any:
         return self._hover_path[0] if self._hover_path else None
 
@@ -277,6 +297,16 @@ class EventDispatcher:
 
         match event.type:
             case EventType.POINTER_MOVE:
+                self._pointer = (event.x, event.y)
+                # The cursor is resolved from the *unfiltered* path. A disabled
+                # control is removed from the event path -- correctly, it must
+                # receive nothing -- but it still has to say "not-allowed",
+                # which is feedback rather than an event.
+                self._cursor_path = (
+                    [self._captured]
+                    if self._captured is not None
+                    else self.hit_path(event.x, event.y)
+                )
                 self._update_hover(path)
             case EventType.POINTER_DOWN:
                 # Only the primary button presses, captures, and moves focus.

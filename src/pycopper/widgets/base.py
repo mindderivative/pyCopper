@@ -262,6 +262,7 @@ class ButtonElement(ContainerElement):
 
     HEIGHT: Final = 40.0
     MIN_WIDTH: Final = 64.0
+    CURSOR = "pointer"
 
     #: Only the `elevated` variant rests above the surface; M3 puts filled,
     #: tonal and outlined buttons at level 0.

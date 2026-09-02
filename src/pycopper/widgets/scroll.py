@@ -172,6 +172,16 @@ class ScrollViewElement(_StyledMixin, Padding):
         slop = self.THUMB_GRAB_SLOP
         return (tx - slop <= x <= tx + tw + slop) and (ty - slop <= y <= ty + th + slop)
 
+    def cursor_at(self, x: float, y: float) -> str | None:
+        """A resize cursor over the thumb only.
+
+        Claiming one over the whole viewport would be wrong: the content is
+        what the pointer is usually over, and it has its own opinions.
+        """
+        if self.grabs_thumb(x, y):
+            return "ew-resize" if self.horizontal else "ns-resize"
+        return super().cursor_at(x, y)
+
     @property
     def dragging(self) -> bool:
         return "drag_from" in self.state.data

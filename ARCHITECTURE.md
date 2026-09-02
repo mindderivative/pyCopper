@@ -1395,6 +1395,29 @@ uses — then clamps, so a menu taller than the window still starts on screen.
 
 It dismisses on an outside press or Escape like any other transient surface.
 
+### 5.17.5 Cursor shapes
+
+The pointer shape is resolved from the element under it: the topmost one with
+an opinion wins, falling back to the platform default. `cursor_at(x, y)` takes
+a position rather than being a plain property, because some widgets want
+different shapes in different regions — a scroll view is a resize cursor over
+its thumb and has no opinion at all over its content.
+
+Two details that are not obvious:
+
+**It resolves from the *unfiltered* hit path.** A disabled control is removed
+from the event path, correctly — it must receive nothing — but it still has to
+show `not-allowed`. The cursor is feedback, not an event, so it reads the raw
+path while dispatch reads the filtered one.
+
+**The shape is pushed only when it changes.** The backend destroys and
+recreates a native cursor object on every `set_cursor` call, so setting it each
+frame would churn GLFW resources sixty times a second. `App` tracks the last
+value; a test asserts three unchanged frames push nothing.
+
+Names are the backend's own CSS-style vocabulary, validated at load so an
+unknown one fails with a path instead of raising from inside a frame.
+
 ### 5.18 Disabled state
 
 M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity

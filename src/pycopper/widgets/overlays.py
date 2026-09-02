@@ -356,6 +356,7 @@ class MenuItemElement(_StyledMixin, Padding):
     HEIGHT: Final = 48.0
     PAD_X: Final = 12.0
     LABEL: Final = 14.0
+    CURSOR = "pointer"
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -670,6 +671,11 @@ class BottomSheetElement(_PaddedFlex):
                 return OFFSET_ZERO
             return Offset(0.0, float(snap.value))
         return OFFSET_ZERO
+
+    def cursor_at(self, x: float, y: float) -> str | None:
+        if self.grabs_handle(x, y):
+            return "ns-resize"
+        return super().cursor_at(x, y)
 
     def grabs_handle(self, x: float, y: float) -> bool:
         if not self.style.handle:

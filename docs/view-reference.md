@@ -294,6 +294,24 @@ application keeps focus, scroll, and text.
 Selectors are structured rather than CSS-like strings, deliberately: a `#name`
 selector would need quoting in every rule, because YAML reads `#` as a comment.
 
+## Cursor shapes
+
+The pointer changes shape over what it is on, without you asking:
+
+| Over | Shape |
+|---|---|
+| anything clickable — button, checkbox, radio, switch, chip, menu item | `pointer` |
+| a **disabled** control | `not-allowed` |
+| a scrollbar thumb | `ns-resize` / `ew-resize` |
+| a bottom sheet's drag handle | `ns-resize` |
+| everything else | `default` |
+
+`cursor:` overrides it on any node. The topmost element with an opinion wins, so
+a button inside a container gets the button's shape and the container keeps its
+own everywhere the button does not reach.
+
+An unknown name fails at load rather than from inside a frame.
+
 ## Context menus
 
 A right-click fires `on_context_menu`, and an overlay with `placement: pointer`
@@ -538,6 +556,7 @@ scrolls by pixels.
 | `border` | `{width, color}` |
 | `shadow` | `{blur, offset_x, offset_y, color, opacity}` — hand-tuned; prefer `elevation` |
 | `elevation` | M3 level 0–5. Omit to use the component's own resting level |
+| `cursor` | pointer shape: `default`, `pointer`, `text`, `crosshair`, `ns-resize`, `ew-resize`, `nesw-resize`, `nwse-resize`, `not-allowed`, `none` |
 | `opacity` | 0–1 |
 
 Colours are **token names, not hex** — that is what makes a theme switch a
@@ -590,4 +609,4 @@ Stated plainly so you can design around it:
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
   expressed on a smaller visible control. This is deliberate — pyCopper is
   pointer-only.
-- **Cursor shapes and mouse text selection.**
+- **Mouse text selection.**
