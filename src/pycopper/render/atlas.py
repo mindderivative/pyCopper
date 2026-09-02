@@ -274,6 +274,14 @@ class GlyphAtlas:
             usage=wgpu.TextureUsage.TEXTURE_BINDING | wgpu.TextureUsage.COPY_DST,
         )
 
+    def destroy(self) -> None:
+        """Release the GPU texture. The CPU image stays, so an atlas can be
+        re-attached to a new device without re-rasterising anything."""
+        if self._texture is not None:
+            self._texture.destroy()
+            self._texture = None
+        self._device = None
+
     def upload(self) -> bool:
         """Push the CPU image to the GPU if it changed. Returns whether it did."""
         if self._device is None or not self._dirty:

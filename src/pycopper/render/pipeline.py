@@ -179,6 +179,19 @@ class UIPipeline:
         self.glyph_atlas = texture
         self.bind_group = self._make_bind_group()
 
+    def destroy(self) -> None:
+        """Release every GPU object this pipeline owns.
+
+        Called from `Engine.close`, so the ordering there can be relied on
+        rather than left to whenever the garbage collector gets round to it.
+        """
+        self.instances.destroy()
+        for buffer in (self.quad_buffer, self.globals_buffer, self.palette_buffer):
+            buffer.destroy()
+        for texture in (self.glyph_atlas, self.image_atlas):
+            if texture is not None:
+                texture.destroy()
+
     def upload_palette(self, palette: np.ndarray) -> None:
         self.device.queue.write_buffer(
             self.palette_buffer, 0, np.ascontiguousarray(palette, dtype=np.float32)

@@ -644,7 +644,49 @@ Events arrive from `rendercanvas` callbacks and are pushed onto a queue drained 
 
 The path is **the target followed by its ancestors**, not everything under the cursor. An occluded sibling that also contains the point is absent from it and receives nothing, which is the whole point of respecting paint order.
 
-#### 5.9.1 Editable text — `text/editing.py`, `widgets/textfield.py`
+#### 5.8.1 Resize, and why it needs a throttle
+
+**During a resize, rendercanvas draws and presents once per compositor
+configure, synchronously** — "during a resize, the `glfw.poll_events()`
+function blocks, so our event-loop is on pause … we can use these to draw, to
+get a smoother experience" (`rendercanvas/glfw.py`). That path calls
+`_draw_and_present(force_sync=True)`, which bypasses its own `max_fps`
+throttle.
+
+Measured on one drag of the gallery: **410 configures a second**. With vsync
+every present waits for the display, so about 60 of them can finish and the
+rest queue — the window trails the pointer by a growing gap and then catches up
+seconds later. The same drag with vsync off produced 11,761 frames, a 1.09 ms
+median present, and exactly **one** frame over budget; with vsync on, the worst
+present was **802 ms**. The frames themselves were never slow. There were
+simply seven times more of them than the display could take.
+
+So `Engine.draw_frame` declines a frame whose size differs from the last one
+drawn and which arrives within `RESIZE_MIN_INTERVAL` of the last present,
+raising `DrawCancelled` and asking for another draw. A burst of 410/s becomes
+58 presents a second — what vsync can service — and the queue never forms.
+The gate keys on the *size changing*, so ordinary animation frames are
+untouched however fast they arrive, and the first frame after a pause is
+always drawn so an ordinary resize gains no latency.
+
+`DrawCancelled` is recognised by rendercanvas **by class name**, and the class
+is not exported, so pyCopper defines its own. Matching on a name is fragile
+enough to be worth stating; the alternative is having no way to decline a
+frame at all.
+
+### 5.8.2 Shutdown
+
+`Engine.close()` releases the GPU objects in the order the surface requires —
+context, then the atlas texture and pipeline buffers, then the device — and
+`run()` calls it in a `finally`. Not left to the garbage collector: rendercanvas
+terminates GLFW from a class attribute's `__del__` *specifically* so it happens
+late, because "the release of the surface should happen before the termination
+of glfw" or the process segfaults (citing pygfx/pygfx#642). An `Engine` reached
+from a module-level `App` — how every example here is written — outlives even
+that, so closing the window destroyed the native window and left a live wgpu
+surface pointing at it.
+
+### 5.9.1 Editable text — `text/editing.py`, `widgets/textfield.py`
 
 `TextField` is the only widget that *owns* state rather than reading it, which
 is why the split runs where it does. **`text/editing.py` holds every rule and

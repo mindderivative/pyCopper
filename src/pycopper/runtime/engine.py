@@ -11,8 +11,9 @@ flag. Polling GLFW here would double-pump the event queue.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Final
 
 import wgpu
 
@@ -22,7 +23,20 @@ from ..render import UIPipeline
 from ..text import TextEngine
 from ..theme import Palette, Theme
 
-__all__ = ["Engine"]
+__all__ = ["DrawCancelled", "Engine"]
+
+
+# The name is not ours to choose -- see the docstring -- so the "must end
+# in Error" convention has to give way to an external contract.
+class DrawCancelled(Exception):  # noqa: N818
+    """Raised out of `draw_frame` to skip a frame without presenting one.
+
+    rendercanvas recognises this **by class name** -- `type(err).__name__ ==
+    "DrawCancelled"` in its `base.py` -- and does not export the class, so
+    defining our own is the whole contract. Matching on a name is fragile
+    enough to say out loud; the alternative is having no way to decline a
+    frame, and presenting one anyway is what caused the bug below.
+    """
 
 
 class Engine:
@@ -57,6 +71,13 @@ class Engine:
 
         self._frame_count = 0
         self._instance_count = 0
+        self._last_size: tuple[int, int] | None = None
+        #: Negative infinity, not zero: the gate compares against this, and a
+        #: zero would decline the very first frame of any application whose
+        #: clock starts near zero -- which is every test that injects one.
+        self._last_present = float("-inf")
+        #: Injectable so a test can drive the resize gate without sleeping.
+        self.clock: Callable[[], float] = time.perf_counter
 
     def _make_canvas(self) -> Any:
         from rendercanvas.glfw import RenderCanvas
@@ -96,8 +117,37 @@ class Engine:
 
     # ---------------------------------------------------------------- frame
 
+    #: The shortest gap between two presents while a window is being resized.
+    #:
+    #: rendercanvas draws and presents once per compositor configure during a
+    #: resize, synchronously, bypassing its own fps throttle -- "during a
+    #: resize, the glfw.poll_events() function blocks, so our event-loop is on
+    #: pause ... we can use these to draw, to get a smoother experience"
+    #: (rendercanvas/glfw.py). Measured on one drag: **410 configures a
+    #: second**. With vsync every present waits for the display, so at most 60
+    #: of them can finish; the rest queue, and the window trails the pointer by
+    #: seconds while the backlog drains. Declining the ones that arrive too
+    #: close together consumes that backlog at memory speed and paints the
+    #: latest size instead of every size.
+    RESIZE_MIN_INTERVAL: Final = 1.0 / 60.0
+
+    def _resize_is_too_soon(self) -> bool:
+        """Whether this frame is one of a resize burst arriving faster than the
+        display can show them."""
+        size = self.canvas.get_physical_size()
+        if size == self._last_size:
+            return False
+        if self.clock() - self._last_present < self.RESIZE_MIN_INTERVAL:
+            # Come back for whatever size it has settled on.
+            self.canvas.request_draw()
+            return True
+        self._last_size = size
+        return False
+
     def draw_frame(self) -> None:
         """One frame. Steps 6-9 of ARCHITECTURE.md 6; 1-5 arrive in M3."""
+        if self._resize_is_too_soon():
+            raise DrawCancelled
         self.display_list.clear()
         if self.painter is not None:
             self.painter(self.display_list)
@@ -118,6 +168,7 @@ class Engine:
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
         self._frame_count += 1
+        self._last_present = self.clock()
 
     def _upload(self) -> None:
         """Palette, globals, and instance uploads (step 7)."""
@@ -142,4 +193,40 @@ class Engine:
         from rendercanvas.glfw import loop
 
         self.canvas.request_draw(on_frame or self.draw_frame)
-        loop.run()
+        try:
+            loop.run()
+        finally:
+            self.close()
+
+    def close(self) -> None:
+        """Release every GPU object, in the order the surface requires.
+
+        Not left to the garbage collector. rendercanvas terminates GLFW from a
+        class attribute's `__del__` specifically so that it happens late,
+        because "the release of the surface should happen before the
+        termination of glfw" -- otherwise the process segfaults on exit
+        (rendercanvas/glfw.py, citing pygfx/pygfx#642). An `Engine` reached
+        from a module-level `App`, which is how every example is written,
+        stays alive until interpreter shutdown and loses that race: closing
+        the window destroyed the native window and left a live wgpu surface
+        pointing at it.
+
+        So the surface is unconfigured first, then the resources the device
+        owns, then the device. Calling this twice is harmless.
+        """
+        context = getattr(self, "context", None)
+        if context is not None:
+            context.unconfigure()
+            del self.context
+        if getattr(self, "text", None) is not None:
+            self.text.atlas.destroy()
+        pipeline = getattr(self, "pipeline", None)
+        if pipeline is not None:
+            pipeline.destroy()
+            del self.pipeline
+        device = getattr(self, "device", None)
+        if device is not None:
+            device.destroy()
+            del self.device
+        if getattr(self, "adapter", None) is not None:
+            del self.adapter
