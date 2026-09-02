@@ -273,9 +273,10 @@ def iter_view(app: App):
 # --------------------------------------------------------------- clipboard
 
 
-def test_the_clipboard_is_in_process_by_default() -> None:
-    """pyCopper ships no system clipboard: rendercanvas exposes none, and the
-    only route is the backend's private window handle."""
+def test_a_bare_clipboard_is_in_process() -> None:
+    """With no backend, copying still works within the application. `Engine`
+    installs the system one when it creates a real window; a `Clipboard` built
+    by hand, and every headless use, keeps this behaviour."""
     board = Clipboard()
     assert not board.system_backed
     assert board.set_text("hi") is False
@@ -314,3 +315,64 @@ def test_a_failing_backend_never_breaks_a_frame() -> None:
     board.install(Broken())
     assert board.set_text("x") is False
     assert board.get_text() == "x", "it lost the in-process copy on failure"
+
+
+def test_an_empty_read_falls_back_to_the_in_process_copy() -> None:
+    """On Wayland a client may only read the selection while it holds keyboard
+    focus, and an unfocused read comes back empty rather than failing. Treating
+    that as "the clipboard is empty" would break pasting inside the
+    application, so an empty result is a miss and the local copy wins.
+    """
+    board = Clipboard()
+
+    class Silent:
+        def set_text(self, text: str) -> bool:
+            return True
+
+        def get_text(self) -> str:
+            return ""
+
+    board.install(Silent())
+    board.set_text("copied here")
+    assert board.get_text() == "copied here"
+
+
+def test_installing_none_returns_to_in_process() -> None:
+    board = Clipboard()
+
+    class Fake:
+        def set_text(self, text: str) -> bool:
+            return True
+
+        def get_text(self) -> str:
+            return "from system"
+
+    board.install(Fake())
+    assert board.get_text() == "from system"
+    board.install(None)
+    assert not board.system_backed
+    board.set_text("local")
+    assert board.get_text() == "local"
+
+
+def test_the_glfw_backend_degrades_when_there_is_no_window() -> None:
+    """It reports failure rather than silently succeeding.
+
+    The binding *warns* on failure instead of raising, so a plain try/except
+    reports a successful write for one that did nothing -- which is what this
+    did at first. It asks GLFW for the error code instead.
+    """
+    from pycopper.runtime.clipboard import GlfwClipboard
+
+    backend = GlfwClipboard()
+    assert backend.set_text("x") is False, "claimed success with no GLFW"
+    assert backend.get_text() == ""
+
+
+def test_a_glfw_failure_still_leaves_a_working_in_process_clipboard() -> None:
+    from pycopper.runtime.clipboard import GlfwClipboard
+
+    board = Clipboard()
+    board.install(GlfwClipboard())
+    assert board.set_text("copied") is False, "no window, so it did not reach the system"
+    assert board.get_text() == "copied", "but the application can still paste into itself"

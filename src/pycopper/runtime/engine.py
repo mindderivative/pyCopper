@@ -21,6 +21,7 @@ from ..paint import DisplayList
 from ..render import UIPipeline
 from ..text import TextEngine
 from ..theme import Palette, Theme
+from .clipboard import GlfwClipboard, clipboard
 
 __all__ = ["Engine"]
 
@@ -70,7 +71,7 @@ class Engine:
             import glfw
 
             glfw.init_hint(glfw.WAYLAND_LIBDECOR, glfw.WAYLAND_DISABLE_LIBDECOR)
-        return RenderCanvas(
+        canvas = RenderCanvas(
             title=s.title,
             size=(s.width, s.height),
             update_mode=s.update_mode,
@@ -78,6 +79,13 @@ class Engine:
             max_fps=s.max_fps,
             vsync=s.vsync,
         )
+        # A real window means GLFW is initialised, which is all the system
+        # clipboard needs. Installed here rather than at import so headless and
+        # offscreen use keeps the in-process one, and skipped if an application
+        # has already supplied its own -- an explicit choice outranks a default.
+        if not clipboard.system_backed:
+            clipboard.install(GlfwClipboard())
+        return canvas
 
     @property
     def pixel_ratio(self) -> float:

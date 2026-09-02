@@ -135,7 +135,7 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 |---|---|
 | Multi-line text entry | `TextField` is one line; it scrolls sideways rather than wrapping |
 | IME preedit | Committed characters only, so CJK input methods are unsupported |
-| A system clipboard | Copy and paste are in-process, with a documented seam for a real one |
+| Clipboard access without focus | Copy and paste use the system clipboard, but Wayland grants that only to a focused window with a real keypress behind it — true of Ctrl+C/Ctrl+V, not of a background thread |
 
 Mobile and touch are explicit non-goals.
 

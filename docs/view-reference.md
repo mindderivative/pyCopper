@@ -479,8 +479,8 @@ double-click uses, so the two always agree.
 
 A field is one line. Text longer than the box scrolls sideways to follow the
 caret and scrolls back rather than leaving empty space when you delete. There
-is no multi-line field, and the clipboard is the in-process one described under
-[Text selection](#text-selection).
+is no multi-line field. Copy and paste use the system clipboard — see
+[The clipboard](#the-clipboard).
 
 ## Text selection
 
@@ -503,13 +503,26 @@ swallows drags — wrong for the labels most text in an interface is.
 
 ### The clipboard
 
-**pyCopper ships no system clipboard.** `rendercanvas` exposes none, and the
-only route to one is the backend's private window handle passed to GLFW —
-platform-specific as well as private, and it fails outright on Wayland without
-a real surface. Depending on that would be a contract that breaks on an upgrade.
+**Ctrl+C and Ctrl+V use the system clipboard.** This previously said pyCopper
+shipped none, on the grounds that the only route was the backend's private
+window handle. That was wrong: GLFW's clipboard functions take the window as a
+*deprecated* parameter and accept `None`, so no private state is involved. A
+window is created, GLFW is initialised, and the backend is installed.
 
-So Ctrl+C fills an **in-process** clipboard, which makes copy-and-paste within
-an application work, and leaves one seam for the system one:
+Two constraints are worth knowing, both from Wayland rather than from pyCopper:
+
+- **Reading needs keyboard focus.** A client may only read the selection while
+  focused. That is always true of a user pressing Ctrl+V, and never reliably
+  true of a program driving the clipboard by itself.
+- **Writing needs a recent input event.** A compositor accepts a new selection
+  only with a serial from a real keystroke or click behind it. Again: true of
+  Ctrl+C, not of a background thread.
+
+A read that comes back empty falls back to whatever this process last copied,
+so pasting inside an application keeps working when the system read is refused.
+The trade is that clearing the clipboard elsewhere does not clear this one.
+
+An application can still install its own backend, which takes precedence:
 
 ```python
 from pycopper.runtime.clipboard import clipboard
@@ -859,8 +872,12 @@ Stated plainly so you can design around it:
   rather than wrapping, and Enter does nothing.
 - **IME preedit.** Committed characters only, so an input method that composes
   before committing — CJK, in practice — is not supported.
-- **A system clipboard.** Copying is in-process with a documented seam for a
-  real one — see [Text selection](#text-selection).
+- **Reading the clipboard without focus.** Copy and paste use the system
+  clipboard, but Wayland only lets a client read the selection while it has
+  keyboard focus, and only accept a *new* selection when a real input event is
+  behind it. Both hold whenever a user presses Ctrl+C or Ctrl+V; neither holds
+  for a program driving the clipboard on its own. A read that comes back empty
+  falls back to whatever this process last copied.
 - **The 48dp minimum touch target by default.** A pointer is pixel-precise, so
   a control is hit-tested at the size it is drawn. `min_hit_size:` asks for
   more where an application wants it — see [Hit targets](#hit-targets).
