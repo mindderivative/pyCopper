@@ -366,7 +366,17 @@ class ButtonElement(ContainerElement):
 
 
 class TextElement(_StyledMixin, Padding):
-    """A run of text, shaped and wrapped to the available width."""
+    """A run of text, shaped and wrapped to the available width.
+
+    With `selectable: true` it can be selected with the mouse: click to place a
+    caret, drag to extend, double-click for a word, Ctrl+A for all of it, and
+    Ctrl+C to copy. Selection is by **grapheme cluster**, so an edge never
+    lands inside a flag emoji or between a base character and its accent.
+    """
+
+    #: Highlight opacity. Not sourced -- M3 has no selection colour, and the
+    #: state-layer opacities are for interaction, not for a persistent mark.
+    SELECTION_ALPHA: Final = 0.30
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, spec.style.padding)
@@ -374,6 +384,110 @@ class TextElement(_StyledMixin, Padding):
 
     def configure(self) -> None:
         self._padding = self.style.padding
+
+    # -------------------------------------------------------- selection
+
+    @property
+    def selectable(self) -> bool:
+        return bool(self.style.selectable)
+
+    @property
+    def selection(self) -> tuple[int, int]:
+        """The selected range, ordered. Empty when nothing is selected."""
+        anchor = int(self.state.data.get("sel_anchor", 0))
+        focus = int(self.state.data.get("sel_focus", 0))
+        return (min(anchor, focus), max(anchor, focus))
+
+    @property
+    def selected_text(self) -> str:
+        start, end = self.selection
+        return self._text[start:end]
+
+    def select(self, anchor: int, focus: int) -> None:
+        self.state.data["sel_anchor"] = anchor
+        self.state.data["sel_focus"] = focus
+        self.mark_needs_paint()
+
+    def select_all(self) -> None:
+        self.select(0, len(self._text))
+
+    def clear_selection(self) -> None:
+        self.select(0, 0)
+
+    def _paragraph(self) -> Any:
+        """The laid-out paragraph, in the shape the paint pass draws.
+
+        Wrapped to the box actually laid out rather than re-deriving it from
+        constraints: hit testing has to agree with what is on screen, and a
+        second derivation is a second chance to disagree.
+        """
+        width = self.size.width - self._padding.horizontal
+        return self.text_engine.layout(
+            self._text,
+            px=self.style.font_size,
+            max_width=width if width > 0 else None,
+        )
+
+    def _offset_at(self, x: float, y: float) -> int:
+        from ..text.selection import index_at
+
+        rect = self.absolute_rect()
+        local_x = x - rect.x - self._padding.left
+        local_y = y - rect.y - self._padding.top
+        return index_at(self._paragraph(), local_x, local_y)
+
+    def cursor_at(self, x: float, y: float) -> str | None:
+        if self.selectable and self.style.cursor is None:
+            return "text"
+        return super().cursor_at(x, y)
+
+    # ----------------------------------------------------------- events
+
+    def on_pointer_down(self, event: Any) -> None:
+        if not self.selectable:
+            return
+        offset = self._offset_at(event.x, event.y)
+        if self.state.data.pop("sel_double", False):
+            from ..text.selection import word_at
+
+            self.select(*word_at(self._text, offset))
+        else:
+            self.select(offset, offset)
+        event.capture()
+
+    def on_pointer_move(self, event: Any) -> None:
+        if not self.selectable or "sel_anchor" not in self.state.data:
+            return
+        if event.button or self.state.pressed:
+            self.select(int(self.state.data["sel_anchor"]), self._offset_at(event.x, event.y))
+
+    def on_click(self, event: Any) -> None:
+        """A second click in quick succession selects a word.
+
+        Tracked by count rather than by clock: pyCopper has no wall-clock in
+        the event path, and a double-click that depends on real time would make
+        every test that exercises it flaky.
+        """
+        if not self.selectable:
+            return
+        self.state.data["sel_double"] = not self.state.data.get("sel_double", False)
+
+    def on_key_down(self, event: Any) -> None:
+        if not self.selectable:
+            return
+        key = str(getattr(event, "key", "")).lower()
+        mods: frozenset[str] = getattr(event, "modifiers", frozenset())
+        control = bool({"ctrl", "control", "meta", "super"} & set(mods))
+        if not control:
+            return
+        if key == "a":
+            self.select_all()
+            event.stop_propagation()
+        elif key == "c" and self.selected_text:
+            from ..runtime.clipboard import clipboard
+
+            clipboard.set_text(self.selected_text)
+            event.stop_propagation()
 
     def _wrap_width(self, constraints: Constraints) -> float | None:
         """Width available for text, or None when the box is unbounded."""
@@ -397,10 +511,39 @@ class TextElement(_StyledMixin, Padding):
         outer = self.sized(constraints, self.style)
         return outer.constrain(self.measure(constraints).inflate(self._padding))
 
+    def _paint_selection(self, ctx: PaintContext, absolute: Any) -> None:
+        """Highlight behind the glyphs.
+
+        Drawn here rather than in `paint_foreground` on purpose: a highlight
+        over the text would tint the letters it is meant to be behind.
+        """
+        from ..text.selection import rects_for
+        from .material import _box
+
+        start, end = self.selection
+        if start == end:
+            return
+        origin_x = absolute.x + self._padding.left
+        origin_y = absolute.y + self._padding.top
+        token = ctx.palette.index("primary")
+        for rect in rects_for(self._paragraph(), start, end):
+            _box(
+                ctx,
+                origin_x + rect.x,
+                origin_y + rect.y,
+                rect.width,
+                rect.height,
+                token=token,
+                radius=0.0,
+                alpha=self.SELECTION_ALPHA,
+            )
+
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         super().paint_self(ctx, absolute)
         if not self._text.strip():
             return
+        if self.selectable:
+            self._paint_selection(ctx, absolute)
         paint_text(
             ctx,
             absolute.x + self._padding.left,

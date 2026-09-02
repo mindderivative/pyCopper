@@ -318,6 +318,10 @@ class StyleSpec(_Frozen):
 
     #: Which M3 variant of the component to render.
     variant: Variant = "filled"
+    #: Whether a `Text` widget's content can be selected with the mouse.
+    #: Off by default: a selectable label shows a text cursor and swallows
+    #: drags, which is wrong for the labels most text in an interface is.
+    selectable: bool = False
     #: Pointer shape over this element. `None` means "this widget's default".
     #: Names are the backend's own (CSS-style); an unknown one fails at load
     #: rather than raising from inside a frame.

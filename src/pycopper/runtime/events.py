@@ -451,6 +451,11 @@ class EventDispatcher:
         """
         if getattr(element, "effective_disabled", False):
             return False
+        # Selectable text is keyboard-reachable: it has to take focus to
+        # receive Ctrl+C at all, and being able to Tab to a block of text and
+        # copy it is the accessible behaviour rather than an accident.
+        if getattr(element, "selectable", False):
+            return True
         return bool(element.handlers) or str(element.spec.widget) in FOCUSABLE_KINDS
 
     def focus(self, element: Any, *, keyboard: bool = False) -> None:

@@ -294,7 +294,60 @@ application keeps focus, scroll, and text.
 Selectors are structured rather than CSS-like strings, deliberately: a `#name`
 selector would need quoting in every rule, because YAML reads `#` as a comment.
 
-## Cursor shapes
+## Text selection
+
+A `Text` widget with `selectable: true` can be selected with the mouse:
+
+```yaml
+- name: quote
+  widget: Text
+  text: "Selectable, and copyable with Ctrl+C."
+  style: {selectable: true, width: 400}
+```
+
+Click to place a caret, drag to extend, double-click for a word, **Ctrl+A** for
+all of it, **Ctrl+C** to copy. Selection moves by **grapheme cluster**, so an
+edge never lands inside a flag emoji or between a letter and its accent. A
+selectable block takes focus and shows a text cursor.
+
+It is **off by default**, because a selectable label shows a text cursor and
+swallows drags — wrong for the labels most text in an interface is.
+
+### The clipboard
+
+**pyCopper ships no system clipboard.** `rendercanvas` exposes none, and the
+only route to one is the backend's private window handle passed to GLFW —
+platform-specific as well as private, and it fails outright on Wayland without
+a real surface. Depending on that would be a contract that breaks on an upgrade.
+
+So Ctrl+C fills an **in-process** clipboard, which makes copy-and-paste within
+an application work, and leaves one seam for the system one:
+
+```python
+from pycopper.runtime.clipboard import clipboard
+import pyperclip
+
+class SystemClipboard:
+    def set_text(self, text: str) -> bool:
+        pyperclip.copy(text)
+        return True
+
+    def get_text(self) -> str:
+        return pyperclip.paste()
+
+clipboard.install(SystemClipboard())
+```
+
+### What is not implemented
+
+- **Editable text.** This is selection, not a text field: no caret blink, no
+  insertion, no undo.
+- **Selection across widgets.** A drag selects within one `Text`.
+- **Bidirectional text.** Selecting across a left-to-right / right-to-left
+  boundary is not handled; the highlight is contiguous in character order,
+  which is not what a bidi caret should do (ARCHITECTURE risk R9).
+- **UAX #29 word boundaries.** Double-click uses whitespace delimiting, which
+  is simple and predictable rather than Unicode-correct.
 
 The pointer changes shape over what it is on, without you asking:
 
@@ -556,6 +609,7 @@ scrolls by pixels.
 | `border` | `{width, color}` |
 | `shadow` | `{blur, offset_x, offset_y, color, opacity}` — hand-tuned; prefer `elevation` |
 | `elevation` | M3 level 0–5. Omit to use the component's own resting level |
+| `selectable` | `Text` only — can its content be selected with the mouse |
 | `cursor` | pointer shape: `default`, `pointer`, `text`, `crosshair`, `ns-resize`, `ew-resize`, `nesw-resize`, `nwse-resize`, `not-allowed`, `none` |
 | `opacity` | 0–1 |
 
@@ -606,7 +660,10 @@ Stated plainly so you can design around it:
   or carousel parallax, which follow a position rather than a clock.
 - **The M3 type scale as named roles.** Widgets take a raw `font_size`;
   `label-large` and friends are not modelled.
+- **Editable text.** Text can be selected and copied, not typed into: no
+  caret blink, no insertion, no undo. A text field is its own piece of work.
+- **A system clipboard.** Copying is in-process with a documented seam for a
+  real one — see [Text selection](#text-selection).
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
   expressed on a smaller visible control. This is deliberate — pyCopper is
   pointer-only.
-- **Mouse text selection.**

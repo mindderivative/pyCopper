@@ -299,6 +299,10 @@ change *behaviour*, not appearance.
 *before* them, which is right for a background and wrong for a label over an
 image -- the carousel item's caption was invisible until this existed.
 
+**Text selection** lives in `text/selection.py` and works on any `Paragraph`.
+If a widget needs caret geometry, use `index_at` / `rects_for` rather than
+walking runs yourself -- and note offsets are snapped to grapheme clusters.
+
 **Cursor shapes** come from a widget's `CURSOR` class attribute (or
 `cursor_at(x, y)` when the shape varies by region). Anything clickable should
 set `CURSOR = "pointer"`; disabled is handled centrally.
@@ -364,6 +368,8 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   appears as both 32sp and 36sp), so a real source is needed before hardcoding
   the scale.
 - **RTL text.** Direction and run ordering work, but the bundled fonts carry no
-  Arabic or Hebrew glyphs, and caret/selection across a direction boundary is
-  unimplemented (risk R9).
+  Arabic or Hebrew glyphs, and selection across a direction boundary is
+  unimplemented -- the highlight is contiguous in character order, which is not
+  what a bidi caret should do (risk R9).
+- **Editable text.** Text can be selected and copied, not typed into.
 

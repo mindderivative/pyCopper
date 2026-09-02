@@ -1636,3 +1636,59 @@ def test_context_menu_baseline(render_scene, assert_golden) -> None:
 
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("context_menu", np.asarray(engine.canvas.draw()))
+
+
+def test_text_selection_baseline(render_scene, assert_golden) -> None:
+    """Selected text, single-line and wrapped.
+
+    The highlight sits behind the glyphs, so the letters keep their own colour
+    rather than being tinted by the band over them.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 14},
+            "children": [
+                {
+                    "name": "one",
+                    "widget": "Text",
+                    "text": "Select a few words here",
+                    "style": {
+                        "font_size": 20,
+                        "selectable": True,
+                        "width": 300,
+                        "height": 28,
+                        "color": "on_surface",
+                    },
+                },
+                {
+                    "name": "many",
+                    "widget": "Text",
+                    "text": "A wrapped paragraph selects across every line it covers, "
+                    "one highlight rectangle per line.",
+                    "style": {
+                        "font_size": 15,
+                        "selectable": True,
+                        "width": 300,
+                        "height": 90,
+                        "color": "on_surface",
+                    },
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=340, height=180, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.paint(DisplayList())
+
+    one = app.root.find("one")
+    one.select(7, 18)  # a span in the middle of the line
+    app.root.find("many").select_all()
+
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("text_selection", np.asarray(engine.canvas.draw()))

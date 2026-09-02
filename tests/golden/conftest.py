@@ -97,7 +97,14 @@ def assert_golden(regenerating: bool):
     """Compare a rendered frame against a committed baseline PNG."""
     from PIL import Image
 
+    used: set[str] = set()
+
     def _check(name: str, frame: np.ndarray) -> None:
+        # Two tests sharing a baseline name overwrite each other's image, so
+        # neither tests what it claims. Cheap to catch, and it already happened.
+        if name in used:
+            pytest.fail(f"golden name {name!r} is used by more than one test")
+        used.add(name)
         BASELINES.mkdir(parents=True, exist_ok=True)
         baseline_path = BASELINES / f"{name}.png"
         actual = np.asarray(frame)[:, :, :3].astype(np.int16)

@@ -1418,6 +1418,55 @@ value; a test asserts three unchanged frames push nothing.
 Names are the backend's own CSS-style vocabulary, validated at load so an
 unknown one fails with a path instead of raising from inside a frame.
 
+### 5.17.6 Text selection — `text/selection.py`
+
+Selection needs two inverse questions answered: which character is under a
+point, and which rectangles cover a character range. Both are derived from
+`Paragraph` as it already existed, with **no change to the shaping structures
+or the shape cache's key** — which matters, because that cache is on the text
+hot path.
+
+The obstacle was that a `ShapedRun` carries cluster indices into *its own* text
+and no offset back to the paragraph. Adding one would have meant threading an
+offset through itemisation, shaping, and the cache. It turned out to be
+unnecessary: the runs of a line concatenate in order, so walking them while
+accumulating `len(run.text)` recovers the paragraph offset exactly.
+
+Offsets snap to **grapheme cluster** boundaries via the existing UAX #29
+segmentation (§5.7), so an edge never lands inside a flag emoji or between a
+base character and its combining mark — a test asserts the caret cannot reach
+the interior of a combining sequence. Hit testing picks the **nearest edge**
+rather than the containing glyph, which is what makes click-and-drag feel like
+it tracks the pointer instead of lagging a character behind.
+
+**Selectable text is focusable.** Key events go to the focused element, so
+without that Ctrl+C reaches nothing at all — and being able to Tab to a block
+of text and copy it is the accessible behaviour rather than an accident.
+
+**The highlight is painted in `paint_self`**, before the glyphs. In
+`paint_foreground` it would sit *over* the letters it is meant to be behind.
+
+#### No system clipboard, deliberately
+
+`rendercanvas` exposes no clipboard, and the only route to one is the backend's
+private `canvas._window` handed to GLFW — platform-specific as well as private,
+and it fails outright on Wayland without a real surface, which was checked
+rather than assumed. Depending on that would be a contract that breaks on a
+dependency upgrade.
+
+Copying therefore fills an in-process clipboard, so copy-and-paste *within* an
+application works, and `clipboard.install(...)` is the seam for an application
+that wants the system one in three lines. A failing backend can never break a
+frame: the in-process copy happens first and exceptions are swallowed.
+
+#### Not implemented, and stated
+
+Editable text, selection across widgets, and bidirectional selection. That last
+is risk R9: the highlight is contiguous in character order, which is not what a
+caret should do across a direction boundary. Double-click uses whitespace
+delimiting rather than UAX #29 word segmentation — simple and predictable, and
+labelled as such rather than presented as Unicode-correct.
+
 ### 5.18 Disabled state
 
 M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity
