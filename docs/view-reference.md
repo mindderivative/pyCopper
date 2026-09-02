@@ -232,6 +232,9 @@ dialog closes only through its own buttons:
   style: {modal: true, scrim: true, dismissable: false}
 ```
 
+The gallery has one of each, built from the same `Dialog` and one property
+apart: `parts/confirm_dialog.yaml` and `parts/locked_dialog.yaml`.
+
 **`on_dismiss` is not optional for a dismissable overlay whose `open:` is
 bound**, which is every overlay an application controls. The runtime closing it
 is a *request*: the binding still says open, so without a handler to clear the

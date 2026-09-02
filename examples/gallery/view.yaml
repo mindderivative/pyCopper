@@ -151,6 +151,13 @@ root:
           text: "Delete…"
           style: {width: 110, height: 40, variant: text}
           handlers: {on_click: ask}
+        # Opens the locked dialog: same component, `dismissable: false`, so a
+        # click outside does nothing and only its own button closes it.
+        - name: lock_btn
+          widget: Button
+          text: "Locked…"
+          style: {width: 110, height: 40, variant: text}
+          handlers: {on_click: lock}
         - name: reset_btn
           widget: Button
           classes: action          # size and variant come from theme.yaml
@@ -162,9 +169,17 @@ root:
           text: "Confirm"
           handlers: {on_click: confirm}
 overlays:
+  # Two dialogs, one component, one property apart. The first closes when you
+  # click away from it; the second refuses to.
   - name: confirm
     source: parts/confirm_dialog.yaml
     with:
       title: "Delete this item?"
       body: "This cannot be undone."
       open: "{{ confirming.get() }}"
+  - name: locked
+    source: parts/locked_dialog.yaml
+    with:
+      title: "This one is locked"
+      body: "Clicking outside does nothing. Use the button."
+      open: "{{ locking.get() }}"

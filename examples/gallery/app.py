@@ -36,7 +36,8 @@ app = App(
 clicks = Signal(0, name="clicks")
 dark = Signal(True, name="dark")
 confirming = Signal(False, name="confirming")
-app.expose(clicks=clicks, dark=dark, confirming=confirming)
+locking = Signal(False, name="locking")
+app.expose(clicks=clicks, dark=dark, confirming=confirming, locking=locking)
 
 
 @app.handler
@@ -48,6 +49,22 @@ def confirm(event) -> None:
 def ask(event) -> None:
     """Opens the dialog defined in parts/confirm_dialog.yaml."""
     confirming.set(True)
+
+
+@app.handler
+def lock(event) -> None:
+    """Opens the locked dialog defined in parts/locked_dialog.yaml."""
+    locking.set(True)
+
+
+@app.handler
+def unlock(event) -> None:
+    """Closes the locked dialog. Its only button, and the only way out.
+
+    There is no `on_dismiss` counterpart: with `dismissable: false` the runtime
+    never closes that overlay, so there is nothing to be told about.
+    """
+    locking.set(False)
 
 
 @app.handler
