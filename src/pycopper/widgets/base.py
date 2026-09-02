@@ -25,6 +25,7 @@ from ..layout import (
 )
 from ..paint import NO_TOKEN
 from ..spec import StyleSpec, WidgetKind, WidgetSpec
+from ..spec.typescale import TYPE_SCALE, TypeStyle
 from ..text import TextEngine
 from ..text.fontdb import FontRequest
 from ..text.layout import Alignment as TextAlignment
@@ -213,22 +214,44 @@ class StackElement(_StyledMixin, Stack):
         return super().perform_layout(self.sized(constraints, self.style))
 
 
+def _face_of(font: float | TypeStyle, weight: int, tracking: float) -> tuple[float, int, float]:
+    """``(size, weight, tracking)`` from either a raw size or a type-scale role.
+
+    A role is passed as **one object** on purpose. Three loose numbers that must
+    match between a widget's measure and its paint are three chances to
+    disagree, and a weight mismatch is exactly the bug that got in when the
+    scale's weights were applied. A role cannot half-arrive.
+    """
+    if isinstance(font, TypeStyle):
+        return (font.size, font.weight, font.tracking)
+    return (float(font), weight, tracking)
+
+
 def measure_text(
     text: str,
-    font_size: float,
+    font: float | TypeStyle,
     *,
     engine: TextEngine | None = None,
     max_width: float | None = None,
     weight: int = 400,
+    tracking: float = 0.0,
 ) -> Size:
     """Shaped metrics for *text*. Memoised by the engine.
 
-    `weight` selects a real face, so metrics differ between weights -- which is
-    why layout and paint must pass the same one or they will disagree about
-    how wide a label is.
+    `font` is either a raw size in logical px or a `TypeStyle` role, which
+    carries its own weight and tracking and overrides the keyword arguments.
+
+    Weight selects a real face and tracking adds width per cluster, so metrics
+    differ on both -- which is why layout and paint must pass the same values
+    or they will disagree about how wide a label is.
     """
+    size, face_weight, track = _face_of(font, weight, tracking)
     return (engine or default_text_engine()).measure(
-        text, px=font_size, max_width=max_width, request=FontRequest(weight=weight)
+        text,
+        px=size,
+        max_width=max_width,
+        request=FontRequest(weight=face_weight),
+        tracking=track,
     )
 
 
@@ -237,24 +260,28 @@ def paint_text(
     x: float,
     y: float,
     text: str,
-    font_size: float,
+    font: float | TypeStyle,
     token: int,
     *,
     max_width: float | None = None,
     alignment: str = TextAlignment.START,
     weight: int = 400,
+    tracking: float = 0.0,
 ) -> int:
     """Emit shaped glyphs at logical position ``(x, y)``.
 
     ``x``/``y`` are the top-left of the text block; the baseline offset comes
     from the font's own ascent, so lines sit correctly whatever face is used.
+    ``font`` takes a raw size or a `TypeStyle` role, as `measure_text` does.
     """
+    size, face_weight, track = _face_of(font, weight, tracking)
     paragraph = ctx.text.layout(
         text,
-        px=font_size,
+        px=size,
         max_width=max_width,
         alignment=alignment,
-        request=FontRequest(weight=weight),
+        request=FontRequest(weight=face_weight),
+        tracking=track,
     )
     return ctx.text.emit(
         ctx.display_list,
@@ -282,8 +309,9 @@ class ButtonElement(ContainerElement):
 
     #: "Typography: md.sys.typescale.label-large (14sp / 20dp line height,
     #: medium weight)" -- quoted, and the reason a button label is Medium
-    #: rather than Regular.
-    LABEL_WEIGHT: Final = 500
+    #: rather than Regular. The whole role travels as one object so its size,
+    #: weight and tracking cannot arrive at measure and paint separately.
+    LABEL_ROLE: Final = TYPE_SCALE["label-large"]
 
     #: Only the `elevated` variant rests above the surface; M3 puts filled,
     #: tonal and outlined buttons at level 0.
@@ -374,18 +402,14 @@ class ButtonElement(ContainerElement):
         _emit_state_layer(ctx, self, absolute, token, radii)
 
         if self._text.strip():
-            font = style.font_size
-            label = measure_text(
-                self._text, font, engine=self.text_engine, weight=self.LABEL_WEIGHT
-            )
+            label = measure_text(self._text, self.LABEL_ROLE, engine=self.text_engine)
             paint_text(
                 ctx,
                 absolute.x + (size.width - label.width) / 2,
                 absolute.y + (size.height - label.height) / 2,
                 self._text,
-                font,
+                self.LABEL_ROLE,
                 token,
-                weight=self.LABEL_WEIGHT,
             )
 
 
@@ -451,6 +475,7 @@ class TextElement(_StyledMixin, Padding):
             px=self.style.font_size,
             max_width=width if width > 0 else None,
             request=FontRequest(weight=self.style.font_weight),
+            tracking=self.style.letter_spacing,
         )
 
     def _offset_at(self, x: float, y: float) -> int:
@@ -531,6 +556,7 @@ class TextElement(_StyledMixin, Padding):
             engine=self.text_engine,
             max_width=wrap,
             weight=self.style.font_weight,
+            tracking=self.style.letter_spacing,
         )
 
     def perform_layout(self, constraints: Constraints) -> Size:
@@ -579,6 +605,7 @@ class TextElement(_StyledMixin, Padding):
             content_token(ctx, self.style, "on_surface"),
             max_width=max(0.0, self.size.width - self._padding.horizontal) or None,
             weight=self.style.font_weight,
+            tracking=self.style.letter_spacing,
         )
 
 

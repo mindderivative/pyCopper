@@ -73,6 +73,12 @@ class Paragraph:
     #: claiming its whole wrap box and starving its siblings in a Row.
     box_width: float = 0.0
     px: float = 14.0
+    #: Letter spacing in logical px, added after every grapheme cluster --
+    #: including the last on a line, as CSS `letter-spacing` does. That leaves
+    #: centred text off-centre by half a tracking value (a quarter-pixel at
+    #: M3's largest), which is the price of every consumer deriving its
+    #: positions from one advance array instead of special-casing line ends.
+    tracking: float = 0.0
     base_direction: str = Direction.LTR
 
     @property
@@ -86,6 +92,7 @@ class Paragraph:
             pen = line.x
             for run in line.runs:
                 scale = run.face.scale_for(self.px)
+                advances = run.advances_px(self.px, self.tracking)
                 for i in range(len(run)):
                     ox, oy = run.offsets[i]
                     out.append(
@@ -97,7 +104,7 @@ class Paragraph:
                             cluster=int(run.clusters[i]),
                         )
                     )
-                    pen += float(run.advances[i]) * scale
+                    pen += float(advances[i])
         return out
 
 
@@ -118,18 +125,21 @@ def layout_text(
     max_width: float | None = None,
     request: FontRequest | None = None,
     alignment: str = Alignment.START,
+    tracking: float = 0.0,
     cache: ShapeCache | None = None,
 ) -> Paragraph:
     """Shape, break, and position *text*.
 
     ``max_width`` of None lays the text out as a single unwrapped line.
+    ``tracking`` is letter spacing in logical px -- an absolute figure, the way
+    M3's type-scale tokens state it, not a multiple of the font size.
     """
     req = request or FontRequest()
     # NOT `cache or ShapeCache()`: an empty ShapeCache is falsy (__len__ == 0),
     # so that form silently discards the caller's cache on first use.
     shaper = ShapeCache() if cache is None else cache
     primary = db.face_for(req)
-    para = Paragraph(text=text, px=px)
+    para = Paragraph(text=text, px=px, tracking=tracking)
 
     if not text:
         para.size = Size(0.0, primary.metrics(px).line_height)
@@ -145,7 +155,7 @@ def layout_text(
         for item in itemize(segment, db, req):
             run = shaper.get(item.text, item.face, direction=item.direction, script=item.script)
             runs.append(run)
-            width += run.width(px)
+            width += run.width(px, tracking)
         return runs, width
 
     # Hard breaks split the paragraph first; wrapping happens inside each block.

@@ -1515,6 +1515,55 @@ def test_stylesheet_baseline(render_scene, assert_golden) -> None:
     assert_golden("stylesheet", np.asarray(engine.canvas.draw()))
 
 
+def test_type_scale_baseline(render_scene, assert_golden) -> None:
+    """All fifteen M3 roles, each rendered by naming it and nothing else.
+
+    A role resolves to three things -- size, weight and tracking -- and until
+    now none of them had a picture. Sizes are visible as height, weights as the
+    Medium rows (every `label-*`, `title-medium` and `title-small`), and
+    tracking only as width, which is exactly the sort of change a property
+    assertion can pass while the frame is wrong.
+
+    The last row pairs a role with an explicit `letter_spacing:` well outside
+    the scale, so the override is legible rather than a fraction of a pixel.
+    """
+    from pycopper.spec.models import TYPE_ROLES
+
+    children: list[dict] = [
+        {
+            "name": role,
+            "widget": "Text",
+            "text": role,
+            "style": {"text_style": role, "color": "on_surface"},
+        }
+        for role in TYPE_ROLES
+    ]
+    children.append(
+        {
+            "name": "tracked",
+            "widget": "Text",
+            "text": "label-large, spaced",
+            "style": {"text_style": "label-large", "letter_spacing": 4.0, "color": "primary"},
+        }
+    )
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 12, "spacing": 2},
+            "children": children,
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=420, height=560, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("type_scale", np.asarray(engine.canvas.draw()))
+
+
 def test_elevation_baseline(render_scene, assert_golden) -> None:
     """The six M3 elevation levels, on a light theme.
 

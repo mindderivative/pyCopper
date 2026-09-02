@@ -347,6 +347,10 @@ class StyleSpec(_Frozen):
     #: the nearest available within the family rather than synthesising one,
     #: so 700 renders as Medium rather than as smeared Regular.
     font_weight: int = Field(default=400, ge=1, le=1000)
+    #: Letter spacing in logical px, added after every grapheme cluster. An
+    #: absolute figure, the way M3 states tracking -- it does not scale with
+    #: `font_size`, so a role's tracking stays correct only at that role's size.
+    letter_spacing: float = Field(default=0.0, ge=-100.0, le=100.0)
     #: An M3 type-scale role, resolved to `font_size` at load against the
     #: view's `type_scale:`. Naming a role with no scale defined is an error,
     #: not a silent fallback -- pyCopper ships no figures for these (see

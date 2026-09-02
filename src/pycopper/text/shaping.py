@@ -43,13 +43,39 @@ class ShapedRun:
     def width_units(self) -> float:
         return float(self.advances.sum())
 
-    def width(self, px: float) -> float:
-        """Advance width in pixels at *px*."""
-        return self.width_units * self.face.scale_for(px)
+    def cluster_ends(self) -> np.ndarray:
+        """Mask of glyphs that *complete* a cluster.
 
-    def cumulative_width(self, px: float) -> np.ndarray:
+        Tracking is added per cluster, not per glyph: a ligature is one glyph
+        for several characters, and a combining mark is several glyphs for one.
+        Spacing either of those apart internally would be wrong.
+        """
+        count = len(self)
+        ends = np.ones(count, dtype=bool)
+        if count > 1:
+            ends[:-1] = self.clusters[1:] != self.clusters[:-1]
+        return ends
+
+    def advances_px(self, px: float, tracking: float = 0.0) -> np.ndarray:
+        """Per-glyph advance in pixels at *px*, with *tracking* folded in.
+
+        **The one place an advance is computed.** Width, caret placement,
+        selection rectangles and the paint pen all read this array, so they
+        cannot drift apart the way three separate copies of the arithmetic
+        would -- which is exactly how a weight mismatch got in.
+        """
+        advances = np.asarray(self.advances, dtype=np.float64) * self.face.scale_for(px)
+        if tracking:
+            advances = advances + self.cluster_ends() * tracking
+        return advances
+
+    def width(self, px: float, tracking: float = 0.0) -> float:
+        """Advance width in pixels at *px*."""
+        return float(self.advances_px(px, tracking).sum())
+
+    def cumulative_width(self, px: float, tracking: float = 0.0) -> np.ndarray:
         """Pen x after each glyph, in pixels. Used for caret placement."""
-        return np.cumsum(self.advances) * self.face.scale_for(px)
+        return np.cumsum(self.advances_px(px, tracking))
 
     def slice_to_cluster(self, limit: int) -> ShapedRun:
         """The prefix of this run whose source clusters are below *limit*.

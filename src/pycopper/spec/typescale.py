@@ -21,14 +21,19 @@ as both 32sp and 36sp in the same file: it is **32**.
 
 Sizes are converted from the source's `rem` at the CSS default of 16px/rem.
 
-`size` and `weight` are both applied: a role resolves to `font_size` and
-`font_weight`, and Roboto ships the Regular and Medium faces the scale asks
-for, so `title-medium` is genuinely Medium rather than emboldened Regular.
+`size`, `weight` and `tracking` are all applied: a role resolves to
+`font_size`, `font_weight` and `letter_spacing`. Roboto ships the Regular and
+Medium faces the scale asks for, so `title-medium` is genuinely Medium rather
+than emboldened Regular.
 
-`line_height` and `tracking` are recorded but not applied -- pyCopper's
-paragraph layout takes its line height from the font's own metrics and has no
-letter-spacing control to resolve tracking into. Recorded rather than dropped,
-because they belong to the same token set and an application will want them.
+Tracking is an **absolute** figure in logical px, not a multiple of the size --
+that is how the source states it (`letter-spacing` in rem, converted at the
+same 16px/rem as the sizes), and it is why a role's tracking is only right at
+that role's size. Eleven of the fifteen roles track 0.
+
+`line_height` is recorded but not applied: paragraph layout takes its line
+height from the font's own metrics. Recorded rather than dropped, because it
+belongs to the same token set and an application will want it.
 """
 
 from __future__ import annotations
@@ -43,7 +48,7 @@ __all__ = ["TYPE_SCALE", "TypeScaleError", "TypeStyle", "apply_type_scale"]
 
 @dataclass(frozen=True, slots=True)
 class TypeStyle:
-    """One role's tokens. Only `size` is applied so far -- see the module docstring."""
+    """One role's tokens. `line_height` is not applied -- see the module docstring."""
 
     size: float
     line_height: float
@@ -89,12 +94,18 @@ def _resolve(node: WidgetSpec, scale: dict[str, float]) -> WidgetSpec:
             name: getattr(node.style, name) for name in node.style.model_fields_set
         }
         fields["font_size"] = float(scale[role])
-        # An explicit `font_weight:` on the node wins: naming a role states the
-        # intent, but writing a weight beside it states a more specific one.
+        # An explicit `font_weight:` or `letter_spacing:` on the node wins:
+        # naming a role states the intent, but writing either beside it states
+        # a more specific one.
+        #
+        # A view's `type_scale:` overrides only the *size*, so a resized role
+        # keeps its own weight and tracking -- they are separate tokens, and
+        # resizing a role is not a statement about either.
+        known = TYPE_SCALE[role]
         if "font_weight" not in node.style.model_fields_set:
-            known = TYPE_SCALE.get(role)
-            if known is not None:
-                fields["font_weight"] = known.weight
+            fields["font_weight"] = known.weight
+        if "letter_spacing" not in node.style.model_fields_set:
+            fields["letter_spacing"] = known.tracking
         style = StyleSpec(**fields)
 
     if style is None and all(a is b for a, b in zip(children, node.children, strict=True)):
@@ -106,7 +117,7 @@ def _resolve(node: WidgetSpec, scale: dict[str, float]) -> WidgetSpec:
 
 
 def apply_type_scale(view: ViewSpec) -> ViewSpec:
-    """Resolve every `text_style:` to a concrete `font_size`.
+    """Resolve every `text_style:` to a concrete size, weight and tracking.
 
     A no-op when no node names a role, so the common case pays nothing -- not
     even a tree walk's worth of copying.

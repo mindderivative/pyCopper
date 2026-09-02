@@ -114,7 +114,8 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 
 | Absent | Consequence |
 |---|---|
-| M3 type scale as named roles | Widgets take a raw `font_size` |
+| Type-scale line height | A line takes its height from the font's own metrics; a role's size, weight and tracking *are* applied |
+| Editable text | Text can be selected and copied, not typed into |
 | Separate hit and paint rects | M3's 48dp minimum touch target cannot be expressed — deliberate, as pyCopper is pointer-only |
 
 Mobile and touch are explicit non-goals.

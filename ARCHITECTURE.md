@@ -1514,9 +1514,37 @@ library documents one: a common button is `label-large`, quoted as "(14sp /
 role is sourced, and looking different from its sibling control would be worse
 than following it.
 
-`line_height` and `tracking` remain recorded but unapplied: paragraph line
-height comes from the font's own metrics, and there is no letter-spacing
-control to resolve tracking into.
+**Tracking is applied too**, as `letter_spacing`. It is an absolute figure in
+logical px — that is how the token source states it, and it is why a role's
+tracking is only right at that role's size. Nine of the fifteen roles carry
+one; the largest is half a pixel.
+
+Letter spacing lands in exactly one place: `ShapedRun.advances_px(px, tracking)`.
+Shaping stays size- and spacing-independent, so the shape cache is untouched
+and one shaped run still serves every size and every spacing the same string is
+drawn at. Everything downstream — a paragraph's width, the paint pen, caret
+placement, selection rectangles — reads that one array rather than repeating
+the arithmetic, because the same class of bug that a weight mismatch caused
+would otherwise have three more places to appear.
+
+Spacing is added per **grapheme cluster**, not per glyph: a ligature is one
+glyph for several characters and a combining mark is several glyphs for one, and
+spacing either apart from the inside would be wrong. It is added after the last
+cluster on a line as well, as CSS `letter-spacing` is, which leaves centred text
+off-centre by half a tracking value — a quarter-pixel at the scale's largest.
+Trimming it would mean special-casing line ends in the measurement, the caret
+and the pen independently, and those drifting apart is the worse bug.
+
+Because three numbers now have to agree between a widget's measure and its
+paint, a role travels as **one object**: `ButtonElement.LABEL_ROLE` is the
+`TypeStyle` itself, and `measure_text`/`paint_text` take `float | TypeStyle`.
+A role cannot half-arrive. The test for it uses the paragraph cache as a
+mismatch detector — a label measured and painted with different metrics leaves
+two entries where there should be one — and a deliberate mutation confirms it
+fails when the tracking is dropped.
+
+`line_height` remains recorded but unapplied: paragraph line height comes from
+the font's own metrics.
 
 ### 5.18 Disabled state
 

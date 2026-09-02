@@ -11,6 +11,10 @@ offset back to it -- but the runs of a line concatenate in order, so walking
 them while accumulating `len(run.text)` recovers the paragraph offset without
 touching the shaping structures or the shape cache's key.
 
+Advances come from `ShapedRun.advances_px`, the same call the paint pass uses,
+so a caret cannot land somewhere the glyphs are not -- letter spacing in
+particular has to be in both or neither.
+
 Offsets are snapped to **grapheme cluster** boundaries (`segment.py`, UAX #29),
 so a selection edge never lands inside a flag emoji or between a base character
 and its combining mark.
@@ -70,9 +74,9 @@ def index_at(para: Paragraph, x: float, y: float) -> int:
     char = line.start
 
     for run in line.runs:
-        scale = run.face.scale_for(para.px)
+        advances = run.advances_px(para.px, para.tracking)
         for i in range(len(run)):
-            advance = float(run.advances[i]) * scale
+            advance = float(advances[i])
             if x < pen + advance / 2.0:
                 return _snap(para.text, char + int(run.clusters[i]))
             pen += advance
@@ -88,9 +92,9 @@ def _span_x(line: TextLine, para: Paragraph, start: int, end: int) -> tuple[floa
     right = line.x
 
     for run in line.runs:
-        scale = run.face.scale_for(para.px)
+        advances = run.advances_px(para.px, para.tracking)
         for i in range(len(run)):
-            advance = float(run.advances[i]) * scale
+            advance = float(advances[i])
             position = char + int(run.clusters[i])
             if start <= position < end:
                 if left is None:

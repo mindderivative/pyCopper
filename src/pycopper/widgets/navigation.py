@@ -29,6 +29,7 @@ from ..layout import (
     Size,
 )
 from ..spec import WidgetSpec
+from ..spec.typescale import TYPE_SCALE
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
 from .material import _arc, _box, _emit_state_layer
@@ -47,21 +48,23 @@ __all__ = [
     "TopAppBarElement",
 ]
 
-#: Sizes and weights from the components' own M3 type roles, quoted from
-#: M3_COMPONENT_SPECS.md: nav labels are `label-medium` (12sp), an app-bar
-#: title is `title-large` (22sp), a tab is `title-small` (14sp). The weights
-#: come from those roles in the type scale -- label and title steps below
-#: `title-large` are Medium, which is why these are 500 and the app bar is 400.
+#: The components' own M3 type roles, quoted from M3_COMPONENT_SPECS.md: a
+#: navigation bar's "Text Label Typography" is `label-medium` (12sp), an
+#: app-bar title is `title-large` (22sp), a tab is `title-small` (14sp).
 #:
-#: A Segment reuses the Tab constants. Only the Tab's role is sourced; a
-#: segmented button is its sibling control and looking different from it would
-#: be worse than following it.
-LABEL_SIZE: Final = 12.0
-LABEL_WEIGHT: Final = 500
-TITLE_SIZE: Final = 22.0
-TITLE_WEIGHT: Final = 400
-TAB_LABEL_SIZE: Final = 14.0
-TAB_LABEL_WEIGHT: Final = 500
+#: Each is held as the whole role rather than as loose numbers, so its size,
+#: weight and tracking reach a widget's measure and its paint together. They
+#: cannot be half-applied, which is what a separate SIZE/WEIGHT pair allowed.
+#:
+#: A Segment reuses the Tab role. Only the Tab's is sourced; a segmented button
+#: is its sibling control and looking different from it would be worse than
+#: following it. The navigation *drawer* is not here: section 4.4 states no
+#: typography, so its label keeps a plain size rather than borrowing a role it
+#: was never given.
+LABEL_ROLE: Final = TYPE_SCALE["label-medium"]
+TITLE_ROLE: Final = TYPE_SCALE["title-large"]
+TAB_LABEL_ROLE: Final = TYPE_SCALE["title-small"]
+TITLE_SIZE: Final = TITLE_ROLE.size
 ICON: Final = 24.0
 
 #: One full turn, for the circular progress sweep.
@@ -160,9 +163,7 @@ class NavItemElement(_StyledMixin, Padding):
     def _label_height(self) -> float:
         if not (self._supporting).strip():
             return 0.0
-        return measure_text(
-            self._supporting, LABEL_SIZE, engine=self.text_engine, weight=LABEL_WEIGHT
-        ).height
+        return measure_text(self._supporting, LABEL_ROLE, engine=self.text_engine).height
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         selected = self.selected
@@ -246,17 +247,14 @@ class NavItemElement(_StyledMixin, Padding):
                 clip_radii=ctx.clip_radii,
             )
         if label_text:
-            label = measure_text(
-                label_text, LABEL_SIZE, engine=self.text_engine, weight=LABEL_WEIGHT
-            )
+            label = measure_text(label_text, LABEL_ROLE, engine=self.text_engine)
             paint_text(
                 ctx,
                 absolute.x + (size.width - label.width) / 2,
                 absolute.y + self.INDICATOR_H + 4.0,
                 label_text,
-                LABEL_SIZE,
+                LABEL_ROLE,
                 content,
-                weight=LABEL_WEIGHT,
             )
 
 
@@ -438,13 +436,28 @@ class TopAppBarElement(_StyledMixin, Flex):
             # The headline shrinks to title-large as the bar becomes a small
             # one, so the two forms agree at the moment of arrival.
             size = self.HEADLINE + (size - self.HEADLINE) * t
-        label = measure_text(title, size, engine=self.text_engine)
+        label = measure_text(
+            title,
+            size,
+            engine=self.text_engine,
+            weight=TITLE_ROLE.weight,
+            tracking=TITLE_ROLE.tracking,
+        )
         x = (
             absolute.x + (self.size.width - label.width) / 2
             if style.variant == "center_aligned"
             else absolute.x + self.PAD
         )
-        paint_text(ctx, x, absolute.y + (self.size.height - label.height) / 2, title, size, token)
+        paint_text(
+            ctx,
+            x,
+            absolute.y + (self.size.height - label.height) / 2,
+            title,
+            size,
+            token,
+            weight=TITLE_ROLE.weight,
+            tracking=TITLE_ROLE.tracking,
+        )
 
 
 # ------------------------------------------------------------------- tabs
@@ -461,9 +474,7 @@ class TabElement(_StyledMixin, Padding):
         self.init_element(spec)
 
     def perform_layout(self, constraints: Constraints) -> Size:
-        label = measure_text(
-            self._text, TAB_LABEL_SIZE, engine=self.text_engine, weight=TAB_LABEL_WEIGHT
-        )
+        label = measure_text(self._text, TAB_LABEL_ROLE, engine=self.text_engine)
         return self.sized(constraints, self.style).constrain(
             Size(label.width + self.PAD_X * 2, self.HEIGHT)
         )
@@ -473,17 +484,14 @@ class TabElement(_StyledMixin, Padding):
         _emit_state_layer(ctx, self, absolute, token, (0.0,) * 4)
         if not self._text.strip():
             return
-        label = measure_text(
-            self._text, TAB_LABEL_SIZE, engine=self.text_engine, weight=TAB_LABEL_WEIGHT
-        )
+        label = measure_text(self._text, TAB_LABEL_ROLE, engine=self.text_engine)
         paint_text(
             ctx,
             absolute.x + (self.size.width - label.width) / 2,
             absolute.y + (self.size.height - label.height) / 2,
             self._text,
-            TAB_LABEL_SIZE,
+            TAB_LABEL_ROLE,
             token,
-            weight=TAB_LABEL_WEIGHT,
         )
 
 
@@ -577,9 +585,7 @@ class SegmentElement(_StyledMixin, Padding):
         return value
 
     def perform_layout(self, constraints: Constraints) -> Size:
-        label = measure_text(
-            self._text, TAB_LABEL_SIZE, engine=self.text_engine, weight=TAB_LABEL_WEIGHT
-        )
+        label = measure_text(self._text, TAB_LABEL_ROLE, engine=self.text_engine)
         width = label.width + self.PAD_X * 2 + (self.CHECK + self.GAP) * self._check_progress()
         return self.sized(constraints, self.style).constrain(Size(width, self.HEIGHT))
 
@@ -621,17 +627,14 @@ class SegmentElement(_StyledMixin, Padding):
             )
             x += (self.CHECK + self.GAP) * t
         if self._text.strip():
-            label = measure_text(
-                self._text, TAB_LABEL_SIZE, engine=self.text_engine, weight=TAB_LABEL_WEIGHT
-            )
+            label = measure_text(self._text, TAB_LABEL_ROLE, engine=self.text_engine)
             paint_text(
                 ctx,
                 x,
                 absolute.y + (self.size.height - label.height) / 2,
                 self._text,
-                TAB_LABEL_SIZE,
+                TAB_LABEL_ROLE,
                 token,
-                weight=TAB_LABEL_WEIGHT,
             )
 
 

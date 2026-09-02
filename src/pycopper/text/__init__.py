@@ -125,10 +125,11 @@ class TextEngine:
         max_width: float | None = None,
         request: FontRequest | None = None,
         alignment: str = Alignment.START,
+        tracking: float = 0.0,
     ) -> Paragraph:
         """Lay out *text*, memoised. Static labels cost nothing after frame one."""
         req = request or FontRequest()
-        key = (text, px, max_width, req.key(), alignment)
+        key = (text, px, max_width, req.key(), alignment, tracking)
         hit = self._layouts.get(key)
         if hit is not None:
             return hit
@@ -139,6 +140,7 @@ class TextEngine:
             max_width=max_width,
             request=req,
             alignment=alignment,
+            tracking=tracking,
             cache=self.shaper,
         )
         self._layouts[key] = para
@@ -151,8 +153,11 @@ class TextEngine:
         px: float = 14.0,
         max_width: float | None = None,
         request: FontRequest | None = None,
+        tracking: float = 0.0,
     ) -> Size:
-        return self.layout(text, px=px, max_width=max_width, request=request).size
+        return self.layout(
+            text, px=px, max_width=max_width, request=request, tracking=tracking
+        ).size
 
     def clear_caches(self) -> None:
         self._layouts.clear()

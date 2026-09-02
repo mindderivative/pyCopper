@@ -13,6 +13,7 @@ settle the one it contradicts itself on.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -268,26 +269,167 @@ def test_a_missing_weight_resolves_to_the_nearest_available() -> None:
     assert db.face_for(FontRequest(weight=400)).weight == 400
 
 
-def test_components_use_the_weight_their_m3_role_specifies() -> None:
+def test_components_hold_the_m3_role_their_spec_names() -> None:
     """M3_COMPONENT_SPECS: a common button is `label-large` "(14sp / 20dp line
-    height, medium weight)" -- quoted, not inferred."""
+    height, medium weight)"; a navigation bar's label is `label-medium`; a tab
+    is `title-small`. Quoted, not inferred.
+
+    The whole role is held, not a size and a weight side by side, so its three
+    numbers cannot reach a widget's measure and its paint separately.
+    """
     from pycopper.widgets.base import ButtonElement
-    from pycopper.widgets.navigation import LABEL_WEIGHT, TAB_LABEL_WEIGHT
+    from pycopper.widgets.navigation import LABEL_ROLE, TAB_LABEL_ROLE, TITLE_ROLE
 
-    assert ButtonElement.LABEL_WEIGHT == TYPE_SCALE["label-large"].weight == 500
-    assert LABEL_WEIGHT == TYPE_SCALE["label-medium"].weight == 500
-    assert TAB_LABEL_WEIGHT == TYPE_SCALE["title-small"].weight == 500
+    assert ButtonElement.LABEL_ROLE is TYPE_SCALE["label-large"]
+    assert LABEL_ROLE is TYPE_SCALE["label-medium"]
+    assert TAB_LABEL_ROLE is TYPE_SCALE["title-small"]
+    assert TITLE_ROLE is TYPE_SCALE["title-large"]
+    assert (ButtonElement.LABEL_ROLE.weight, ButtonElement.LABEL_ROLE.tracking) == (500, 0.1)
 
 
-def test_label_layout_and_paint_agree_on_weight() -> None:
-    """They measure separately, so a mismatch would size a label for one face
-    and draw it in another -- clipping it. This caught a real bug."""
-    import re
-    from pathlib import Path
+def _paint_once(spec: dict[str, object], width: float, height: float) -> tuple[Any, Any]:
+    """Lay out and paint one widget through a single text engine, and return it.
 
-    source = (
-        Path(__file__).resolve().parents[1] / "src/pycopper/widgets/navigation.py"
-    ).read_text()
-    for call in re.findall(r"(?:measure_text|paint_text)\((.{0,400}?)\)\n", source, re.S):
-        if "LABEL_SIZE" in call:
-            assert "weight=" in call, f"a label call carries no weight: {call[:80]!r}"
+    The engine memoises paragraphs on the *whole* set of parameters -- text,
+    size, face, alignment, wrap width, tracking -- so a widget that measured
+    with one and painted with another leaves two entries where there should be
+    one. That makes the cache a mismatch detector, and it covers every
+    parameter at once rather than the one a hand-written assertion remembers.
+    """
+    from pycopper.layout import Constraints, Offset
+    from pycopper.paint import DisplayList
+    from pycopper.text import TextEngine
+    from pycopper.theme import Palette, Theme
+    from pycopper.tree.element import PaintContext
+    from pycopper.widgets import build_element
+
+    engine = TextEngine()
+    element = build_element(parse_view(spec).root)
+    element.set_text_engine(engine)
+    element.layout(Constraints(0.0, width, 0.0, height))
+    ctx = PaintContext(
+        display_list=DisplayList(), palette=Palette(Theme()), text=engine, pixel_ratio=1.0
+    )
+    element.paint(ctx, Offset(0.0, 0.0))
+    return engine, ctx.display_list
+
+
+@pytest.mark.parametrize(
+    ("spec", "label"),
+    [
+        ({"name": "b", "widget": "Button", "text": "Confirm"}, "Confirm"),
+        ({"name": "n", "widget": "NavItem", "text": "home", "supporting_text": "Home"}, "Home"),
+        ({"name": "t", "widget": "Tab", "text": "Overview"}, "Overview"),
+        ({"name": "s", "widget": "Segment", "text": "Weekly"}, "Weekly"),
+        (
+            {"name": "x", "widget": "Text", "text": "Body", "style": {"text_style": "body-large"}},
+            "Body",
+        ),
+    ],
+)
+def test_a_label_is_measured_and_painted_with_one_set_of_metrics(
+    spec: dict[str, object], label: str
+) -> None:
+    """A widget measures and paints its label in separate calls. If they
+    disagree on size, face or tracking, the box is sized for one rendering and
+    drawn in another -- which clips it. This caught a real bug when weight was
+    applied, and tracking is a third chance at the same mistake.
+
+    Only the *metrics* have to match. A `Text` legitimately measures against the
+    width it is offered and paints against the narrower box it settled on --
+    that is how it shrink-wraps instead of starving its siblings in a Row.
+    """
+    from pycopper.paint.display_list import Kind
+
+    engine, display_list = _paint_once(spec, 200.0, 80.0)
+    assert any(s["flags"][0] == Kind.GLYPH for s in display_list.view), "no label was drawn"
+    metrics = {(k[1], k[3], k[5]) for k in engine._layouts if k[0] == label}
+    assert len(metrics) == 1, f"measure and paint disagreed: {metrics}"
+
+
+def test_a_button_label_carries_its_roles_tracking_into_the_paint_pass() -> None:
+    """The positive case behind the test above: not merely consistent, but
+    consistent at the figure `label-large` actually specifies."""
+    engine, _ = _paint_once({"name": "b", "widget": "Button", "text": "Confirm"}, 200.0, 80.0)
+    (key,) = [k for k in engine._layouts if k[0] == "Confirm"]
+    assert key[1] == TYPE_SCALE["label-large"].size == 14.0
+    assert key[-1] == TYPE_SCALE["label-large"].tracking == 0.1
+
+
+# --------------------------------------------------------------- tracking
+
+
+def test_a_role_resolves_its_tracking_into_letter_spacing() -> None:
+    parsed = view(None, {"text_style": "body-large"})
+    assert parsed.root.style.letter_spacing == TYPE_SCALE["body-large"].tracking == 0.5
+
+
+def test_most_roles_track_zero() -> None:
+    """Worth pinning: tracking is the exception in this scale, not the rule, so
+    a change that gave every role a nonzero value would be a mistake."""
+    zero = [name for name, style in TYPE_SCALE.items() if style.tracking == 0.0]
+    assert len(zero) == 6, "display-medium and -small, all three headlines, title-large"
+    assert TYPE_SCALE["display-large"].tracking == -0.25, "the only negative one"
+    assert max(s.tracking for s in TYPE_SCALE.values()) == 0.5, "and the widest is half a pixel"
+
+
+def test_an_explicit_letter_spacing_beats_the_role() -> None:
+    parsed = view(None, {"text_style": "body-large", "letter_spacing": 3.0})
+    assert parsed.root.style.letter_spacing == 3.0
+
+
+def test_a_resized_role_keeps_its_own_tracking() -> None:
+    """`type_scale:` overrides a size. Tracking is a separate token, and
+    resizing a role says nothing about it."""
+    parsed = view({"body-large": 20}, {"text_style": "body-large"})
+    assert parsed.root.style.font_size == 20.0
+    assert parsed.root.style.letter_spacing == 0.5
+
+
+def test_tracking_widens_text_by_one_step_per_cluster() -> None:
+    """Per *cluster*, not per glyph: "fi" shapes to a single ligature glyph for
+    two characters and must not be pulled apart from the inside."""
+    from pycopper.text import TextEngine
+
+    engine = TextEngine()
+    text = "Hamburgefonstiv fi"
+    plain = engine.layout(text, px=16.0)
+    tracked = engine.layout(text, px=16.0, tracking=2.0)
+    assert len(plain.placements()) == 17, "expected the fi ligature"
+    assert tracked.size.width - plain.size.width == pytest.approx(2.0 * 17)
+
+
+def test_negative_tracking_narrows_text() -> None:
+    from pycopper.text import TextEngine
+
+    engine = TextEngine()
+    assert (
+        engine.layout("Display", px=57.0, tracking=-0.25).size.width
+        < engine.layout("Display", px=57.0).size.width
+    )
+
+
+def test_the_caret_follows_tracked_glyphs() -> None:
+    """Selection walks advances itself. If it read them without tracking, a
+    click would land on a different character than the one under the cursor --
+    which is why both go through `ShapedRun.advances_px`.
+    """
+    from pycopper.text import TextEngine
+    from pycopper.text.selection import index_at
+
+    para = TextEngine().layout("Selection", px=16.0, tracking=4.0)
+    assert index_at(para, para.size.width, 0.0) == len("Selection")
+    for want, place in enumerate(para.placements()):
+        assert index_at(para, place.x + 0.01, 0.0) == want
+
+
+def test_shaping_stays_size_and_tracking_independent() -> None:
+    """Tracking is applied in pixels at layout time, so one shaped run still
+    serves every size and every spacing the same string is drawn at."""
+    from pycopper.text import TextEngine
+
+    engine = TextEngine()
+    for tracking in (0.0, 0.5, 2.0):
+        engine.layout("Shared", px=16.0, tracking=tracking)
+    _, misses = engine.shaper.stats
+    assert misses == 1, "tracking re-shaped the run"

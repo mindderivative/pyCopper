@@ -136,7 +136,7 @@ runs **twice** for one event. Check the phase when that matters:
 @app.handler
 def on_card_click(event) -> None:
     if event.phase is not Phase.CAPTURE:
-        ...   # runs once, on the way back up
+        ...  # runs once, on the way back up
 ```
 
 A handler on the target itself runs once, so the common case is unaffected.
@@ -345,15 +345,37 @@ They agree with every value the reference library corroborates independently,
 and settle the one it contradicts itself on: `headline-large` appears there as
 both 32sp and 36sp, and the token source says **32**. Tests pin both facts.
 
-A role also carries its **weight**: `title-medium`, `title-small` and every
-`label-*` role are Medium (500), the rest Regular (400). Roboto ships both
-faces, so those are genuinely Medium rather than emboldened Regular — and
-because a weight is a different face with different metrics, layout and paint
-must use the same one. An explicit `font_weight:` beside a role wins.
+A role also carries its **weight** and its **tracking**. `title-medium`,
+`title-small` and every `label-*` role are Medium (500), the rest Regular
+(400); Roboto ships both faces, so those are genuinely Medium rather than
+emboldened Regular. Tracking becomes `letter_spacing`, and nine of the fifteen
+roles have some — `body-large` and the two smallest labels the most, at half a
+pixel, and `display-large` the only negative one at −0.25.
 
-Line height and tracking are recorded per role but not applied: paragraph line
-height comes from the font's own metrics, and there is no letter-spacing
-control to resolve tracking into.
+| | tracking |
+|---|---|
+| `display-large` | −0.25 |
+| `title-medium` / `body-small` | 0.15 / 0.4 |
+| `title-small` / `label-large` | 0.1 |
+| `body-medium` | 0.25 |
+| `body-large`, `label-medium`, `label-small` | 0.5 |
+| everything else | 0 |
+
+An explicit `font_weight:` or `letter_spacing:` beside a role wins — naming a
+role states an intent, and writing either beside it states a more specific one.
+Overriding a role's size in `type_scale:` leaves both alone: they are separate
+tokens, and resizing a role says nothing about them.
+
+Tracking is **absolute**, in logical px, the way M3 states it — it does not
+scale with `font_size`, so a role's tracking is only right at that role's size.
+It is added after every grapheme cluster, including the last on a line, as CSS
+`letter-spacing` is. That leaves centred text off-centre by half a tracking
+value, a quarter-pixel at the largest figure in the scale; the alternative is
+special-casing line ends in the measurement, the caret and the paint pen
+separately, and those three drifting apart is a worse bug than a quarter-pixel.
+
+Line height is recorded per role but not applied: paragraph line height comes
+from the font's own metrics.
 
 ## Text selection
 
@@ -388,6 +410,7 @@ an application work, and leaves one seam for the system one:
 from pycopper.runtime.clipboard import clipboard
 import pyperclip
 
+
 class SystemClipboard:
     def set_text(self, text: str) -> bool:
         pyperclip.copy(text)
@@ -395,6 +418,7 @@ class SystemClipboard:
 
     def get_text(self) -> str:
         return pyperclip.paste()
+
 
 clipboard.install(SystemClipboard())
 ```
@@ -693,6 +717,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `font_size` | dp |
 | `text_style` | an M3 type-scale role, resolved against `type_scale:` |
 | `font_weight` | 400 or 500 (Roboto ships both); resolves to the nearest available |
+| `letter_spacing` | tracking in logical px, added after each grapheme cluster |
 | `icon_size` | dp, default 24 |
 | `icon_fill` | 0–1. M3 uses this for selected state — prefer it to swapping icon names. |
 | `icon_weight` | 100–700 |
@@ -721,11 +746,9 @@ Stated plainly so you can design around it:
   content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
   make timed transitions arrive at once — it does not affect app-bar collapse
   or carousel parallax, which follow a position rather than a clock.
-- **Line height and tracking from the type scale.** Recorded per role but not
-  applied — line height comes from the font's metrics and there is no
-  letter-spacing control. Size and weight *are* applied. Widgets otherwise take
-  a raw `font_size`;
-  `label-large` and friends are not modelled.
+- **Line height from the type scale.** Recorded per role but not applied — a
+  line's height comes from the font's own metrics. Size, weight and tracking
+  *are* applied.
 - **Editable text.** Text can be selected and copied, not typed into: no
   caret blink, no insertion, no undo. A text field is its own piece of work.
 - **A system clipboard.** Copying is in-process with a documented seam for a
