@@ -88,102 +88,6 @@ def test_closing_releases_gpu_objects_in_order(offscreen_engine) -> None:
     assert getattr(engine, "device", None) is None
 
 
-# ------------------------------------------------------- resize coalescing
-
-
-def burst(engine, count: int, rate: float) -> tuple[int, int]:
-    """Feed *count* configures a second apart at *rate*, as a drag does."""
-    from pycopper.runtime.engine import DrawCancelled
-
-    drawn = cancelled = 0
-    now = [0.0]
-    engine.clock = lambda: now[0]
-    for i in range(count):
-        now[0] += 1.0 / rate
-        engine.canvas.set_logical_size(400 + i, 300)
-        try:
-            engine.draw_frame()
-            drawn += 1
-        except DrawCancelled:
-            cancelled += 1
-    return drawn, cancelled
-
-
-def test_a_resize_burst_is_coalesced_to_the_display_rate(offscreen_engine) -> None:
-    """The measured bug. rendercanvas draws and presents once per compositor
-    configure during a resize, synchronously, bypassing its own fps throttle;
-    a real drag produced 410 configures a second. With vsync each present
-    waits for the display, so ~60 finish and the rest queue -- which is why
-    the window trailed the pointer by seconds and then caught up.
-
-    Declining the ones that arrive too close together has to bring the present
-    rate down to something vsync can actually service.
-    """
-    engine = offscreen_engine(width=400, height=300)
-    drawn, cancelled = burst(engine, 400, rate=410.0)
-    assert drawn < 70, f"presented {drawn} times in a second; vsync can service ~60"
-    assert cancelled > 300, "almost all of a 410/s burst should be declined"
-
-
-def test_the_first_resize_after_a_pause_is_drawn_at_once(offscreen_engine) -> None:
-    """The gate must not add latency to an ordinary resize -- only to a burst
-    arriving faster than the display can show it."""
-    from pycopper.runtime.engine import DrawCancelled
-
-    engine = offscreen_engine(width=400, height=300)
-    now = [10.0]
-    engine.clock = lambda: now[0]
-    engine.canvas.set_logical_size(500, 300)
-    try:
-        engine.draw_frame()
-    except DrawCancelled:
-        pytest.fail("a resize after a quiet period was declined")
-
-
-def test_drawing_at_an_unchanged_size_is_never_declined(offscreen_engine) -> None:
-    """The gate keys on the size changing, so ordinary animation frames -- a
-    caret, a state layer, a progress sweep -- go through untouched however
-    fast they arrive."""
-    from pycopper.runtime.engine import DrawCancelled
-
-    engine = offscreen_engine(width=400, height=300)
-    now = [0.0]
-    engine.clock = lambda: now[0]
-    engine.canvas.request_draw(engine.draw_frame)
-    engine.canvas.draw()
-    for _ in range(50):
-        now[0] += 0.0001
-        try:
-            engine.draw_frame()
-        except DrawCancelled:
-            pytest.fail("an animation frame was declined as if it were a resize")
-
-
-def test_a_declined_frame_asks_to_come_back(offscreen_engine) -> None:
-    """Otherwise the last configure of a drag could be the one that is
-    declined, and the window would be left showing the size before it."""
-    engine = offscreen_engine(width=400, height=300)
-    asked: list[int] = []
-    engine.canvas.request_draw = lambda *a: asked.append(1)  # type: ignore[method-assign]
-    _, cancelled = burst(engine, 20, rate=410.0)
-    assert cancelled, "the burst was not fast enough to decline anything"
-    assert len(asked) == cancelled, "a declined frame did not schedule a replacement"
-
-
-def test_the_very_first_frame_is_never_declined(offscreen_engine) -> None:
-    """It has no previous present to be too close to. Getting this wrong makes
-    an application open to an empty window until something else asks for a
-    frame."""
-    from pycopper.runtime.engine import DrawCancelled
-
-    engine = offscreen_engine(width=400, height=300)
-    engine.clock = lambda: 0.0
-    try:
-        engine.draw_frame()
-    except DrawCancelled:
-        pytest.fail("the first frame of the application was declined")
-
-
 def test_wayland_decorations_defaults_to_the_portable_choice() -> None:
     """`server` is opt-in on purpose. GNOME offers no server-side decorations
     for xdg-shell, so defaulting to it would leave those users with a window
@@ -194,3 +98,13 @@ def test_wayland_decorations_defaults_to_the_portable_choice() -> None:
     assert Settings(wayland_decorations="server").wayland_decorations == "server"
     with pytest.raises(ValueError):
         Settings(wayland_decorations="client")
+
+
+def test_vsync_defaults_on_and_is_settable() -> None:
+    """Off is a trade -- smoother live resizing on compositors whose present
+    is slow during a drag, at the cost of tearing and a busy GPU everywhere
+    else -- so it is opt-in rather than a default."""
+    from pycopper import Settings
+
+    assert Settings().vsync is True
+    assert Settings(vsync=False).vsync is False

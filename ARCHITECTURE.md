@@ -644,35 +644,44 @@ Events arrive from `rendercanvas` callbacks and are pushed onto a queue drained 
 
 The path is **the target followed by its ancestors**, not everything under the cursor. An occluded sibling that also contains the point is absent from it and receives nothing, which is the whole point of respecting paint order.
 
-#### 5.8.1 Resize, and why it needs a throttle
+#### 5.8.1 Resize: every frame is drawn, and why
 
 **During a resize, rendercanvas draws and presents once per compositor
 configure, synchronously** — "during a resize, the `glfw.poll_events()`
 function blocks, so our event-loop is on pause … we can use these to draw, to
-get a smoother experience" (`rendercanvas/glfw.py`). That path calls
+get a smoother experience" (`rendercanvas/glfw.py`), via
 `_draw_and_present(force_sync=True)`, which bypasses its own `max_fps`
-throttle.
+throttle. Measured on KDE Plasma Wayland: **250 genuinely new sizes a second**.
 
-Measured on one drag of the gallery: **410 configures a second**. With vsync
-every present waits for the display, so about 60 of them can finish and the
-rest queue — the window trails the pointer by a growing gap and then catches up
-seconds later. The same drag with vsync off produced 11,761 frames, a 1.09 ms
-median present, and exactly **one** frame over budget; with vsync on, the worst
-present was **802 ms**. The frames themselves were never slow. There were
-simply seven times more of them than the display could take.
+The obvious response is to throttle — draw the latest size and skip the rest.
+**That was tried, shipped, and reverted, and the reason is worth keeping.** A
+Wayland client is expected to commit a buffer in response to a configure.
+Declining a frame means not committing, which leaves the compositor waiting
+before it offers the next size. The throttle did not merely fail to help; it
+was the cause of the choppiness it was meant to fix:
 
-So `Engine.draw_frame` declines a frame whose size differs from the last one
-drawn and which arrives within `RESIZE_MIN_INTERVAL` of the last present,
-raising `DrawCancelled` and asking for another draw. A burst of 410/s becomes
-58 presents a second — what vsync can service — and the queue never forms.
-The gate keys on the *size changing*, so ordinary animation frames are
-untouched however fast they arrive, and the first frame after a pause is
-always drawn so an ordinary resize gains no latency.
+| | redraws/s | gap between drawn frames | worst gap |
+|---|---|---|---|
+| throttled, vsync on | 12 | 86 ms | 1.1 s |
+| throttled, vsync off | 12 | 66 ms | 0.7 s |
+| unthrottled, vsync on | 99 | 0.04 ms | 7.9 s |
+| unthrottled, vsync off | **466** | **0.04 ms** | none |
 
-`DrawCancelled` is recognised by rendercanvas **by class name**, and the class
-is not exported, so pyCopper defines its own. Matching on a name is fragile
-enough to be worth stating; the alternative is having no way to decline a
-frame at all.
+The inter-frame gap collapses by three orders of magnitude the moment
+declining stops. So `draw_frame` presents every frame it is asked for, and
+`vsync` is the only lever: with it on, this path still produces multi-second
+stalls under a fast drag; with it off, a live resize runs at several hundred
+redraws a second with none. `Settings.vsync` exposes that trade.
+
+**The diagnosis took four wrong turns**, each from reasoning past the data
+rather than measuring the next thing: blaming the frame cost (it was 2 ms),
+blaming vsync alone (throttled-and-vsync-off was still 12/s), concluding the
+compositor's present was an immovable ceiling (it was 0.04 ms unthrottled),
+and only then instrumenting the throttle itself — which showed declines
+clustering within 16 ms of a present and then 85 ms of total silence, the
+signature of a stalled handshake rather than a busy GPU. The lesson worth
+carrying: a *gap between* our frames is not evidence about what happens inside
+them, and "the platform is slow" is the hypothesis to test last, not first.
 
 ### 5.8.2 Shutdown
 

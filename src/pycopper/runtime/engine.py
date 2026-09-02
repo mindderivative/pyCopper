@@ -11,9 +11,8 @@ flag. Polling GLFW here would double-pump the event queue.
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
-from typing import Any, Final
+from typing import Any
 
 import wgpu
 
@@ -23,20 +22,7 @@ from ..render import UIPipeline
 from ..text import TextEngine
 from ..theme import Palette, Theme
 
-__all__ = ["DrawCancelled", "Engine"]
-
-
-# The name is not ours to choose -- see the docstring -- so the "must end
-# in Error" convention has to give way to an external contract.
-class DrawCancelled(Exception):  # noqa: N818
-    """Raised out of `draw_frame` to skip a frame without presenting one.
-
-    rendercanvas recognises this **by class name** -- `type(err).__name__ ==
-    "DrawCancelled"` in its `base.py` -- and does not export the class, so
-    defining our own is the whole contract. Matching on a name is fragile
-    enough to say out loud; the alternative is having no way to decline a
-    frame, and presenting one anyway is what caused the bug below.
-    """
+__all__ = ["Engine"]
 
 
 class Engine:
@@ -71,13 +57,6 @@ class Engine:
 
         self._frame_count = 0
         self._instance_count = 0
-        self._last_size: tuple[int, int] | None = None
-        #: Negative infinity, not zero: the gate compares against this, and a
-        #: zero would decline the very first frame of any application whose
-        #: clock starts near zero -- which is every test that injects one.
-        self._last_present = float("-inf")
-        #: Injectable so a test can drive the resize gate without sleeping.
-        self.clock: Callable[[], float] = time.perf_counter
 
     def _make_canvas(self) -> Any:
         from rendercanvas.glfw import RenderCanvas
@@ -97,6 +76,7 @@ class Engine:
             update_mode=s.update_mode,
             min_fps=s.min_fps,
             max_fps=s.max_fps,
+            vsync=s.vsync,
         )
 
     @property
@@ -125,37 +105,16 @@ class Engine:
 
     # ---------------------------------------------------------------- frame
 
-    #: The shortest gap between two presents while a window is being resized.
-    #:
-    #: rendercanvas draws and presents once per compositor configure during a
-    #: resize, synchronously, bypassing its own fps throttle -- "during a
-    #: resize, the glfw.poll_events() function blocks, so our event-loop is on
-    #: pause ... we can use these to draw, to get a smoother experience"
-    #: (rendercanvas/glfw.py). Measured on one drag: **410 configures a
-    #: second**. With vsync every present waits for the display, so at most 60
-    #: of them can finish; the rest queue, and the window trails the pointer by
-    #: seconds while the backlog drains. Declining the ones that arrive too
-    #: close together consumes that backlog at memory speed and paints the
-    #: latest size instead of every size.
-    RESIZE_MIN_INTERVAL: Final = 1.0 / 60.0
-
-    def _resize_is_too_soon(self) -> bool:
-        """Whether this frame is one of a resize burst arriving faster than the
-        display can show them."""
-        size = self.canvas.get_physical_size()
-        if size == self._last_size:
-            return False
-        if self.clock() - self._last_present < self.RESIZE_MIN_INTERVAL:
-            # Come back for whatever size it has settled on.
-            self.canvas.request_draw()
-            return True
-        self._last_size = size
-        return False
-
     def draw_frame(self) -> None:
-        """One frame. Steps 6-9 of ARCHITECTURE.md 6; 1-5 arrive in M3."""
-        if self._resize_is_too_soon():
-            raise DrawCancelled
+        """One frame. Steps 6-9 of ARCHITECTURE.md 6; 1-5 arrive in M3.
+
+        Every frame asked for is drawn and presented, including the hundreds a
+        second a window resize produces. Skipping one is not the optimisation
+        it looks like: a Wayland client is expected to commit a buffer in
+        response to a configure, and declining leaves the compositor waiting.
+        Measured on KDE Plasma, a throttle that skipped frames dropped a live
+        resize from 466 redraws a second to 12 -- see ARCHITECTURE.md 5.8.1.
+        """
         self.display_list.clear()
         if self.painter is not None:
             self.painter(self.display_list)
@@ -176,7 +135,6 @@ class Engine:
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
         self._frame_count += 1
-        self._last_present = self.clock()
 
     def _upload(self) -> None:
         """Palette, globals, and instance uploads (step 7)."""
