@@ -259,7 +259,11 @@ along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.
 
-**Motion exists.** Use `self.animated("key", target, duration="short4",
+**Motion exists.** Two things to know before animating colour or geometry:
+palette tokens **cannot be interpolated** (they resolve in the shader), so a
+colour cross-fade is two boxes at complementary alpha; and if a fading border
+reaches zero alpha its *width* must go to zero too, or the shader leaves a
+transparent ring where the fill should reach. Use `self.animated("key", target, duration="short4",
 curve="standard")` inside `paint_self` and render what it returns; it settles
 immediately on the first call and retargets on later ones. Durations and curves
 are M3 tokens (`motion/easing.py`) -- look the component's timing up rather
@@ -317,8 +321,8 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% disabled opacities
   have nowhere to attach.
-- **Motion on some components.** Overlay fades, state-layer cross-fades, the
-  `Switch`, indeterminate progress, and the carousel snap use it. Selection
-  controls other than the switch still change instantly. Wiring one up is
-  usually small — see the "Motion exists" note above.
+- **Motion is not everywhere.** Overlay fades, state layers, every selection
+  control, indeterminate progress and the carousel snap are animated. Tab and
+  navigation indicators, app-bar collapse and carousel parallax are not.
+  Wiring one up is usually small — see the "Motion exists" note above.
 - **Tonal elevation.** Shadows only (see Step 2).

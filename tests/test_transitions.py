@@ -321,3 +321,164 @@ def test_state_layers_still_paint_a_palette_token() -> None:
 def test_nothing_hovered_means_no_frames() -> None:
     app, _button, _clock = button_app()
     assert not app.motion.active
+
+
+# ------------------------------------------------------- selection controls
+
+
+def selection_app(**settings):
+    """A checkbox, radio and filter chip all bound to one signal."""
+    on = Signal(False)
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Row",
+                "style": {"background": "surface", "spacing": 8},
+                "children": [
+                    {"name": "cb", "widget": "Checkbox", "value": "{{ on.get() }}"},
+                    {"name": "rd", "widget": "Radio", "value": "{{ on.get() }}"},
+                    {
+                        "name": "ch",
+                        "widget": "Chip",
+                        "text": "Filter",
+                        "style": {"variant": "filter"},
+                        "value": "{{ on.get() }}",
+                    },
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=400, height=80, **settings),
+    )
+    clock = Clock()
+    app.expose(on=on)
+    app.clock = clock
+    app.mount()
+    app.paint(DisplayList())
+    return app, on, clock
+
+
+@pytest.mark.parametrize("name", ["cb", "rd", "ch"])
+def test_a_selection_control_transitions_rather_than_flipping(name: str) -> None:
+    """M3 states the timing outright: "Selection controls have a short duration
+    of 200ms with Standard easing"."""
+    app, on, clock = selection_app()
+    control = app.root.find(name)
+    assert control.animation("selected").value == 0.0
+
+    on.set(True)
+    app.paint(DisplayList())
+    assert control.animation("selected").value == 0.0, "it flipped instantly"
+
+    clock.t = 0.05
+    app.paint(DisplayList())
+    assert 0.0 < control.animation("selected").value < 1.0
+
+    for _ in range(8):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    assert control.animation("selected").value == pytest.approx(1.0)
+    assert not app.motion.active
+
+
+def test_every_selection_control_shares_the_one_sourced_timing() -> None:
+    from pycopper.motion import DURATION
+    from pycopper.widgets.material import SELECTION_MOTION
+
+    assert DURATION[SELECTION_MOTION] == 0.200
+    app, on, _clock = selection_app()
+    on.set(True)
+    app.paint(DisplayList())
+    for name in ("cb", "rd", "ch"):
+        assert app.root.find(name).animation("selected").duration == 0.200
+
+
+def test_a_filter_chip_widens_as_its_checkmark_arrives() -> None:
+    """The one selection control whose transition changes geometry, so the
+    label and every sibling in the row move with it."""
+    app, on, clock = selection_app()
+    chip = app.root.find("ch")
+    narrow = chip.size.width
+
+    on.set(True)
+    app.paint(DisplayList())
+    clock.t = 0.05
+    app.paint(DisplayList())
+    midway = chip.size.width
+    assert narrow < midway
+
+    for _ in range(8):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    assert chip.size.width > midway
+
+
+def test_the_chip_transition_invalidates_layout() -> None:
+    app, on, _clock = selection_app()
+    chip = app.root.find("ch")
+    on.set(True)
+    app.paint(DisplayList())
+    chip._needs_paint = False
+    app.motion.tick(0.05)
+    assert chip.needs_layout
+
+
+def test_a_non_filter_chip_has_no_checkmark_to_animate() -> None:
+    """An assist chip never shows one, so it must not pay for a transition."""
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Row",
+                "style": {"background": "surface"},
+                "children": [
+                    {
+                        "name": "a",
+                        "widget": "Chip",
+                        "text": "Assist",
+                        "style": {"variant": "assist"},
+                        "value": "true",
+                    }
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=200, height=60),
+    )
+    app.mount()
+    app.paint(DisplayList())
+    assert app.root.find("a")._check_progress() == 0.0
+    assert not app.motion.active
+
+
+def test_a_selected_chip_has_no_transparent_ring() -> None:
+    """The shader insets a box's fill by its border width, so a fully faded
+    1dp border would leave a gap where the fill should reach. The width has to
+    drop with the alpha, not just the alpha."""
+    app, on, clock = selection_app()
+    on.set(True)
+    for _ in range(10):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    dl = DisplayList()
+    app.paint(dl)
+
+    chip = app.root.find("ch")
+    containers = [
+        s
+        for s in dl.view
+        if abs(float(s["rect"][2]) - chip.size.width) < 0.01
+        and abs(float(s["rect"][3]) - chip.size.height) < 0.01
+    ]
+    assert containers, "the chip container was not found"
+    assert all(float(s["params"][0]) == 0.0 for s in containers), "border width left behind"
+
+
+def test_reduce_motion_selects_at_once() -> None:
+    app, on, _clock = selection_app(reduce_motion=True)
+    on.set(True)
+    app.paint(DisplayList())
+    for name in ("cb", "rd", "ch"):
+        assert app.root.find(name).animation("selected").value == 1.0
+    assert not app.motion.active

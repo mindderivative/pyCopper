@@ -1186,6 +1186,19 @@ and its "begin and end on screen" pair is about elements arriving rather than
 an in-place emphasis change. 100ms is chosen because a hover response slower
 than that reads as lag.
 
+**Every selection control transitions**, on the one line M3 states outright:
+"Selection controls have a short duration of 200ms with Standard easing". A
+checkbox cross-fades its outline for its filled container and fades the
+checkmark in; a radio cross-fades its ring colour and grows the dot out of the
+centre; a filter chip grows its checkmark into the space being made for it.
+
+Two things fall out of the architecture there. **Palette tokens cannot be
+interpolated** — they are resolved in the shader against the palette buffer, so
+a colour cross-fade is two boxes at complementary alpha, not one lerp. And a
+**filter chip's transition changes its width**, so it is the second widget to
+use `invalidates="layout"`; the label and every sibling in the row move with
+it, which is the behaviour M3 describes.
+
 The `Switch` thumb slides and grows on
 timing M3 states directly — "Selection controls have a short duration of 200ms
 with Standard easing" — and **indeterminate progress** now works: omitting

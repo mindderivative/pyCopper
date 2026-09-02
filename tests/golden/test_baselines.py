@@ -1107,3 +1107,62 @@ def test_transitions_baseline(render_scene, assert_golden) -> None:
     clock["t"] = 0.060  # 60ms into a 400ms entrance
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("transitions", np.asarray(engine.canvas.draw()))
+
+
+def test_selection_controls_baseline(render_scene, assert_golden) -> None:
+    """Checkbox, radio and filter chip: off, mid-transition, and on.
+
+    The middle column is sampled 40ms into the 200ms transition M3 specifies
+    for selection controls, so the checkbox container is half-filled, the radio
+    dot half-grown, and the chip half-widened around its arriving checkmark.
+    """
+    from pycopper import Signal
+
+    def column(name: str, value: str) -> dict:
+        return {
+            "name": name,
+            "widget": "Column",
+            "style": {"width": 120, "spacing": 14, "cross_alignment": "start"},
+            "children": [
+                {"name": f"{name}_cb", "widget": "Checkbox", "value": value},
+                {"name": f"{name}_rd", "widget": "Radio", "value": value},
+                {
+                    "name": f"{name}_ch",
+                    "widget": "Chip",
+                    "text": "Filter",
+                    "style": {"variant": "filter"},
+                    "value": value,
+                },
+            ],
+        }
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Row",
+            "style": {"background": "surface", "padding": 16, "spacing": 8},
+            "children": [
+                column("off", "false"),
+                column("mid", "{{ flip.get() }}"),
+                column("on", "true"),
+            ],
+        }
+    }
+    flip = Signal(False)
+    _, engine = render_scene(
+        lambda dl: None, width=400, height=150, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(flip=flip)
+    app.attach(engine)
+
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
+    app.mount()
+    app.paint(DisplayList())  # resting frame establishes the animations
+    flip.set(True)
+    app.paint(DisplayList())  # notices the change and starts the transition
+
+    clock["t"] = 0.040  # 40ms into 200ms
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("selection", np.asarray(engine.canvas.draw()))

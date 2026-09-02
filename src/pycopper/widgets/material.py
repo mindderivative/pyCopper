@@ -43,6 +43,12 @@ FOCUS: Final = 0.10
 PRESS: Final = 0.10
 
 
+#: "Selection controls have a short duration of 200ms with Standard easing"
+#: -- M3 states this outright, and it covers the whole family: checkbox, radio,
+#: switch, and the filter chip's checkmark.
+SELECTION_MOTION: Final = "short4"
+SELECTION_CURVE: Final = "standard"
+
 #: State layers cross-fade rather than snapping. **Not sourced** -- M3 gives no
 #: duration for a state layer, and the "begin and end on screen" pair (Standard,
 #: 300ms) is about elements arriving, not an in-place emphasis change. 100ms is
@@ -111,6 +117,7 @@ def _box(
     alpha: float = 1.0,
     border_width: float = 0.0,
     border_token: int | None = None,
+    border_alpha: float = 1.0,
 ) -> None:
     """Emit one token-coloured rounded box in logical coordinates."""
     from ..paint import NO_TOKEN
@@ -126,7 +133,7 @@ def _box(
         radii=(radius * dpr,) * 4,
         border_width=border_width * dpr,
         border_token=NO_TOKEN if border_token is None else border_token,
-        border_color=(1.0, 1.0, 1.0, 1.0),
+        border_color=(1.0, 1.0, 1.0, border_alpha),
         clip=ctx.clip,
         clip_radii=ctx.clip_radii,
     )
@@ -301,21 +308,15 @@ class CheckboxElement(_StyledMixin, Padding):
         on_primary = content_token(ctx, self.style, "on_primary")
 
         _emit_state_layer(ctx, self, absolute, primary, (self.RADIUS,) * 4)
-        if selected:
-            _box(ctx, absolute.x, absolute.y, self.BOX, self.BOX, token=primary, radius=self.RADIUS)
-            ctx.text.emit_icon(
-                ctx.display_list,
-                "check",
-                x=absolute.x,
-                y=absolute.y,
-                size=self.BOX,
-                weight=500,
-                pixel_ratio=ctx.pixel_ratio,
-                token=on_primary,
-                clip=ctx.clip,
-                clip_radii=ctx.clip_radii,
-            )
-        else:
+        t = self.animated(
+            "selected",
+            1.0 if selected else 0.0,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
+        )
+        # Empty outline fading out, filled container fading in. Two instances
+        # only while in flight -- at either end one of them is skipped.
+        if t < 1.0:
             _box(
                 ctx,
                 absolute.x,
@@ -327,6 +328,33 @@ class CheckboxElement(_StyledMixin, Padding):
                 alpha=0.0,
                 border_width=2.0,
                 border_token=outline,
+                border_alpha=1.0 - t,
+            )
+        if t > 0.0:
+            _box(
+                ctx,
+                absolute.x,
+                absolute.y,
+                self.BOX,
+                self.BOX,
+                token=primary,
+                radius=self.RADIUS,
+                alpha=t,
+            )
+            # M3 draws the checkmark on; a glyph cannot be drawn progressively,
+            # so it fades -- an approximation, and the honest one available.
+            ctx.text.emit_icon(
+                ctx.display_list,
+                "check",
+                x=absolute.x,
+                y=absolute.y,
+                size=self.BOX,
+                weight=500,
+                pixel_ratio=ctx.pixel_ratio,
+                token=on_primary,
+                color=(1.0, 1.0, 1.0, t),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
             )
 
 
@@ -349,33 +377,47 @@ class RadioElement(_StyledMixin, Padding):
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         selected = self.checked
-        ring = ctx.palette.index(
-            (self.style.background or "primary") if selected else "on_surface_variant"
-        )
+        active = ctx.palette.index(self.style.background or "primary")
+        inactive = ctx.palette.index("on_surface_variant")
+        ring = active if selected else inactive
         _emit_state_layer(ctx, self, absolute, ring, (self.OUTER / 2,) * 4)
-        # A circle is a rounded box with radius = half the side.
-        _box(
-            ctx,
-            absolute.x,
-            absolute.y,
-            self.OUTER,
-            self.OUTER,
-            token=ring,
-            radius=self.OUTER / 2,
-            alpha=0.0,
-            border_width=2.0,
-            border_token=ring,
+
+        t = self.animated(
+            "selected",
+            1.0 if selected else 0.0,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
         )
-        if selected:
-            pad = (self.OUTER - self.INNER) / 2
+        # A circle is a rounded box with radius = half the side. Tokens cannot
+        # be interpolated -- the palette is resolved in the shader -- so the
+        # ring colour is cross-faded by drawing both rings instead.
+        for token, weight in ((inactive, 1.0 - t), (active, t)):
+            if weight > 0.0:
+                _box(
+                    ctx,
+                    absolute.x,
+                    absolute.y,
+                    self.OUTER,
+                    self.OUTER,
+                    token=token,
+                    radius=self.OUTER / 2,
+                    alpha=0.0,
+                    border_width=2.0,
+                    border_token=token,
+                    border_alpha=weight,
+                )
+        # The dot grows out of the centre rather than appearing whole.
+        inner = self.INNER * t
+        if inner > 0.5:
+            pad = (self.OUTER - inner) / 2
             _box(
                 ctx,
                 absolute.x + pad,
                 absolute.y + pad,
-                self.INNER,
-                self.INNER,
-                token=ring,
-                radius=self.INNER / 2,
+                inner,
+                inner,
+                token=active,
+                radius=inner / 2,
             )
 
 
@@ -395,9 +437,8 @@ class SwitchElement(_StyledMixin, Padding):
     TRACK_H: Final = 32.0
     THUMB_OFF: Final = 16.0
     THUMB_ON: Final = 24.0
-    #: "Selection controls have a short duration of 200ms with Standard easing"
-    MOTION: Final = "short4"
-    CURVE: Final = "standard"
+    MOTION: Final = SELECTION_MOTION
+    CURVE: Final = SELECTION_CURVE
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
@@ -472,54 +513,97 @@ class ChipElement(_StyledMixin, Padding):
         self.init_element(spec)
 
     @property
+    def _is_filter(self) -> bool:
+        return self.style.variant == "filter"
+
+    @property
     def _leading(self) -> str:
-        if self.style.variant == "filter" and self.checked:
-            return "check"
-        return ""
+        return "check" if self._is_filter and self.checked else ""
+
+    def _check_progress(self) -> float:
+        """How far the leading checkmark has slid in, 0 to 1.
+
+        This changes the chip's **width**, so it invalidates layout rather than
+        paint -- the label and every sibling in the row move with it, which is
+        the behaviour M3 describes. A chip row is a handful of elements, so the
+        relayout is affordable; see the Carousel (5.16) for the same trade.
+        """
+        if not self._is_filter:
+            return 0.0
+        value: float = self.animated(
+            "selected",
+            1.0 if self.checked else 0.0,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
+            invalidates="layout",
+        )
+        return value
 
     def perform_layout(self, constraints: Constraints) -> Size:
         style = self.style
         label = measure_text(self._text, style.font_size, engine=self.text_engine)
-        width = self.PAD_X * 2 + label.width
-        if self._leading:
-            width += self.ICON + self.GAP
+        width = self.PAD_X * 2 + label.width + (self.ICON + self.GAP) * self._check_progress()
         return self.sized(constraints, style).constrain(Size(width, self.HEIGHT))
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         style = self.style
-        selected = style.variant == "filter" and self.checked
-        container = style.background or ("secondary_container" if selected else "surface")
+        selected = self._is_filter and self.checked
+        t = self._check_progress()
         content = style.color or ("on_secondary_container" if selected else "on_surface_variant")
-        token = ctx.palette.index(container)
         content_tok = ctx.palette.index(content)
 
-        _box(
-            ctx,
-            absolute.x,
-            absolute.y,
-            self.size.width,
-            self.size.height,
-            token=token,
-            radius=self.RADIUS,
-            border_width=0.0 if selected else 1.0,
-            border_token=ctx.palette.index("outline_variant"),
-        )
+        containers: tuple[tuple[int, float], ...]
+        if style.background:
+            containers = ((ctx.palette.index(style.background), 1.0),)
+        else:
+            # Cross-fade the container the same way as the Radio's ring: the
+            # palette is resolved in the shader, so two boxes, not one lerp.
+            containers = (
+                (ctx.palette.index("surface"), 1.0 - t),
+                (ctx.palette.index("secondary_container"), t),
+            )
+        for token, weight in containers:
+            if weight <= 0.0:
+                continue
+            # The outline belongs to the unselected chip and fades with it. The
+            # width must drop to zero as well, not just the alpha: the shader
+            # insets the fill by the border width, so a fully transparent 1dp
+            # border would leave a transparent ring where the fill should reach.
+            border_alpha = (1.0 - t) * weight
+            _box(
+                ctx,
+                absolute.x,
+                absolute.y,
+                self.size.width,
+                self.size.height,
+                token=token,
+                radius=self.RADIUS,
+                alpha=weight,
+                border_width=1.0 if border_alpha > 0.0 else 0.0,
+                border_token=ctx.palette.index("outline_variant"),
+                border_alpha=border_alpha,
+            )
         _emit_state_layer(ctx, self, absolute, content_tok, (self.RADIUS,) * 4)
 
         x = absolute.x + self.PAD_X
-        if self._leading:
+        if t > 0.0:
+            # The checkmark grows into the space being made for it. Drawn at
+            # full size it would overlap the label, which has only travelled a
+            # fraction of the way -- visible as "check-Filter" mid-transition.
+            icon = self.ICON * t
             ctx.text.emit_icon(
                 ctx.display_list,
-                self._leading,
+                "check",
                 x=x,
-                y=absolute.y + (self.HEIGHT - self.ICON) / 2,
-                size=self.ICON,
+                y=absolute.y + (self.HEIGHT - icon) / 2,
+                size=icon,
                 pixel_ratio=ctx.pixel_ratio,
                 token=content_tok,
+                color=(1.0, 1.0, 1.0, t),
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
-            x += self.ICON + self.GAP
+            x += (self.ICON + self.GAP) * t
         if self._text.strip():
             label = measure_text(self._text, style.font_size, engine=self.text_engine)
             paint_text(
