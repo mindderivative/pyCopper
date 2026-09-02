@@ -681,6 +681,45 @@ the GPU — does not apply here: an idle pyCopper application renders no frames 
 all (§5.10), so there is no loop to burn anything. Set it True on a platform
 where the resize path behaves and tearing matters more.
 
+**What remains, and where it lives.** With every frame drawn, a live resize on
+KDE Plasma runs at several hundred redraws a second with no stall, and the
+window still trails the pointer slightly. That residue is measured rather than
+assumed. A resize frame is ~1.94 ms, split roughly half to pyCopper and half to
+the platform:
+
+| stage | median | share |
+|---|---|---|
+| layout | 0.34 ms | 27% |
+| paint | 0.58 ms | 32% |
+| upload | 0.01 ms | 1% |
+| acquire (`get_current_texture`) | 0.48 ms | 33% |
+| submit | 0.10 ms | 7% |
+
+pyCopper's half is not waste: during a resize about half the element tree is
+still spliced from its paint cache, no element is left spuriously dirty, and
+the ones that rebuild are exactly those whose width changed.
+
+**`acquire` is the swapchain rebuild**, and that was worth testing rather than
+assuming — splitting it by whether the size actually changed gives a **12×
+difference**: 0.476 ms median across 2346 rebuild frames against 0.039 ms
+across 24 that reused the swapchain. wgpu reconfigures the surface whenever the
+size differs, so during a drag it tears down and recreates the
+`VkSwapchainKHR` on every pixel.
+
+Amortising that would cut ~23% from the frame, which at ~385 configures a
+second is roughly a halving of the queueing component of the lag. It cannot be
+done from here. wgpu decides to reconfigure by comparing the canvas's physical
+size against the configured one, and that size arrives from GLFW through
+rendercanvas; pyCopper supplies only a draw callback and has no seam at which
+to hold a stale swapchain. Rounding the swapchain up to a coarse multiple *is*
+possible on Wayland in principle — commit an oversized buffer and declare a
+smaller `xdg_surface.set_window_geometry`, which is how client-side shadows
+work — but GLFW owns the `xdg_surface`, and neither rendercanvas nor wgpu
+exposes window geometry or `wp_viewporter` cropping. `set_scissor_rect` does
+not substitute: the swapchain image *is* the window's buffer, so an oversized
+one is displayed oversized. This is an upstream limitation, recorded here with
+the numbers that would support raising it.
+
 **The diagnosis took four wrong turns**, each from reasoning past the data
 rather than measuring the next thing: blaming the frame cost (it was 2 ms),
 blaming vsync alone (throttled-and-vsync-off was still 12/s), concluding the
