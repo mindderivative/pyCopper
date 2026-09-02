@@ -189,7 +189,7 @@ positional and assigned by the loader — never author one. `name` is optional,
 unique, and the handle for `find()`, `anchor:`, and a selection `value:`; it is
 also the reconciliation key, so a named node keeps its state across a reorder
 and an unnamed one keeps state by *position*. `classes` is optional and
-repeatable, reserved for the coming theme engine. Only name what something
+repeatable, and selected on by the stylesheet (`styles:`). Only name what something
 references; a handler names a *function*, not the node, so a button with an
 `on_click` needs no name. Names must be unique within a view and the
 loader enforces it. See ARCHITECTURE.md §5.1.0.
@@ -276,6 +276,13 @@ than guessing, since M3 states many of them directly. Use `repeat=True` with
 that does, and it is affordable there only because a carousel holds a handful
 of items; the same choice in a `ScrollView` would relayout a thousand rows a
 frame.
+
+**Stylesheets exist.** A `styles:` list selects on widget kind, `classes:` and
+`name:`, and is folded into each node's `StyleSpec` at load. A new widget needs
+no work to participate -- it reads `style` as usual. Do remember that a
+stylesheet value counts as **explicitly set**, so if your widget distinguishes
+an authored value from a field default via `model_fields_set`, a sheet will
+(correctly) win.
 
 **Disabled state exists** and is handled centrally: `disabled:` is a templated
 node field, it is inherited by children, and the M3 recolour (container

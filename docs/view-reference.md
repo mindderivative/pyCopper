@@ -40,7 +40,7 @@ Every node accepts these. Only `widget` is required.
 |---|---|---|
 | `widget` | enum | Which widget. An unknown name fails at load. |
 | `name` | string | Optional, **unique** handle. Used by `find()`, `anchor:`, and reconciliation. |
-| `classes` | string or list | Optional, repeatable categories. Reserved for the theme engine. |
+| `classes` | string or list | Optional, repeatable categories. Selected on by [stylesheets](#stylesheets). |
 | `id` | — | **Assigned by the loader.** Never author one. |
 | `style` | mapping | See [Style properties](#style-properties). |
 | `text` | string | Label, or an icon name for `Icon`/`IconButton`/`Fab`. |
@@ -202,6 +202,58 @@ Most components know where they belong: `BottomSheet` and `Snackbar` default to
 implies `placement: anchor`. Declaration order is z-order.
 
 ---
+
+## Stylesheets
+
+`styles:` is a list of rules applied to every node before the interface is
+built. It is what `classes:` exists for.
+
+```yaml
+styles:
+  - style: {corner_radius: 12}                      # baseline: everything
+  - widget: Button
+    style: {height: 44, width: 150}
+  - classes: danger
+    style: {background: error, color: on_error}
+  - name: confirm
+    style: {width: 220}
+
+root:
+  widget: Column
+  children:
+    - {name: save,    widget: Button, text: Save}
+    - {name: confirm, widget: Button, classes: danger, text: Confirm}
+```
+
+A rule matches on any combination of `widget:`, `classes:` (**all** listed
+classes must be present), and `name:`. A rule with no selector matches
+everything, which is how you set a baseline.
+
+### Precedence
+
+Lowest to highest:
+
+1. rules with no selector
+2. `widget:` rules
+3. `classes:` rules — more classes beat fewer
+4. `name:` rules
+5. the node's own inline `style:`
+
+Ties within a level go to document order, later winning — the same rule CSS
+uses. **Rules merge rather than replace:** each contributes only the properties
+it actually sets, so a `widget:` rule setting `height` and a `classes:` rule
+setting `background` both apply.
+
+### What it costs
+
+Nothing per frame. Rules are folded into each node's style once, at load, so
+layout and paint read `style` exactly as they do for a hand-written one.
+Changing a stylesheet is a reload, which hot reload already handles — and
+because reloading reconciles rather than replaces, restyling a running
+application keeps focus, scroll, and text.
+
+Selectors are structured rather than CSS-like strings, deliberately: a `#name`
+selector would need quoting in every rule, because YAML reads `#` as a comment.
 
 ## Disabled controls
 
@@ -409,10 +461,10 @@ Stated plainly so you can design around it:
   content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
   make timed transitions arrive at once — it does not affect app-bar collapse
   or carousel parallax, which follow a position rather than a clock.
-- **A theme engine / stylesheet.** `classes` is a reserved selector target with
-  no consumer yet.
 - **The M3 type scale as named roles.** Widgets take a raw `font_size`;
   `label-large` and friends are not modelled.
+- **Tonal elevation.** M3 elevation is a tonal surface shift *plus* a shadow;
+  only the shadow is modelled.
 - **Drag gestures.** A bottom sheet's drag handle and a scrollbar's thumb are
   drawn but do not respond to a drag; both are affordances for a gesture that
   is not wired to the pointer yet.

@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from .include import IncludeError, resolve_includes
 from .models import ViewSpec, WidgetSpec
+from .stylesheet import apply_stylesheet
 
 __all__ = ["SpecError", "assign_ids", "load_view", "parse_view"]
 
@@ -87,7 +88,7 @@ def parse_view(data: Any, *, origin: str = "<string>") -> ViewSpec:
     except ValidationError as exc:
         raise SpecError(_format(exc, origin)) from exc
     _check_unique_names(view, origin)
-    return view
+    return apply_stylesheet(view)
 
 
 def load_view(path: str | Path, *, sources: set[Path] | None = None) -> ViewSpec:

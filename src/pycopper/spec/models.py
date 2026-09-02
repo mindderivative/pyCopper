@@ -395,6 +395,42 @@ class WidgetSpec(_Frozen):
             yield from child.walk()
 
 
+class StyleRule(_Frozen):
+    """One stylesheet rule: what it matches, and what it sets.
+
+    Selectors are structured rather than a CSS-like string. A string grammar
+    would need `#name`, which YAML reads as a comment unless quoted -- a
+    papercut on every rule -- and this form validates with a path to the
+    offending field like every other part of the format.
+
+    A rule with no selector at all matches everything, which is how you set a
+    baseline.
+    """
+
+    #: Match a widget kind, e.g. `Button`.
+    widget: WidgetKind | None = None
+    #: Match nodes carrying **all** of these classes.
+    classes: Classes = ()
+    #: Match one node by name.
+    name: Identifier | None = None
+    #: What to apply. Only fields set here are applied; the rest are not
+    #: defaults being imposed, they are simply absent from the rule.
+    style: StyleSpec = StyleSpec()
+
+    @property
+    def specificity(self) -> tuple[int, int, int]:
+        """CSS's ordering: a name beats any number of classes, which beat a
+        kind. Ties are broken by document order, later winning."""
+        return (1 if self.name else 0, len(self.classes), 1 if self.widget else 0)
+
+    def matches(self, node: WidgetSpec) -> bool:
+        if self.name is not None and node.name != self.name:
+            return False
+        if self.widget is not None and node.widget != self.widget:
+            return False
+        return all(c in node.classes for c in self.classes)
+
+
 class ViewSpec(_Frozen):
     """A whole view file: a schema version plus one root widget."""
 
@@ -404,6 +440,9 @@ class ViewSpec(_Frozen):
     #: not laid out or clipped by whatever opened it, so declaring it as a
     #: child would be a lie about the geometry.
     overlays: tuple[WidgetSpec, ...] = ()
+    #: Stylesheet rules, applied to every node before the element tree is
+    #: built. Resolution happens once at load, so nothing is paid per frame.
+    styles: tuple[StyleRule, ...] = ()
 
     @field_validator("version")
     @classmethod

@@ -100,6 +100,10 @@ versioning and pinned by a test; adding to it is a minor release, changing or
 removing anything in it is a major one. (1.1 is that rule in action: motion
 added four names and nothing else moved.)
 
+**Stylesheets are built.** A `styles:` list selects on widget kind, `classes:`,
+and `name:`, with CSS-like precedence, resolved once at load so nothing is paid
+per frame.
+
 **Motion is built.** M3 easing curves and duration tokens, an injectable clock,
 and a `reduce_motion` setting. It drives overlay fades, state layers, every
 selection control, tab and navigation indicators, indeterminate progress, the
@@ -109,7 +113,6 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 
 | Absent | Consequence |
 |---|---|
-| Theme engine and stylesheet | `classes` is a reserved selector target with no consumer |
 | Drag gestures | A bottom sheet's handle and a scrollbar's thumb are drawn but inert |
 | M3 type scale as named roles | Widgets take a raw `font_size` |
 | Separate hit and paint rects | M3's 48dp minimum touch target cannot be expressed — deliberate, as pyCopper is pointer-only |

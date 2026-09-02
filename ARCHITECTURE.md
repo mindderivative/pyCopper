@@ -758,9 +758,10 @@ positional ids in the message (`duplicate name 'badge' (used at /6/1/ and
 `Container` both named `badge`. At load it is a one-line fix; at runtime it
 looks like a widget mysteriously ignoring its handler.
 
-`classes` has no consumer yet — the theme engine and stylesheet are future work.
-It is in the format now deliberately, because retrofitting a selector target
-into a shipped view language is far more expensive than reserving it.
+`classes` was added before it had a consumer, deliberately: retrofitting a
+selector target into a shipped view language costs far more than reserving one.
+The stylesheet (§5.17.1) is that consumer, and it landed without changing the
+identity model at all — which is the argument for having reserved it.
 
 ### 5.1.1 View composition — `spec/include.py`
 
@@ -1240,6 +1241,48 @@ content — and M3 carousel items hold images, so the item's label was drawn
 underneath the very content it captions and was invisible in every realistic
 use. `ElementMixin.paint_foreground` runs after the children and **inside the
 cached range**, so a clean subtree still splices correctly.
+
+### 5.17.1 Stylesheets — `spec/stylesheet.py`
+
+`classes` was reserved as a selector target when node identity was split
+(§5.1.0); this is its consumer.
+
+**Resolved once, at load.** A rule's properties are folded into the node's own
+`StyleSpec` before the element tree is built, so layout and paint read `style`
+exactly as they always have and a stylesheet costs **nothing per frame**. The
+alternative — resolving selectors during paint — would put a matching pass on
+the hot path in the one language where that is least affordable (§12).
+
+The merge rests on Pydantic's `model_fields_set`, the same mechanism that lets
+a component distinguish an authored `placement:` from the field default
+(§5.13.1). Only fields a rule actually wrote are applied. Without it every rule
+would impose the full set of `StyleSpec` defaults, the last match would erase
+every earlier one, and a node's own `style:` could never win — its unset fields
+would be indistinguishable from deliberate values.
+
+That composition matters in both directions: a stylesheet value lands on the
+**explicit** side of `model_fields_set`, so a sheet can override a component's
+own default (`CircularProgress`'s 4dp thickness, `BottomSheet`'s bottom
+placement). A stylesheet is authorial intent, not a fallback.
+
+| Precedence | |
+|---|---|
+| 1 | rules with no selector (a baseline) |
+| 2 | `widget:` |
+| 3 | `classes:` — more classes beat fewer |
+| 4 | `name:` |
+| 5 | the node's own inline `style:` |
+
+Ties go to document order, later winning. Selectors are **structured**, not
+CSS-like strings: `#name` would need quoting in every rule, since YAML reads
+`#` as a comment, and a structured rule validates with a field path like the
+rest of the format.
+
+**Restyling a running application is a reload**, and reload reconciles rather
+than replaces (§5.3) — so changing a stylesheet keeps focus, scroll, and text.
+
+Not yet built: sharing a sheet across files. `source:` composes widget
+fragments (§5.1.1) and the equivalent for `styles:` is the obvious next step.
 
 ### 5.18 Disabled state
 

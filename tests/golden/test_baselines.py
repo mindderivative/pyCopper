@@ -1463,3 +1463,53 @@ def test_disabled_baseline(render_scene, assert_golden) -> None:
     app.mount()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("disabled", np.asarray(engine.canvas.draw()))
+
+
+def test_stylesheet_baseline(render_scene, assert_golden) -> None:
+    """The same three buttons, styled entirely from a sheet.
+
+    Only `classes:` and `name:` appear on the nodes -- every dimension and
+    colour below comes from `styles:`, resolved at load. The third button
+    shows a name selector overriding a class one, and the fourth shows an
+    inline `style:` beating the sheet.
+    """
+    view = {
+        "styles": [
+            {"style": {"corner_radius": 12}},
+            {"widget": "Button", "style": {"height": 44, "width": 150, "variant": "filled"}},
+            {"classes": "danger", "style": {"background": "error", "color": "on_error"}},
+            {
+                "name": "confirm",
+                "style": {"width": 220, "background": "tertiary", "color": "on_tertiary"},
+            },
+        ],
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 12},
+            "children": [
+                {"name": "plain", "widget": "Button", "text": "Plain"},
+                {"name": "danger", "widget": "Button", "classes": "danger", "text": "Delete"},
+                {"name": "confirm", "widget": "Button", "classes": "danger", "text": "Confirm"},
+                {
+                    "name": "inline",
+                    "widget": "Button",
+                    "classes": "danger",
+                    "text": "Inline",
+                    "style": {
+                        "width": 110,
+                        "background": "secondary_container",
+                        "color": "on_secondary_container",
+                    },
+                },
+            ],
+        },
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=280, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("stylesheet", np.asarray(engine.canvas.draw()))
