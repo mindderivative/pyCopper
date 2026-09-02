@@ -537,10 +537,10 @@ class TextElement(_StyledMixin, Padding):
     def on_key_down(self, event: Any) -> None:
         if not self.selectable:
             return
+        from ..runtime.events import is_accelerator, modifiers_of
+
         key = str(getattr(event, "key", "")).lower()
-        mods: frozenset[str] = getattr(event, "modifiers", frozenset())
-        control = bool({"ctrl", "control", "meta", "super"} & set(mods))
-        if not control:
+        if not is_accelerator(modifiers_of(event)):
             return
         if key == "a":
             self.select_all()
@@ -684,6 +684,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import navigation as n
     from . import overlays as o
     from . import scroll as sc
+    from . import textfield as tf
 
     return {
         WidgetKind.CARD: m.CardElement,
@@ -716,6 +717,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.SCROLL_VIEW: sc.ScrollViewElement,
         WidgetKind.CAROUSEL: ca.CarouselElement,
         WidgetKind.CAROUSEL_ITEM: ca.CarouselItemElement,
+        WidgetKind.TEXT_FIELD: tf.TextFieldElement,
     }
 
 

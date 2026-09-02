@@ -1564,6 +1564,74 @@ def test_type_scale_baseline(render_scene, assert_golden) -> None:
     assert_golden("type_scale", np.asarray(engine.canvas.draw()))
 
 
+def test_text_field_baseline(render_scene, assert_golden) -> None:
+    """Both M3 variants, in the states that look different.
+
+    Every state here is one a user reaches by clicking or typing, and each is
+    reached the same way rather than by setting a flag: the third field is
+    focused through the dispatcher, so the frame shows what focus actually
+    paints -- a 2dp indicator, a floated label in `primary`, and a caret.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 12},
+            "children": [
+                {
+                    "name": "empty",
+                    "widget": "TextField",
+                    "text": "Empty, label at rest",
+                    "style": {"width": 288},
+                },
+                {
+                    "name": "filled",
+                    "widget": "TextField",
+                    "text": "Name",
+                    "value": "Ada Lovelace",
+                    "supporting_text": "As it appears on your card",
+                    "style": {"width": 288},
+                },
+                {
+                    "name": "focused",
+                    "widget": "TextField",
+                    "text": "Focused",
+                    "value": "with a caret",
+                    "style": {"width": 288},
+                },
+                {
+                    "name": "outlined",
+                    "widget": "TextField",
+                    "text": "Outlined",
+                    "value": "notched label",
+                    "style": {"width": 288, "variant": "outlined"},
+                },
+                {
+                    "name": "wrong",
+                    "widget": "TextField",
+                    "text": "Email",
+                    "value": "not-an-address",
+                    "supporting_text": "Enter a valid address",
+                    "error": "true",
+                    "style": {"width": 288},
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=400, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.dispatcher.focus(app.root.find("focused"))
+    # The caret blinks, so pin it: with the ticker never advanced the repeating
+    # animation sits at zero, which is the visible half of the cycle.
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("text_field", np.asarray(engine.canvas.draw()))
+
+
 def test_elevation_baseline(render_scene, assert_golden) -> None:
     """The six M3 elevation levels, on a light theme.
 

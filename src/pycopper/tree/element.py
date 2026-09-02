@@ -149,6 +149,8 @@ class ElementMixin:
     _open: str
     _disabled_template: Template | None
     _disabled: str
+    _error_template: Template | None
+    _error: str
     _cached: np.ndarray | None
     _cached_origin: Offset | None
     _needs_paint: bool
@@ -176,6 +178,8 @@ class ElementMixin:
         self._open = spec.open or ""
         self._disabled_template = spec.disabled_template()
         self._disabled = spec.disabled or ""
+        self._error_template = spec.error_template()
+        self._error = spec.error or ""
         self._cached = None
         self._cached_origin = None
         self._needs_paint = True
@@ -207,6 +211,14 @@ class ElementMixin:
         self._open_template = spec.open_template()
         if self._open_template is None or self._open_template.is_static:
             self._open = spec.open or ""
+        # `disabled:` was missing here: a reload that changed it updated the
+        # spec and kept the old value, because only `init_element` read it.
+        self._disabled_template = spec.disabled_template()
+        if self._disabled_template is None or self._disabled_template.is_static:
+            self._disabled = spec.disabled or ""
+        self._error_template = spec.error_template()
+        if self._error_template is None or self._error_template.is_static:
+            self._error = spec.error or ""
         self.configure()
         self.mark_needs_layout()
 
@@ -342,6 +354,11 @@ class ElementMixin:
         return self._disabled.strip().lower() in ("true", "1", "yes")
 
     @property
+    def in_error(self) -> bool:
+        """Whether this control is showing an error. Only `TextField` paints it."""
+        return self._error.strip().lower() in ("true", "1", "yes")
+
+    @property
     def _ancestor_disabled(self) -> bool:
         node = self.parent
         while node is not None:
@@ -441,6 +458,7 @@ class ElementMixin:
                 ("_supporting", self._supporting_template),
                 ("_open", self._open_template),
                 ("_disabled", self._disabled_template),
+                ("_error", self._error_template),
             )
             if tpl is not None and not tpl.is_static
         ]

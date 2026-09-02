@@ -47,6 +47,7 @@ from .overlays import (
     TooltipElement,
 )
 from .scroll import ScrollViewElement
+from .textfield import TextFieldElement
 
 __all__ = [
     "BadgeElement",
@@ -85,6 +86,7 @@ __all__ = [
     "TabElement",
     "TabsElement",
     "TextElement",
+    "TextFieldElement",
     "TooltipElement",
     "TopAppBarElement",
     "build_element",

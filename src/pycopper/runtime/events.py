@@ -51,6 +51,9 @@ class EventType(StrEnum):
     TEXT = "text"
     FOCUS = "focus"
     BLUR = "blur"
+    #: A control's value settled on something new. Posted by the widget, not
+    #: by the canvas -- a text field is the only source so far.
+    CHANGE = "change"
 
 
 class Phase(Enum):
@@ -120,6 +123,50 @@ class KeyEvent(Event):
     modifiers: frozenset[str] = field(default_factory=frozenset)
 
 
+@dataclass(slots=True)
+class ChangeEvent(Event):
+    """A control's value settled on something new. Carries the new value, so a
+    handler does not have to reach back into the widget to find out what it is."""
+
+    value: str = ""
+
+
+#: Modifier spellings, folded to one vocabulary. `rendercanvas` reports GLFW's
+#: names -- "Control", "Shift", "Alt", "Meta" -- while hand-written events and
+#: other backends use their own. Matching a raw string against one spelling is
+#: how Shift+Tab and Ctrl+A came to be dead in a real window while their tests
+#: passed: the tests posted "shift" and "ctrl", and GLFW never sends either.
+_MODIFIER_NAMES = {
+    "control": "ctrl",
+    "ctrl": "ctrl",
+    "meta": "meta",
+    "super": "meta",
+    "cmd": "meta",
+    "command": "meta",
+    "os": "meta",
+    "shift": "shift",
+    "alt": "alt",
+    "option": "alt",
+    "altgraph": "alt",
+}
+
+
+def modifiers_of(event: Any) -> frozenset[str]:
+    """An event's modifiers as lower-case canonical names."""
+    raw = getattr(event, "modifiers", ()) or ()
+    return frozenset(_MODIFIER_NAMES.get(str(name).lower(), str(name).lower()) for name in raw)
+
+
+def is_accelerator(mods: frozenset[str]) -> bool:
+    """Whether the platform's shortcut modifier is held.
+
+    Ctrl or Meta, without distinguishing them: pyCopper does not branch on
+    platform anywhere else, and a Mac user pressing Cmd+C means the same thing
+    a Linux user pressing Ctrl+C does.
+    """
+    return "ctrl" in mods or "meta" in mods
+
+
 #: Event type -> the handler key a view file uses.
 HANDLER_KEYS = {
     EventType.POINTER_DOWN: "on_pointer_down",
@@ -134,6 +181,7 @@ HANDLER_KEYS = {
     EventType.TEXT: "on_text",
     EventType.FOCUS: "on_focus",
     EventType.BLUR: "on_blur",
+    EventType.CHANGE: "on_change",
 }
 
 
@@ -153,6 +201,7 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "Tab",
         "Segment",
         "ListItem",
+        "TextField",
     }
 )
 
@@ -375,7 +424,7 @@ class EventDispatcher:
         # nothing is focused yet, which is the state an app starts in.
         if isinstance(event, KeyEvent) and event.type is EventType.KEY_DOWN:
             if event.key in ("Tab", "tab"):
-                self.focus_next(backwards="shift" in event.modifiers)
+                self.focus_next(backwards="shift" in modifiers_of(event))
                 return
             if event.key in ("Escape", "escape"):
                 # Escape closes the topmost overlay before it clears focus.

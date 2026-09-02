@@ -221,11 +221,16 @@ binding; `placement` is `center`, `anchor` (with `anchor: <id>`), or an edge;
 and the selection controls are `Padding`-based and take one child — wrap
 several in a Row or Column.
 
-**Widgets today (27 kinds):** primitives — Container, Row, Column, Stack,
-Spacer, Text, Icon. M3 components — Button (5 variants), Card, Divider,
-Checkbox, Radio, Switch, Chip, IconButton, Fab, Badge, NavigationRail,
-NavigationDrawer, NavItem, TopAppBar, Tabs, Tab, SegmentedButton, Segment,
-ListItem, LinearProgress.
+**Widgets today (39 kinds):** primitives — Container, Row, Column, Stack,
+Spacer, Text, Icon, ScrollView. M3 components — Button (5 variants), Card,
+Divider, Checkbox, Radio, Switch, Chip, IconButton, Fab, Badge,
+NavigationRail, NavigationDrawer, NavItem, TopAppBar, Tabs, Tab,
+SegmentedButton, Segment, ListItem, LinearProgress, CircularProgress,
+Carousel, CarouselItem, **TextField**. Overlays — Dialog, Menu, MenuItem,
+Tooltip, Snackbar, BottomSheet, SideSheet.
+
+`TextField` is the only one that owns state rather than reading it; its rules
+live in `text/editing.py`, deliberately apart from the widget.
 
 **A container of items where one is selected** — rail, drawer, tabs, segmented
 — subclasses `_SelectionContainer` in `widgets/navigation.py`. The container
@@ -385,5 +390,9 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
   Arabic or Hebrew glyphs, and selection across a direction boundary is
   unimplemented -- the highlight is contiguous in character order, which is not
   what a bidi caret should do (risk R9).
-- **Editable text.** Text can be selected and copied, not typed into.
+- **Multi-line text entry and IME preedit.** `TextField` exists and is a full
+  single-line editor -- caret, selection, word motion, undo, cut/copy/paste --
+  but it does not wrap, and it takes committed characters only, so a composing
+  input method is unsupported. Editing rules live in `text/editing.py`, apart
+  from the widget and testable without a window; put new ones there.
 

@@ -48,6 +48,7 @@ Every node accepts these. Only `widget` is required.
 | `supporting_text` | string | Second line, trailing text, or action label, per widget. |
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
+| `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
 | `handlers` | mapping | `on_*` keys to handler names registered in Python. |
 | `children` | list | Child nodes. |
 
@@ -118,7 +119,11 @@ def save(event) -> None: ...
 
 Available keys: `on_click`, `on_context_menu`, `on_pointer_down`,
 `on_pointer_up`, `on_pointer_move`, `on_pointer_enter`, `on_pointer_leave`,
-`on_wheel`, `on_key_down`, `on_text`, `on_focus`, `on_blur`.
+`on_wheel`, `on_key_down`, `on_text`, `on_focus`, `on_blur`, `on_change`.
+
+`on_change` is the odd one: it is posted by a widget rather than by the window,
+and its event carries `event.value` — the new text — so a handler does not have
+to reach back into the field to find out what it is.
 
 An unknown handler name fails at mount, not at the first click.
 
@@ -425,6 +430,58 @@ Three things worth knowing:
   `SegmentedButton` — clips their targets too. A control scrolled just past the
   edge does not take clicks it cannot visibly respond to.
 
+## Text fields
+
+The only widget that takes typing.
+
+```yaml
+- name: email
+  widget: TextField
+  text: "Email"                     # the label
+  value: "{{ email.get() }}"        # the content
+  supporting_text: "We never share it"
+  error: "{{ not valid.get() }}"
+  style: {variant: outlined, width: 320}
+  handlers: {on_change: set_email}
+```
+
+`text:` is the label, `value:` is the content and `supporting_text:` is the
+line beneath — the same three fields every other widget already has, rather
+than a `label:` invented for one component. Binding `value:` makes the field
+controlled: the application can put text into it at any point, and each edit
+fires `on_change` with the new value.
+
+The label "floats upward to 12sp typography scale when focused or populated" —
+M3's words, and the reason it animates between `body-large` and `body-small`
+rather than between two chosen numbers. `variant: filled` (the default) has a
+1dp bottom indicator that thickens to 2dp on focus; `variant: outlined` has a
+border that does the same.
+
+**What the keyboard does:**
+
+| Keys | Effect |
+|---|---|
+| Arrows | Move by grapheme cluster; Home / End go to the ends |
+| Ctrl+arrows | Move by word |
+| Shift+anything | Extend the selection instead of moving |
+| Backspace / Delete | Remove the selection, or one cluster; Ctrl to take a word |
+| Ctrl+A / C / X / V | Select all, copy, cut, paste |
+| Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y | Undo and redo |
+
+A run of typing is **one undo step**. The run breaks when the caret moves, when
+a selection is replaced, or when a deletion intervenes — the three rules a text
+editor uses, so undo takes back a word rather than a letter.
+
+Editing is by **grapheme cluster** throughout: backspace removes an accented
+character rather than its accent, and the caret never lands inside a flag
+emoji. Word boundaries are whitespace-delimited, not UAX #29 — the same rule
+double-click uses, so the two always agree.
+
+A field is one line. Text longer than the box scrolls sideways to follow the
+caret and scrolls back rather than leaving empty space when you delete. There
+is no multi-line field, and the clipboard is the in-process one described under
+[Text selection](#text-selection).
+
 ## Text selection
 
 A `Text` widget with `selectable: true` can be selected with the mouse:
@@ -473,8 +530,8 @@ clipboard.install(SystemClipboard())
 
 ### What is not implemented
 
-- **Editable text.** This is selection, not a text field: no caret blink, no
-  insertion, no undo.
+- **Editing.** This is selection on a `Text`, which is read-only. For typing,
+  use [`TextField`](#text-fields).
 - **Selection across widgets.** A drag selects within one `Text`.
 - **Bidirectional text.** Selecting across a left-to-right / right-to-left
   boundary is not handled; the highlight is contiguous in character order,
@@ -619,6 +676,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | `Stack` | Overlays children; positioned with `align_x` / `align_y`. |
 | `Spacer` | Empty space. `width: expand` pushes siblings apart. |
 | `ScrollView` | A clipped viewport. **Must** have a bounded size on its scroll axis. |
+| `TextField` | The editable one. 56dp, `filled` or `outlined`. See [Text fields](#text-fields). |
 
 Inside a `Row` or `Column`, a child with `width: expand` (or `flex`) on the main
 axis shares the free space; anything else is measured first and takes what it
@@ -797,8 +855,10 @@ Stated plainly so you can design around it:
   content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
   make timed transitions arrive at once — it does not affect app-bar collapse
   or carousel parallax, which follow a position rather than a clock.
-- **Editable text.** Text can be selected and copied, not typed into: no
-  caret blink, no insertion, no undo. A text field is its own piece of work.
+- **Multi-line text entry.** A `TextField` is one line: it scrolls sideways
+  rather than wrapping, and Enter does nothing.
+- **IME preedit.** Committed characters only, so an input method that composes
+  before committing — CJK, in practice — is not supported.
 - **A system clipboard.** Copying is in-process with a documented seam for a
   real one — see [Text selection](#text-selection).
 - **The 48dp minimum touch target by default.** A pointer is pixel-precise, so

@@ -639,7 +639,53 @@ Events arrive from `rendercanvas` callbacks and are pushed onto a queue drained 
 
 The path is **the target followed by its ancestors**, not everything under the cursor. An occluded sibling that also contains the point is absent from it and receives nothing, which is the whole point of respecting paint order.
 
-#### 5.9.1 Hit rects are not paint rects
+#### 5.9.1 Editable text — `text/editing.py`, `widgets/textfield.py`
+
+`TextField` is the only widget that *owns* state rather than reading it, which
+is why the split runs where it does. **`text/editing.py` holds every rule and
+knows nothing about pixels**: what a backspace removes, where a word ends, when
+two keystrokes are one undo step. All of it is testable without a window, a
+font, or a GPU, and a test that had to open a canvas to check Ctrl-Backspace is
+a test nobody runs.
+
+An `EditState` is frozen — text, anchor, focus — so an operation returns a new
+one and **the undo stack is a list of states, not a list of inverse
+operations**. At the sizes a field holds that is cheaper as well as simpler: no
+operation needs an inverse, and no inverse can be subtly wrong. Anchor and
+focus rather than start and length, so shift-arrow knows which end to move and
+a backwards selection is representable instead of normalised away.
+
+Every offset sits on a **grapheme cluster** boundary, reusing the segmenter
+selection already went through. Backspace removes an accented character rather
+than its accent. Word boundaries are the whitespace rule `selection.word_at`
+uses, not UAX #29 — asserted equal to it in a test, because double-clicking a
+word and then Ctrl-Backspacing it taking different amounts of text would be a
+genuinely baffling bug.
+
+Typing coalesces into one undo step, broken by a caret move, a replaced
+selection, or a different kind of edit. A bound `value:` changing from the
+application clears the history instead of recording a step: that text did not
+come from the user, so offering to undo back to what they typed would restore
+something the application has already moved past.
+
+The widget half is the parts that need pixels. Its vertical layout is the
+sourced M3 figures tiling the container exactly — 8dp padding, a 16dp floated
+label line, a 24dp input line, 8dp padding, summing to the specified 56dp — and
+a test asserts the sum so that changing one figure cannot silently decentre the
+input. The label animates between `body-large` and `body-small` off one
+animation value, so it cannot be caught half-floated in size and settled in
+position. A field is one line and scrolls sideways to follow the caret, and
+back rather than leaving empty space when text is deleted.
+
+Two things it does not do. The **outlined** variant cannot notch its border,
+because the shader draws no notch: the floating label gets a `surface`-coloured
+patch behind it instead, which is wrong if the field sits on a tinted
+container, and is stated at the call site rather than hidden. And the caret
+**stops blinking under `reduce_motion`** rather than blinking on — the setting
+makes timed transitions arrive at once everywhere else, and the equivalent for
+something that never arrives is to stop it moving.
+
+### 5.9.2 Hit rects are not paint rects
 
 A control may accept clicks in an area larger than the one it draws. Two style
 properties say so: `hit_padding` grows each edge, and `min_hit_size` states a
@@ -690,7 +736,9 @@ Dispatch follows a **capture → target → bubble** path over that hit path, wi
 - **Pointer capture** — a widget may capture the pointer on press so drags continue outside its bounds.
 - **Enter/leave** — computed by diffing the current hit path against the previous one.
 - **Focus tree** — a tab-order traversal derived from document order, with `Tab`/`Shift-Tab` and focus-visible state.
-- **Text input** — GLFW `char` callbacks for committed text. IME preedit is a known gap (§13).
+- **Text input** — GLFW `char` callbacks for committed text, delivered as `EventType.TEXT` to the focused element. IME preedit is a known gap (§13).
+
+**Modifier names are normalised on arrival.** `rendercanvas` reports GLFW's spellings — `"Control"`, `"Shift"`, `"Alt"`, `"Meta"` — and matching a raw string against one spelling is how Shift+Tab back-traversal and `Text`'s Ctrl+A both came to be dead in a running window while their tests passed: the tests posted `"shift"` and `"ctrl"`, which GLFW never sends. `modifiers_of()` folds every spelling to one vocabulary and `is_accelerator()` answers "is the platform's shortcut key held" without branching on platform. Both bugs were found while wiring the text field, and the tests for it deliberately use GLFW's spellings.
 
 Handlers named in YAML (`on_click: submit_form`) resolve against a registry the application populates by decorator:
 

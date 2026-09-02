@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from .layout import Paragraph, TextLine
 from .segment import cluster_boundaries
 
-__all__ = ["SelectionRect", "index_at", "line_index_at", "rects_for", "word_at"]
+__all__ = ["SelectionRect", "caret_at", "index_at", "line_index_at", "rects_for", "word_at"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +103,38 @@ def _span_x(line: TextLine, para: Paragraph, start: int, end: int) -> tuple[floa
             pen += advance
         char += len(run.text)
     return (left if left is not None else line.x, right)
+
+
+def caret_at(para: Paragraph, offset: int) -> SelectionRect:
+    """Where a caret sitting *before* `offset` belongs, as a zero-width rect.
+
+    The inverse of `index_at`, and it must walk advances the same way that does
+    -- through `ShapedRun.advances_px` -- or clicking would put the caret
+    somewhere the caret then would not draw.
+    """
+    if not para.lines:
+        return SelectionRect(0.0, 0.0, 0.0, 0.0)
+    top = 0.0
+    line = para.lines[0]
+    for candidate in para.lines:
+        if candidate.start <= offset <= candidate.end:
+            line = candidate
+            break
+        top += candidate.height
+    else:
+        line = para.lines[-1]
+        top -= line.height
+
+    pen = line.x
+    char = line.start
+    for run in line.runs:
+        advances = run.advances_px(para.px, para.tracking)
+        for i in range(len(run)):
+            if char + int(run.clusters[i]) >= offset:
+                return SelectionRect(pen, top, 0.0, line.height)
+            pen += float(advances[i])
+        char += len(run.text)
+    return SelectionRect(pen, top, 0.0, line.height)
 
 
 def rects_for(para: Paragraph, start: int, end: int) -> list[SelectionRect]:

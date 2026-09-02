@@ -79,6 +79,7 @@ class WidgetKind(StrEnum):
     BOTTOM_SHEET = "BottomSheet"
     SIDE_SHEET = "SideSheet"
     SCROLL_VIEW = "ScrollView"
+    TEXT_FIELD = "TextField"
 
 
 class SizeSpec:
@@ -445,6 +446,11 @@ class WidgetSpec(_Frozen):
     #: chooses to paint it -- which is why it lives here and not on StyleSpec.
     #: Disabling a container disables everything inside it.
     disabled: str | None = None
+    #: Whether this control is showing an error. Templated like `disabled:`,
+    #: and state for the same reason: M3 gives an errored text field its own
+    #: colours and a view should be able to drive it from validation rather
+    #: than restyle it. Only `TextField` reads it.
+    error: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
     children: tuple[WidgetSpec, ...] = ()
 
@@ -468,6 +474,9 @@ class WidgetSpec(_Frozen):
 
     def disabled_template(self) -> Template | None:
         return Template(self.disabled) if self.disabled is not None else None
+
+    def error_template(self) -> Template | None:
+        return Template(self.error) if self.error is not None else None
 
     def supporting_template(self) -> Template | None:
         return Template(self.supporting_text) if self.supporting_text is not None else None
