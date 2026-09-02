@@ -55,6 +55,28 @@ ICON: Final = 24.0
 #: One full turn, for the circular progress sweep.
 TAU: Final = 2.0 * math.pi
 
+#: An indicator sliding or growing "begins and ends on screen"; M3's suggested
+#: pairs table offers Emphasized/500ms or Standard/300ms for that. The standard
+#: row is the right one: these respond to a click and are repeated freely, and
+#: half a second of emphasis on every tab change would drag.
+INDICATOR_MOTION: Final = "medium2"
+INDICATOR_CURVE: Final = "standard"
+
+#: How finely the icon FILL axis is stepped while animating.
+#:
+#: FILL is a variable-font axis, and the axis coordinates are part of the glyph
+#: atlas key (`render/atlas.py`). The atlas has no per-entry eviction -- when it
+#: fills it resets wholesale and re-rasterises everything -- so animating FILL
+#: continuously would pack a fresh rasterisation every frame and force repeated
+#: resets. Six steps still reads as a transition and bounds the entries per
+#: icon at six.
+ICON_FILL_STEPS: Final = 6
+
+
+def _stepped_fill(t: float) -> float:
+    """Quantise an animated FILL so the atlas sees a bounded set of values."""
+    return round(t * ICON_FILL_STEPS) / ICON_FILL_STEPS
+
 
 class _SelectionContainer(_StyledMixin, Flex):
     """A Flex whose ``value:`` names the selected child by id."""
@@ -131,6 +153,12 @@ class NavItemElement(_StyledMixin, Padding):
         selected = self.selected
         size = self.size
         active_bg = ctx.palette.index("secondary_container")
+        t = self.animated(
+            "selected",
+            1.0 if selected else 0.0,
+            duration=INDICATOR_MOTION,
+            curve=INDICATOR_CURVE,
+        )
         content = content_token(
             ctx,
             self.style,
@@ -139,7 +167,7 @@ class NavItemElement(_StyledMixin, Padding):
         label_text = (self._supporting).strip()
 
         if self._in_drawer:
-            if selected:
+            if t > 0.0:
                 _box(
                     ctx,
                     absolute.x,
@@ -148,6 +176,7 @@ class NavItemElement(_StyledMixin, Padding):
                     size.height,
                     token=active_bg,
                     radius=self.DRAWER_RADIUS,
+                    alpha=t,
                 )
             _emit_state_layer(ctx, self, absolute, content, self.effective_radii)
             x = absolute.x + self.DRAWER_PAD
@@ -158,7 +187,7 @@ class NavItemElement(_StyledMixin, Padding):
                     x=x,
                     y=absolute.y + (size.height - ICON) / 2,
                     size=ICON,
-                    fill=1.0 if selected else 0.0,
+                    fill=_stepped_fill(t),
                     pixel_ratio=ctx.pixel_ratio,
                     token=content,
                     clip=ctx.clip,
@@ -172,17 +201,20 @@ class NavItemElement(_StyledMixin, Padding):
                 )
             return
 
-        # Rail: a 56x32dp indicator pill behind the icon, label beneath.
-        ind_x = absolute.x + (size.width - self.INDICATOR_W) / 2
-        if selected:
+        # Rail: a 56x32dp indicator pill behind the icon, label beneath. It
+        # grows outward from a circle around the icon rather than appearing at
+        # full width, which is how M3 expands it.
+        if t > 0.0:
+            width = self.INDICATOR_H + (self.INDICATOR_W - self.INDICATOR_H) * t
             _box(
                 ctx,
-                ind_x,
+                absolute.x + (size.width - width) / 2,
                 absolute.y,
-                self.INDICATOR_W,
+                width,
                 self.INDICATOR_H,
                 token=active_bg,
                 radius=self.INDICATOR_H / 2,
+                alpha=t,
             )
         _emit_state_layer(ctx, self, absolute, content, self.effective_radii)
         if self._text.strip():
@@ -192,7 +224,7 @@ class NavItemElement(_StyledMixin, Padding):
                 x=absolute.x + (size.width - ICON) / 2,
                 y=absolute.y + (self.INDICATOR_H - ICON) / 2,
                 size=ICON,
-                fill=1.0 if selected else 0.0,
+                fill=_stepped_fill(t),
                 pixel_ratio=ctx.pixel_ratio,
                 token=content,
                 clip=ctx.clip,
@@ -382,11 +414,27 @@ class TabsElement(_SelectionContainer):
             return
         primary = self.style.variant != "secondary"
         y = absolute.y + self.size.height - self.INDICATOR_H
+        # The indicator belongs to the container, not to a tab, which is what
+        # lets it travel between them. Both edges animate, so it stretches and
+        # settles rather than jumping -- and this costs paint only, since the
+        # tabs themselves have not moved.
+        x = self.animated(
+            "indicator_x",
+            active.offset.x,
+            duration=INDICATOR_MOTION,
+            curve=INDICATOR_CURVE,
+        )
+        width = self.animated(
+            "indicator_w",
+            active.size.width,
+            duration=INDICATOR_MOTION,
+            curve=INDICATOR_CURVE,
+        )
         _box(
             ctx,
-            absolute.x + active.offset.x,
+            absolute.x + x,
             y,
-            active.size.width,
+            width,
             self.INDICATOR_H,
             token=ctx.palette.index("primary"),
             radius=self.INDICATOR_H if primary else 0.0,
@@ -408,11 +456,26 @@ class SegmentElement(_StyledMixin, Padding):
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
 
+    def _check_progress(self) -> float:
+        """How far the leading checkmark has arrived, 0 to 1.
+
+        Changes the segment's width, so it invalidates layout -- the label and
+        the neighbouring segments move with it. The same trade as the filter
+        Chip, and affordable for the same reason: a segmented button holds two
+        or three children.
+        """
+        value: float = self.animated(
+            "selected",
+            1.0 if self.selected else 0.0,
+            duration=INDICATOR_MOTION,
+            curve=INDICATOR_CURVE,
+            invalidates="layout",
+        )
+        return value
+
     def perform_layout(self, constraints: Constraints) -> Size:
         label = measure_text(self._text, TAB_LABEL_SIZE, engine=self.text_engine)
-        width = label.width + self.PAD_X * 2
-        if self.selected:
-            width += self.CHECK + self.GAP
+        width = label.width + self.PAD_X * 2 + (self.CHECK + self.GAP) * self._check_progress()
         return self.sized(constraints, self.style).constrain(Size(width, self.HEIGHT))
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
@@ -420,7 +483,8 @@ class SegmentElement(_StyledMixin, Padding):
         token = content_token(
             ctx, self.style, "on_secondary_container" if selected else "on_surface"
         )
-        if selected:
+        t = self._check_progress()
+        if t > 0.0:
             _box(
                 ctx,
                 absolute.x,
@@ -429,23 +493,28 @@ class SegmentElement(_StyledMixin, Padding):
                 self.size.height,
                 token=ctx.palette.index("secondary_container"),
                 radius=0.0,
+                alpha=t,
             )
         _emit_state_layer(ctx, self, absolute, token, (0.0,) * 4)
 
         x = absolute.x + self.PAD_X
-        if selected:
+        if t > 0.0:
+            # Grows into the space being made for it, or it would overlap a
+            # label that has only travelled part of the way.
+            check = self.CHECK * t
             ctx.text.emit_icon(
                 ctx.display_list,
                 "check",
                 x=x,
-                y=absolute.y + (self.size.height - self.CHECK) / 2,
-                size=self.CHECK,
+                y=absolute.y + (self.size.height - check) / 2,
+                size=check,
                 pixel_ratio=ctx.pixel_ratio,
                 token=token,
+                color=(1.0, 1.0, 1.0, t),
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
-            x += self.CHECK + self.GAP
+            x += (self.CHECK + self.GAP) * t
         if self._text.strip():
             label = measure_text(self._text, TAB_LABEL_SIZE, engine=self.text_engine)
             paint_text(

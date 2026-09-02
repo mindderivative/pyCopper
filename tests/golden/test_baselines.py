@@ -1166,3 +1166,97 @@ def test_selection_controls_baseline(render_scene, assert_golden) -> None:
     clock["t"] = 0.040  # 40ms into 200ms
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("selection", np.asarray(engine.canvas.draw()))
+
+
+def test_indicators_baseline(render_scene, assert_golden) -> None:
+    """Tab, rail and segment indicators caught part-way between destinations.
+
+    The tab indicator is the interesting one: it belongs to the container, so
+    it travels between tabs and stretches on the way rather than disappearing
+    from one and reappearing under another. Sampled 80ms into a 300ms move.
+    """
+    from pycopper import Signal
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Row",
+            "style": {"background": "surface", "spacing": 12},
+            "children": [
+                {
+                    "name": "rail",
+                    "widget": "NavigationRail",
+                    "value": "{{ nav.get() }}",
+                    "children": [
+                        {
+                            "name": "n1",
+                            "widget": "NavItem",
+                            "text": "home",
+                            "supporting_text": "Home",
+                        },
+                        {
+                            "name": "n2",
+                            "widget": "NavItem",
+                            "text": "search",
+                            "supporting_text": "Search",
+                        },
+                        {
+                            "name": "n3",
+                            "widget": "NavItem",
+                            "text": "settings",
+                            "supporting_text": "Settings",
+                        },
+                    ],
+                },
+                {
+                    "name": "right",
+                    "widget": "Column",
+                    "style": {"width": "expand", "spacing": 20, "padding": 12},
+                    "children": [
+                        {
+                            "name": "tabs",
+                            "widget": "Tabs",
+                            "value": "{{ tab.get() }}",
+                            "style": {"width": "expand"},
+                            "children": [
+                                {"name": "t1", "widget": "Tab", "text": "One"},
+                                {"name": "t2", "widget": "Tab", "text": "Two"},
+                                {"name": "t3", "widget": "Tab", "text": "Three"},
+                            ],
+                        },
+                        {
+                            "name": "segs",
+                            "widget": "SegmentedButton",
+                            "value": "{{ seg.get() }}",
+                            "children": [
+                                {"name": "s1", "widget": "Segment", "text": "Day"},
+                                {"name": "s2", "widget": "Segment", "text": "Week"},
+                                {"name": "s3", "widget": "Segment", "text": "Month"},
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+    }
+    tab, nav, seg = Signal("t1"), Signal("n1"), Signal("s1")
+    _, engine = render_scene(
+        lambda dl: None, width=460, height=220, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.expose(tab=tab, nav=nav, seg=seg)
+    app.attach(engine)
+
+    clock = {"t": 0.0}
+    app.clock = lambda: clock["t"]
+    app.mount()
+    app.paint(DisplayList())  # resting frame establishes the animations
+
+    tab.set("t3")
+    nav.set("n3")
+    seg.set("s3")
+    app.paint(DisplayList())  # notices the changes and starts them
+
+    clock["t"] = 0.080  # 80ms into a 300ms move
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("indicators", np.asarray(engine.canvas.draw()))

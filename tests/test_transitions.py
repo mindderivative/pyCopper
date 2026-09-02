@@ -482,3 +482,188 @@ def test_reduce_motion_selects_at_once() -> None:
     for name in ("cb", "rd", "ch"):
         assert app.root.find(name).animation("selected").value == 1.0
     assert not app.motion.active
+
+
+# ----------------------------------------------------- tab / nav indicators
+
+
+def indicator_app(widget: str, value: str, children: list, *, style=None, **settings):
+    signal = Signal(value)
+    app = App(
+        {
+            "root": {
+                "name": "root",
+                "widget": "Column",
+                "style": {"background": "surface"},
+                "children": [
+                    {
+                        "name": "c",
+                        "widget": widget,
+                        "value": "{{ v.get() }}",
+                        "style": {"width": "expand"} if style is None else style,
+                        "children": children,
+                    }
+                ],
+            }
+        },
+        theme=Theme(dark=True),
+        settings=Settings(width=500, height=200, **settings),
+    )
+    clock = Clock()
+    app.expose(v=signal)
+    app.clock = clock
+    app.mount()
+    app.paint(DisplayList())
+    return app, signal, clock
+
+
+TABS = [
+    {"name": "t1", "widget": "Tab", "text": "One"},
+    {"name": "t2", "widget": "Tab", "text": "Two"},
+    {"name": "t3", "widget": "Tab", "text": "Three"},
+]
+NAV = [
+    {"name": "n1", "widget": "NavItem", "text": "home", "supporting_text": "Home"},
+    {"name": "n2", "widget": "NavItem", "text": "search", "supporting_text": "Search"},
+]
+SEGS = [
+    {"name": "s1", "widget": "Segment", "text": "Day"},
+    {"name": "s2", "widget": "Segment", "text": "Week"},
+]
+
+
+def test_the_tab_indicator_travels_between_tabs() -> None:
+    """It belongs to the container, which is what lets it move between them
+    rather than vanishing from one and appearing under another."""
+    app, value, clock = indicator_app("Tabs", "t1", TABS)
+    tabs = app.root.find("c")
+    start = tabs.animation("indicator_x").value
+    assert start == 0.0
+
+    value.set("t3")
+    app.paint(DisplayList())
+    clock.t = 0.05
+    app.paint(DisplayList())
+    midway = tabs.animation("indicator_x").value
+    assert start < midway < app.root.find("t3").offset.x, "the indicator jumped"
+
+    for _ in range(10):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    assert tabs.animation("indicator_x").value == pytest.approx(app.root.find("t3").offset.x)
+    assert not app.motion.active
+
+
+def test_the_tab_indicator_resizes_as_well_as_moves() -> None:
+    """Tabs are label-width, so an indicator that only slid would be the wrong
+    length for its destination."""
+    app, value, clock = indicator_app("Tabs", "t1", TABS)
+    tabs = app.root.find("c")
+    value.set("t3")
+    app.paint(DisplayList())
+    for _ in range(10):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    assert tabs.animation("indicator_w").value == pytest.approx(app.root.find("t3").size.width)
+
+
+def test_the_tab_indicator_costs_paint_only() -> None:
+    """The tabs themselves have not moved, so nothing needs relaying out."""
+    app, value, _clock = indicator_app("Tabs", "t1", TABS)
+    tabs = app.root.find("c")
+    value.set("t3")
+    app.paint(DisplayList())
+    tabs._needs_paint = False
+    app.motion.tick(0.05)
+    assert tabs.needs_paint
+    assert not tabs.needs_layout
+
+
+def test_the_rail_indicator_cross_fades_between_destinations() -> None:
+    app, value, clock = indicator_app("NavigationRail", "n1", NAV)
+    first, second = app.root.find("n1"), app.root.find("n2")
+    assert first.animation("selected").value == 1.0
+    assert second.animation("selected").value == 0.0
+
+    value.set("n2")
+    app.paint(DisplayList())
+    clock.t = 0.05
+    app.paint(DisplayList())
+    assert 0.0 < first.animation("selected").value < 1.0, "the old pill vanished"
+    assert 0.0 < second.animation("selected").value < 1.0, "the new pill appeared whole"
+
+    for _ in range(10):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    assert first.animation("selected").value == pytest.approx(0.0)
+    assert second.animation("selected").value == pytest.approx(1.0)
+
+
+def test_the_animated_icon_fill_is_quantised() -> None:
+    """FILL is part of the glyph atlas key and the atlas has no per-entry
+    eviction, so a continuous value would pack a new rasterisation every frame
+    and force full atlas resets."""
+    from pycopper.widgets.navigation import ICON_FILL_STEPS, _stepped_fill
+
+    seen = {_stepped_fill(i / 500) for i in range(501)}
+    assert len(seen) == ICON_FILL_STEPS + 1
+    assert _stepped_fill(0.0) == 0.0
+    assert _stepped_fill(1.0) == 1.0
+
+
+def test_the_atlas_does_not_grow_across_a_nav_transition() -> None:
+    """The practical consequence of quantising: a transition must not keep
+    packing glyphs."""
+    from pycopper.widgets.navigation import ICON_FILL_STEPS
+
+    app, value, clock = indicator_app("NavigationRail", "n1", NAV)
+    for _ in range(6):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    before = len(app.text.atlas)
+
+    value.set("n2")
+    for _ in range(20):
+        clock.t += 1 / 60
+        app.paint(DisplayList())
+    grown = len(app.text.atlas) - before
+    # At most one rasterisation per step, per icon, for the two items involved.
+    assert grown <= 2 * (ICON_FILL_STEPS + 1), f"the atlas grew by {grown} entries"
+
+
+def test_a_segment_widens_around_its_arriving_checkmark() -> None:
+    # No `width: expand`: a stretched segmented button divides its width
+    # equally among segments, which would hide the very thing being tested.
+    app, value, clock = indicator_app("SegmentedButton", "s1", SEGS, style={})
+    first, second = app.root.find("s1"), app.root.find("s2")
+    wide, narrow = first.size.width, second.size.width
+    assert wide > narrow
+
+    value.set("s2")
+    app.paint(DisplayList())
+    for _ in range(12):
+        clock.t += 0.05
+        app.paint(DisplayList())
+    assert second.size.width > narrow
+    assert first.size.width < wide
+
+
+def test_indicator_transitions_share_one_sourced_timing() -> None:
+    """M3's "Standard | 300ms | Begin and end on screen" row."""
+    from pycopper.motion import DURATION
+    from pycopper.widgets.navigation import INDICATOR_MOTION
+
+    assert DURATION[INDICATOR_MOTION] == 0.300
+    app, value, _clock = indicator_app("Tabs", "t1", TABS)
+    value.set("t2")
+    app.paint(DisplayList())
+    assert app.root.find("c").animation("indicator_x").duration == 0.300
+
+
+def test_reduce_motion_moves_indicators_at_once() -> None:
+    app, value, _clock = indicator_app("Tabs", "t1", TABS, reduce_motion=True)
+    tabs = app.root.find("c")
+    value.set("t3")
+    app.paint(DisplayList())
+    assert tabs.animation("indicator_x").value == pytest.approx(app.root.find("t3").offset.x)
+    assert not app.motion.active

@@ -337,10 +337,10 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 Stated plainly so you can design around it:
 
 - **Motion is not everywhere yet.** Animated: overlay fades, state layers,
-  every selection control (checkbox, radio, switch, filter chip), indeterminate
-  progress, and a carousel's snap. Not animated: a carousel's parallax, tab and
-  navigation indicators, and app-bar collapse. Set `reduce_motion` in
-  `Settings` to make everything arrive at once.
+  every selection control, tab and navigation indicators, indeterminate
+  progress, and a carousel's snap. Not animated: a carousel's parallax and
+  app-bar collapse. Set `reduce_motion` in `Settings` to make everything arrive
+  at once.
 - **A theme engine / stylesheet.** `classes` is a reserved selector target with
   no consumer yet.
 - **Disabled state.** No `disabled` flag, so M3's 12%/38% opacities have

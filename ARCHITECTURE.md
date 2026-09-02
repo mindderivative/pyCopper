@@ -1186,6 +1186,21 @@ and its "begin and end on screen" pair is about elements arriving rather than
 an in-place emphasis change. 100ms is chosen because a hover response slower
 than that reads as lag.
 
+**Indicators travel.** A tab indicator belongs to the `Tabs` container rather
+than to a tab, which is what lets it move *between* them — both its x and its
+width animate, so it stretches on the way and arrives the right length for a
+label-width destination. It costs paint only: the tabs themselves have not
+moved. A navigation rail's pill grows outward from a circle around the icon,
+and a segment widens around its arriving checkmark (layout, like the chip).
+
+**The icon FILL axis is animated in steps, not continuously.** FILL is a
+variable-font axis and the axis coordinates are part of the glyph atlas key
+(§5.7); the atlas has no per-entry eviction, and resets wholesale when full.
+A continuously animated FILL would therefore pack a fresh rasterisation every
+frame and force repeated full resets, re-rasterising every glyph in the
+application. Six steps still reads as a transition and bounds the entries per
+icon — a test asserts the atlas does not grow across a nav transition.
+
 **Every selection control transitions**, on the one line M3 states outright:
 "Selection controls have a short duration of 200ms with Standard easing". A
 checkbox cross-fades its outline for its filled container and fades the
