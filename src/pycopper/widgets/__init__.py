@@ -12,6 +12,7 @@ from .base import (
     build_element,
     create_element,
 )
+from .carousel import CarouselElement, CarouselItemElement
 from .material import (
     BadgeElement,
     CardElement,
@@ -52,6 +53,8 @@ __all__ = [
     "BottomSheetElement",
     "ButtonElement",
     "CardElement",
+    "CarouselElement",
+    "CarouselItemElement",
     "CheckboxElement",
     "ChipElement",
     "CircularProgressElement",

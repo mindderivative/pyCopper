@@ -927,6 +927,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
 | `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
 | `CircularProgress` | 4dp ring, clockwise from 12 o'clock | determinate only; needs the arc primitive (§5.15). The 48dp default diameter is **not** sourced — that page's size table is an image |
+| `Carousel` + `CarouselItem` | 28dp items, 16dp leading/trailing, 8dp gaps | three layouts; items resize and snap (§5.16) |
 
 **Wave 3** added the six components the overlay layer (§5.13) exists for, in
 `widgets/overlays.py`. They contribute M3 *anatomy* only — container token,
@@ -1102,6 +1103,51 @@ Three details that are not obvious:
   carries `(border_w, blur, shadow_dx, shadow_dy)` carries
   `(thickness, start, sweep, _)`. No struct growth: the instance stays 144
   bytes, and every field stays vec4-aligned.
+
+### 5.16 Carousel — `widgets/carousel.py`
+
+M3 draws an explicit line through the carousel layouts, and it is the line
+this implementation is built on:
+
+- **uncontained** items "don't change size", and both free and snap scrolling
+  suit it. So this scrolls by **pixels**, translating at paint time through
+  `child_origin` exactly as a `ScrollView` does.
+- **hero** and **multi_browse** items "automatically change size and snap into
+  place to maintain the same layout". So these scroll by **item**, and an
+  item's width comes from its position in the strip, not from its content.
+
+That second mode is what makes a carousel a carousel rather than a horizontal
+list, and it is why this is a widget rather than a styled `ScrollView`.
+
+**It is also the deliberate exception to §5.14's rule.** A snapping carousel
+*must* relayout to scroll, because which item sits on the leading keyline is
+what decides every item's width — the two cannot be separated. That is
+affordable precisely where the general rule is not: a carousel holds a handful
+of items, while a `ScrollView` must assume a thousand rows. The two behaviours
+live in one widget and each takes the mechanism that suits it.
+
+Widths per layout, with the leftover going to the large item (M3 calls it
+"Dynamic"):
+
+| Layout | Slots |
+|---|---|
+| `multi_browse` | large, medium, small, then small |
+| `hero` | large, small, then small |
+| `uncontained` | each item's own `width:` |
+
+**What is missing is the transition, not the layout.** M3 resizes items
+continuously as they travel and snaps them home; with no motion system the
+snap is instantaneous and the resize happens in one step. At rest the geometry
+is exactly what M3 specifies — it is the movement between rest states that is
+absent, along with the parallax on item visuals. The **medium item width
+(112dp) is not sourced**: M3 calls it "dynamic" and gives no figure.
+
+One fix this surfaced: a `CarouselItem` label used `on_surface` whatever its
+container, so it turned near-invisible the moment a view set a light
+background. `paired_content_token` now follows M3's container/`on_` pairing —
+`primary_container` implies `on_primary_container`. It is applied only where
+the whole surface belongs to the widget; a component whose background is one
+part of a larger anatomy keeps its variant's content token.
 
 ---
 

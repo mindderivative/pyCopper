@@ -43,6 +43,7 @@ __all__ = [
     "create_element",
     "measure_text",
     "paint_text",
+    "paired_content_token",
 ]
 
 _MAIN = {
@@ -81,6 +82,30 @@ def content_token(ctx: PaintContext, style: StyleSpec, default: str) -> int:
     so each component supplies its own rather than inheriting a global one.
     """
     return ctx.palette.index(style.color or default)
+
+
+def paired_content_token(ctx: PaintContext, style: StyleSpec, default: str) -> int:
+    """Content colour that follows an overridden container.
+
+    M3 pairs a container role with an `on_` role -- `primary_container` with
+    `on_primary_container` -- so a widget whose background the view has
+    changed should change its content colour with it. Without this, a label
+    keeps the default's `on_surface` and turns near-invisible the moment
+    someone sets a light container.
+
+    Only used where the whole surface is the widget's own (a carousel item);
+    a component whose background is one part of a larger anatomy keeps its
+    variant's content token.
+    """
+    from ..theme import is_token
+
+    if style.color:
+        return ctx.palette.index(style.color)
+    if style.background:
+        paired = f"on_{style.background}"
+        if is_token(paired):
+            return ctx.palette.index(paired)
+    return ctx.palette.index(default)
 
 
 class _StyledMixin(ElementMixin):
@@ -442,6 +467,7 @@ class SpacerElement(_StyledMixin, Padding):
 
 def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
+    from . import carousel as ca
     from . import material as m
     from . import navigation as n
     from . import overlays as o
@@ -476,6 +502,8 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.BOTTOM_SHEET: o.BottomSheetElement,
         WidgetKind.SIDE_SHEET: o.SideSheetElement,
         WidgetKind.SCROLL_VIEW: sc.ScrollViewElement,
+        WidgetKind.CAROUSEL: ca.CarouselElement,
+        WidgetKind.CAROUSEL_ITEM: ca.CarouselItemElement,
     }
 
 

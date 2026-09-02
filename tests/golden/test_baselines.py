@@ -889,3 +889,52 @@ def test_arc_baseline(render_scene, assert_golden) -> None:
     app.attach(engine)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("arc", np.asarray(engine.canvas.draw()))
+
+
+def test_carousel_baseline(render_scene, assert_golden) -> None:
+    """The three carousel layouts, with the multi-browse one advanced by two.
+
+    The advanced strip is the interesting row: it shows a passed item clipped
+    at the leading edge, the new large item snapped to the keyline, and the
+    medium and small slots behind it -- which is the resize-and-snap behaviour
+    M3 specifies, at rest.
+    """
+
+    def strip(name: str, variant: str, count: int = 6) -> dict:
+        return {
+            "name": name,
+            "widget": "Carousel",
+            "style": {"variant": variant, "height": 120, "width": "expand"},
+            "children": [
+                {
+                    "name": f"{name}_{j}",
+                    "widget": "CarouselItem",
+                    "text": f"Item {j}",
+                    "style": {"background": "primary_container" if j % 2 else "tertiary_container"},
+                }
+                for j in range(count)
+            ],
+        }
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 8, "spacing": 8},
+            "children": [
+                strip("mb", "multi_browse"),
+                strip("hero", "hero"),
+                strip("adv", "multi_browse"),
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=440, height=420, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    app.root.find("adv").set_index(2)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("carousel", np.asarray(engine.canvas.draw()))

@@ -68,6 +68,8 @@ class WidgetKind(StrEnum):
     LIST_ITEM = "ListItem"
     LINEAR_PROGRESS = "LinearProgress"
     CIRCULAR_PROGRESS = "CircularProgress"
+    CAROUSEL = "Carousel"
+    CAROUSEL_ITEM = "CarouselItem"
     # Overlay components (see runtime/overlay.py and widgets/overlays.py)
     DIALOG = "Dialog"
     MENU = "Menu"
@@ -247,6 +249,10 @@ Variant = Literal[
     # tabs (primary anchors a rounded indicator; secondary a flat stroke)
     "primary",
     "secondary",
+    # carousel layouts
+    "uncontained",
+    "hero",
+    "multi_browse",
     # list items
     "one_line",
     "two_line",

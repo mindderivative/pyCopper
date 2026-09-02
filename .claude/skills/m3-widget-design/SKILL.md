@@ -233,6 +233,13 @@ templated like `text:` — `value: "{{ on.get() }}"`. Use `element.checked` /
 for its variant". Resolve it with `content_token(ctx, style, "your_default")`
 so an explicit token still wins.
 
+Where the widget *is* its whole surface -- a carousel item, a plain card --
+use `paired_content_token` instead. M3 pairs a container role with an `on_`
+role, so an overridden `background: primary_container` should carry
+`on_primary_container` with it; otherwise the content keeps `on_surface` and
+turns invisible on a light container. Do **not** use it where the background
+is one part of a larger anatomy: there the variant's content token is right.
+
 **Variants go in the `variant` style property**, validated centrally by the
 `Variant` literal in `spec/models.py`. M3 usually describes variants as one
 component in several configurations, so prefer that over new widget kinds.
@@ -250,6 +257,12 @@ guidance. An unknown icon name raises; check membership with
 along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.
+
+**Carousels exist**, and show the one case where relayout-on-scroll is right:
+a snapping layout's item widths depend on scroll position, so it marks layout,
+while the uncontained layout translates at paint time like any viewport. If a
+widget's geometry genuinely depends on the offset, say so and mark layout; if
+it does not, never do.
 
 **Arcs exist.** The shader has a `KIND_ARC` branch (`DisplayList.add_arc`,
 or the `_arc` helper in `material.py` for logical coordinates). Angles are
