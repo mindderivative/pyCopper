@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from .include import IncludeError, resolve_includes
 from .models import ViewSpec, WidgetSpec
 from .stylesheet import apply_stylesheet
+from .typescale import TypeScaleError, apply_type_scale
 
 __all__ = ["SpecError", "assign_ids", "load_view", "parse_view"]
 
@@ -88,7 +89,10 @@ def parse_view(data: Any, *, origin: str = "<string>") -> ViewSpec:
     except ValidationError as exc:
         raise SpecError(_format(exc, origin)) from exc
     _check_unique_names(view, origin)
-    return apply_stylesheet(view)
+    try:
+        return apply_type_scale(apply_stylesheet(view))
+    except TypeScaleError as exc:
+        raise SpecError(f"{origin}: {exc}") from exc
 
 
 def load_view(path: str | Path, *, sources: set[Path] | None = None) -> ViewSpec:

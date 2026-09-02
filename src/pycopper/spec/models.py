@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
@@ -260,6 +260,34 @@ Variant = Literal[
 ]
 
 
+#: M3's type-scale roles: five sizes at three steps each, "from Display Large
+#: to Label Small". The **vocabulary** is sourced; the figures behind it are
+#: not -- see `TYPE_SCALE_NOTE` and `spec/typescale.py`.
+TYPE_ROLES: Final = tuple(
+    f"{group}-{step}"
+    for group in ("display", "headline", "title", "body", "label")
+    for step in ("large", "medium", "small")
+)
+
+TypeRole = Literal[
+    "display-large",
+    "display-medium",
+    "display-small",
+    "headline-large",
+    "headline-medium",
+    "headline-small",
+    "title-large",
+    "title-medium",
+    "title-small",
+    "body-large",
+    "body-medium",
+    "body-small",
+    "label-large",
+    "label-medium",
+    "label-small",
+]
+
+
 class StyleSpec(_Frozen):
     """Visual and geometric properties. Note that `children` is NOT here --
     children are structure, and belong on the widget."""
@@ -315,6 +343,12 @@ class StyleSpec(_Frozen):
 
     # text
     font_size: float = Field(default=14.0, gt=0)
+    #: An M3 type-scale role, resolved to `font_size` at load against the
+    #: view's `type_scale:`. Naming a role with no scale defined is an error,
+    #: not a silent fallback -- pyCopper ships no figures for these (see
+    #: `docs/view-reference.md`), so a quiet default would be an invented
+    #: number wearing a Material label.
+    text_style: TypeRole | None = None
 
     #: Which M3 variant of the component to render.
     variant: Variant = "filled"
@@ -469,6 +503,9 @@ class ViewSpec(_Frozen):
     #: Stylesheet rules, applied to every node before the element tree is
     #: built. Resolution happens once at load, so nothing is paid per frame.
     styles: tuple[StyleRule, ...] = ()
+    #: Type-scale role -> size in dp. Supplied by the application, because the
+    #: reference library does not carry the figures (see `spec/typescale.py`).
+    type_scale: dict[TypeRole, float] = Field(default_factory=dict)
 
     @field_validator("version")
     @classmethod

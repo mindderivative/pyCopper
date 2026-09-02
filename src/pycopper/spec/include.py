@@ -42,6 +42,7 @@ __all__ = [
 #: Keys that control inclusion rather than describing a widget.
 SOURCE_KEY: Final = "source"
 STYLES_KEY: Final = "styles"
+TYPE_SCALE_KEY: Final = "type_scale"
 PARAMS_KEY: Final = "params"
 WITH_KEY: Final = "with"
 
@@ -207,6 +208,33 @@ def expand_styles(
     return out
 
 
+def expand_type_scale(
+    value: Any,
+    base: Path,
+    root: Path,
+    sources: set[Path],
+) -> Any:
+    """Expand `type_scale: {source: scale.yaml}` into the mapping it names.
+
+    A scale is a mapping of role to size, so the file is a mapping too -- which
+    is what distinguishes it from a stylesheet, and lets including one in the
+    wrong place say so instead of failing later.
+    """
+    if not (isinstance(value, dict) and SOURCE_KEY in value):
+        return value
+    extra = set(value) - {SOURCE_KEY}
+    if extra:
+        raise IncludeError(
+            f"a type-scale include takes only `source:`, got {', '.join(sorted(extra))}"
+        )
+    path = _resolve_path(str(value[SOURCE_KEY]), base, root, ())
+    sources.add(path)
+    raw = _load_fragment(path, ())
+    if any(not isinstance(v, int | float) for v in raw.values()):
+        raise IncludeError(f"{path.name}: a type scale maps each role to a number")
+    return raw
+
+
 def _expand(
     node: dict[str, Any],
     base: Path,
@@ -300,4 +328,9 @@ def resolve_includes(
     # expander would report a mapping error about a file that is correct.
     if isinstance(data, dict) and STYLES_KEY in data:
         data = {**data, STYLES_KEY: expand_styles(data[STYLES_KEY], base, confine, touched)}
+    if isinstance(data, dict) and TYPE_SCALE_KEY in data:
+        data = {
+            **data,
+            TYPE_SCALE_KEY: expand_type_scale(data[TYPE_SCALE_KEY], base, confine, touched),
+        }
     return _walk(data, base, confine, touched, ())

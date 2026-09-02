@@ -294,6 +294,49 @@ application keeps focus, scroll, and text.
 Selectors are structured rather than CSS-like strings, deliberately: a `#name`
 selector would need quoting in every rule, because YAML reads `#` as a comment.
 
+## Type scale
+
+M3 defines fifteen type roles, from `display-large` to `label-small`. Name one
+with `text_style:` instead of a raw size:
+
+```yaml
+type_scale:
+  title-large: 22
+  body-medium: 14
+
+root:
+  widget: Column
+  children:
+    - {widget: Text, text: Heading, style: {text_style: title-large}}
+    - {widget: Text, text: Body,    style: {text_style: body-medium}}
+```
+
+A scale can live in its own file and be shared, like a stylesheet:
+
+```yaml
+type_scale: {source: typescale.yaml}
+```
+
+Roles resolve to `font_size` once at load, so nothing is paid per frame, and a
+role beats an explicit `font_size` on the same node.
+
+### pyCopper ships no sizes, and that is deliberate
+
+The role names are settled; the numbers are not available to this project. The
+M3 token table at
+<https://m3.material.io/styles/typography/type-scale-tokens> is an interactive
+widget, and the only figures anywhere in the reference library are six values
+in a condensed summary — one of which, `headline-large`, appears there as
+**both 32sp and 36sp**. Four roles are corroborated; ten have no value at all.
+
+Writing a full scale from memory and labelling it Material would be two thirds
+invention, so **naming a role with no entry is a load-time error** that tells
+you which role is missing. A silent fallback to the default size would be an
+unsourced number wearing a Material label.
+
+`examples/typescale.yaml` is a starting point: the four corroborated values,
+and the rest as commented placeholders pointing at the spec page.
+
 ## Text selection
 
 A `Text` widget with `selectable: true` can be selected with the mouse:
@@ -630,6 +673,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | Property | Values |
 |---|---|
 | `font_size` | dp |
+| `text_style` | an M3 type-scale role, resolved against `type_scale:` |
 | `icon_size` | dp, default 24 |
 | `icon_fill` | 0–1. M3 uses this for selected state — prefer it to swapping icon names. |
 | `icon_weight` | 100–700 |
@@ -658,7 +702,9 @@ Stated plainly so you can design around it:
   content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
   make timed transitions arrive at once — it does not affect app-bar collapse
   or carousel parallax, which follow a position rather than a clock.
-- **The M3 type scale as named roles.** Widgets take a raw `font_size`;
+- **M3's type-scale *figures*.** The roles work (see
+  [Type scale](#type-scale)); the sizes behind them are yours to supply.
+  Widgets otherwise take a raw `font_size`;
   `label-large` and friends are not modelled.
 - **Editable text.** Text can be selected and copied, not typed into: no
   caret blink, no insertion, no undo. A text field is its own piece of work.

@@ -361,12 +361,11 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 **Not available yet -- design around these, and say so when a spec needs one:**
 
-- **The M3 type scale.** Widgets take a raw `font_size`; the 15 baseline and
-  15 emphasized type-scale roles (`label-large`, `title-medium`, …) are not
-  modelled as named styles. Note the scraped token tables in `M3-References`
-  are empty and the scattered values disagree with themselves (`headline-large`
-  appears as both 32sp and 36sp), so a real source is needed before hardcoding
-  the scale.
+- **M3 type-scale *figures*.** The roles are modelled (`text_style:` resolved
+  against a view's `type_scale:`), but pyCopper ships no sizes: the scraped
+  token table is empty and the scattered values disagree with themselves
+  (`headline-large` is both 32sp and 36sp). Do **not** fill them in from
+  memory -- naming a role with no entry is a deliberate load-time error.
 - **RTL text.** Direction and run ordering work, but the bundled fonts carry no
   Arabic or Hebrew glyphs, and selection across a direction boundary is
   unimplemented -- the highlight is contiguous in character order, which is not

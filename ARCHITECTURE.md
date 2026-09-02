@@ -1467,6 +1467,41 @@ caret should do across a direction boundary. Double-click uses whitespace
 delimiting rather than UAX #29 word segmentation — simple and predictable, and
 labelled as such rather than presented as Unicode-correct.
 
+### 5.17.7 Type-scale roles — `spec/typescale.py`
+
+This is the one place the project ships a **mechanism without the data**, and
+the reason is worth stating precisely rather than as a shrug.
+
+M3 defines fifteen baseline type styles. The role names are settled and appear
+throughout the reference library. The sizes are not: the token table at
+`styles/M3-Styles-Typography-TypeScaleTokens.md` scraped as an empty
+interactive widget, and the only figures anywhere in the library are six values
+in a condensed summary — one of which, `headline-large`, appears there as
+**both 32sp and 36sp, in the same file**. Four roles are corroborated
+unambiguously; ten have no value at all.
+
+Writing the other eleven from recall and labelling them Material would be two
+thirds invention. So the framework provides the vocabulary and the resolution,
+and an application provides the figures:
+
+```yaml
+type_scale: {source: typescale.yaml}
+root: {widget: Text, style: {text_style: title-large}}
+```
+
+`text_style:` resolves to `font_size` **once at load**, the same decision the
+stylesheet makes (§5.17.1), so every widget downstream keeps reading a plain
+float and a role costs nothing per frame. A role beats an explicit `font_size`
+on the same node, being the more specific statement of intent.
+
+**Naming a role the scale does not define is a load-time error** that names the
+role and lists what is defined. Falling back to the default size would put an
+unsourced number on screen under a Material label, which is exactly the failure
+this module exists to prevent. `examples/typescale.yaml` ships the four
+corroborated values and commented placeholders for the rest, with the
+contradiction recorded — and a test asserts that file never grows an unsourced
+figure.
+
 ### 5.18 Disabled state
 
 M3 states it outright: "Disabled: Container opacity 12% (0.12), Content opacity
