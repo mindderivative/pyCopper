@@ -671,7 +671,15 @@ The inter-frame gap collapses by three orders of magnitude the moment
 declining stops. So `draw_frame` presents every frame it is asked for, and
 `vsync` is the only lever: with it on, this path still produces multi-second
 stalls under a fast drag; with it off, a live resize runs at several hundred
-redraws a second with none. `Settings.vsync` exposes that trade.
+redraws a second with none.
+
+**`Settings.vsync` therefore defaults to False**, which is not the conventional
+choice for an interface and is a deliberate trade. A window that lurches around
+for seconds while being dragged is a worse defect than tearing during an
+animation, and the usual argument for vsync — that an unsynchronised loop burns
+the GPU — does not apply here: an idle pyCopper application renders no frames at
+all (§5.10), so there is no loop to burn anything. Set it True on a platform
+where the resize path behaves and tearing matters more.
 
 **The diagnosis took four wrong turns**, each from reasoning past the data
 rather than measuring the next thing: blaming the frame cost (it was 2 ms),

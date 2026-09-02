@@ -100,11 +100,17 @@ def test_wayland_decorations_defaults_to_the_portable_choice() -> None:
         Settings(wayland_decorations="client")
 
 
-def test_vsync_defaults_on_and_is_settable() -> None:
-    """Off is a trade -- smoother live resizing on compositors whose present
-    is slow during a drag, at the cost of tearing and a busy GPU everywhere
-    else -- so it is opt-in rather than a default."""
+def test_vsync_defaults_off_and_is_settable() -> None:
+    """Off by default, which is not the conventional choice.
+
+    Measured on KDE Plasma Wayland: a fast drag with vsync on stalled for up
+    to 7.9 seconds, and the same drag with it off ran at 466 redraws a second
+    with no stall. A window that lurches for seconds is a worse defect than
+    tearing, and the usual argument for vsync does not apply -- an idle
+    application here renders no frames at all, so there is no loop to burn
+    the GPU.
+    """
     from pycopper import Settings
 
-    assert Settings().vsync is True
-    assert Settings(vsync=False).vsync is False
+    assert Settings().vsync is False
+    assert Settings(vsync=True).vsync is True

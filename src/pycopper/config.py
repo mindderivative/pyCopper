@@ -34,22 +34,26 @@ class Settings(BaseSettings):
 
     #: Wait for the display before showing a frame.
     #:
-    #: True avoids tearing and is the conventional default for an interface.
-    #: An idle pyCopper application renders no frames at all (`update_mode`
-    #: 'ondemand', `min_fps` 0), so it costs nothing while nothing moves.
+    #: Wait for the display before showing a frame.
     #:
-    #: The cost lands on resizing, where rendercanvas presents once per
-    #: compositor configure -- 250 a second, measured -- and does so
-    #: synchronously (ARCHITECTURE.md 5.8.1). On KDE Plasma Wayland a fast drag
-    #: with vsync on produced **stalls of up to 7.9 seconds**; the same drag
-    #: with it off ran at **466 redraws a second with no stall at all**. The
-    #: frames cost ~2 ms either way.
+    #: **False by default**, which is not the conventional choice and is worth
+    #: justifying. Waiting is normally free, but rendercanvas presents once per
+    #: compositor configure during a resize -- 250 a second, measured -- and
+    #: does so synchronously (ARCHITECTURE.md 5.8.1). On KDE Plasma Wayland a
+    #: fast drag with vsync on produced **stalls of up to 7.9 seconds**; the
+    #: same drag with it off ran at **466 redraws a second with no stall at
+    #: all**. The frames cost ~2 ms either way. A window that lurches around
+    #: for seconds is a worse defect than tearing, so the default goes to the
+    #: one that does not do that.
     #:
-    #: So set it False if a live resize has to stay smooth on that path, and
-    #: accept possible tearing while something is actually animating. It is a
-    #: trade, not an optimisation, which is why it is not the default -- but on
-    #: a Wayland compositor it is the only lever that moves this.
-    vsync: bool = True
+    #: What it costs: tearing is possible while something is genuinely
+    #: animating. It costs nothing at rest -- an idle pyCopper application
+    #: renders no frames at all (`update_mode` 'ondemand', `min_fps` 0), so
+    #: this does not spin the GPU.
+    #:
+    #: Set it True on a platform where the resize path behaves and tearing
+    #: during animation matters more.
+    vsync: bool = False
 
     #: Who draws the window frame on Wayland.
     #:
