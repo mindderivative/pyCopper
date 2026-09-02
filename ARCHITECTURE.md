@@ -720,6 +720,27 @@ not substitute: the swapchain image *is* the window's buffer, so an oversized
 one is displayed oversized. This is an upstream limitation, recorded here with
 the numbers that would support raising it.
 
+**X11 is not the way out, and that was tested rather than assumed.** GLFW can
+be pointed at its X11 backend with a `PLATFORM` init hint, and under a Wayland
+session that runs through XWayland. The obvious hope is that X11's lack of a
+configure/commit handshake — the constraint that made the throttle backfire —
+would help. It does the opposite. The same drag:
+
+| | Wayland | X11 via XWayland |
+|---|---|---|
+| redrawn at a new size | **425/s** | 151/s |
+| frame median | 1.94 ms | 0.18 ms |
+| gap mid-drag median | 0.04 ms | 0.34 ms |
+| surface errors | none | continuous |
+
+The 0.18 ms frame is not speed: wgpu could not obtain a usable surface texture
+and returned a dummy for runs of 5, 12 and 25 frames at a time, logging
+`SuccessSuboptimal` throughout. Only 151 frames a second produced a visible
+update. It would also *look* worse — wgpu notes that on Linux a suboptimal
+surface is "blitted to the window leaving either part of the texture invisible,
+or making part of the window black/transparent". No `platform` setting is
+exposed, because its only non-default value is strictly worse.
+
 **The diagnosis took four wrong turns**, each from reasoning past the data
 rather than measuring the next thing: blaming the frame cost (it was 2 ms),
 blaming vsync alone (throttled-and-vsync-off was still 12/s), concluding the
