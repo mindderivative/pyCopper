@@ -17,7 +17,20 @@ SEED = "#6750A4"
 app = App(
     VIEW,
     theme=Theme(seed=SEED, dark=True),
-    settings=Settings(title="pyCopper gallery", width=620, height=720, hot_reload=True),
+    settings=Settings(
+        title="pyCopper gallery",
+        width=620,
+        height=720,
+        hot_reload=True,
+        # Ask the compositor for the window frame instead of libdecor. On KDE
+        # Plasma that skips libdecor entirely, including the "Failed to load
+        # plugin 'libdecor-gtk.so'" warning a missing GTK produces.
+        #
+        # Note if you run this on GNOME: it offers no server-side decorations
+        # for xdg-shell, so this leaves the window with no title bar and no
+        # close button. Drop this line there -- the default is "auto".
+        wayland_decorations="server",
+    ),
 )
 
 clicks = Signal(0, name="clicks")
