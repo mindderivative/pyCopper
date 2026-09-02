@@ -23,6 +23,7 @@ import pycopper
 PUBLIC_API = frozenset(
     {
         # application
+        "AccessibleNode",
         "App",
         "ViewModel",
         "ViewModelError",

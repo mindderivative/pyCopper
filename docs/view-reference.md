@@ -502,6 +502,48 @@ Two consequences worth knowing:
   own — switching the theme is the honest example. It is deliberately not
   visible to `{{ }}` expressions.
 
+## Accessibility
+
+**Read this first: there is no platform bridge.** pyCopper builds the semantic
+tree — roles, names, states, bounds — and nothing that shows it to a screen
+reader. AT-SPI, UIA and NSAccessibility are native, per-OS work and are not
+built. Claiming accessibility you do not have is worse than claiming none, so
+this is the honest position: the half that belongs to the toolkit exists, and
+the half that belongs to the platform does not.
+
+```python
+tree = app.accessibility_tree()
+confirm = tree.find(role="button", name="Confirm")
+assert confirm.bounds.width == 130
+```
+
+It is worth having anyway. It is what any bridge would be handed, and it lets a
+test ask for *the button called Confirm* rather than for a rectangle at some
+coordinate.
+
+**Roles are sourced where M3 states one** — a text field is `textbox`, a
+progress indicator has the "role of 'progressbar'", a navigation item is `tab`,
+and a navigation *container's* "role is not announced". The rest follow ARIA
+convention, and the module marks which is which rather than smoothing over the
+difference.
+
+Three rules worth knowing when writing views:
+
+- **`name:` is never announced.** It is a developer handle; reading out
+  `sw_primary` would be worse than silence. It travels as `key` so tests can
+  still find a node by it.
+- **An icon name is never announced.** For `Icon`, `IconButton`, `Fab` and
+  `NavItem`, `text:` holds a Material Symbols glyph name, so the label comes
+  from `supporting_text:`. **An icon-only control with no `supporting_text:`
+  has no accessible name at all** — that is a real gap in a view, and the tree
+  reports an empty name rather than inventing one.
+- **Layout and decoration disappear.** A `Spacer` is dropped entirely and a
+  silent container's children are lifted into its place, so a reader never
+  walks through a level that says only "group".
+
+Visible overlays are appended to the root, because a dialog is not a child of
+what it covers; a closed one is absent entirely rather than present-but-hidden.
+
 ## Hit targets
 
 A control is clickable at the size it is drawn, which on a pixel-precise

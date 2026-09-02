@@ -1,0 +1,259 @@
+"""The accessibility tree: what an interface *means*, apart from how it looks.
+
+**Read this before believing pyCopper is accessible.** What is here is the
+semantic tree -- roles, names, states, bounds -- and nothing that shows it to a
+screen reader. A platform bridge (AT-SPI on Linux, UIA on Windows,
+NSAccessibility on macOS) is native, per-OS work and is *not* built. Claiming
+accessibility you do not have is worse than claiming none, so this says plainly
+what it is: the half that belongs to the toolkit, and a seam for the half that
+belongs to the platform.
+
+It earns its place even so. It is the prerequisite for any bridge, and it lets
+a test ask for "the button named Confirm" rather than for a pixel.
+
+**Roles are sourced where M3 states one**, which is not often -- a text field is
+"textbox", a progress indicator has the "role of 'progressbar'", a list is a
+"List box", a navigation item's role is "tab", and a navigation *container's*
+"role is not announced". Everything else follows ARIA convention and is marked
+as such, so the difference stays visible instead of being smoothed over.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from typing import Any, Final
+
+from ..layout import Rect
+
+__all__ = ["AccessibleNode", "Bridge", "accessibility_tree", "role_for"]
+
+#: Widget kind -> ARIA role. Sourced entries carry the quote; the rest are the
+#: conventional ARIA role for the equivalent control and say so.
+ROLES: Final[dict[str, str]] = {
+    # --- stated by M3
+    "TextField": "textbox",  # "The role is 'textbox'"
+    "LinearProgress": "progressbar",  # "role of 'progressbar'"
+    "CircularProgress": "progressbar",  # "role of 'progressbar'"
+    "NavItem": "tab",  # "The role is 'tab'"
+    "Tab": "tab",  # "The role is 'tab'"
+    "ListItem": "option",  # a list is a "List box", so its items are options
+    # --- ARIA convention
+    "Button": "button",
+    "Chip": "button",  # ...except a filter chip, which toggles -- see `_node_for`
+    "IconButton": "button",
+    "Fab": "button",
+    "MenuItem": "menuitem",
+    "Checkbox": "checkbox",
+    "Radio": "radio",
+    "Switch": "switch",
+    "Segment": "radio",  # a segmented button is a single-choice set
+    "Text": "text",
+    "Card": "group",
+    "Divider": "separator",
+    "Dialog": "dialog",
+    "Menu": "menu",
+    "Tooltip": "tooltip",
+    "Snackbar": "status",  # "announced ... but don't trap focus"
+    "Badge": "status",
+    "BottomSheet": "dialog",
+    "SideSheet": "dialog",
+    "TopAppBar": "banner",
+    "Tabs": "tablist",
+    "SegmentedButton": "radiogroup",  # M3 calls the equivalent a "Radio group"
+    "Carousel": "group",
+    "CarouselItem": "group",
+    "ScrollView": "group",  # ARIA has no scroll-region role
+    "Container": "group",
+    "Row": "group",
+    "Column": "group",
+    "Stack": "group",
+}
+
+#: Kinds a screen reader should never hear about. A navigation *container's*
+#: "role is not announced" per M3; the rest are layout or decoration with
+#: nothing to say that their children do not say better.
+SILENT: Final[frozenset[str]] = frozenset({"Spacer", "Icon", "NavigationRail", "NavigationDrawer"})
+
+#: Kinds whose `text:` is a Material Symbols glyph name rather than a label.
+#: Announcing "home" instead of "Home" is the sort of bug that only shows up
+#: when someone actually listens to it, so the label comes from
+#: `supporting_text:` for these and the icon name is never read aloud.
+ICON_NAMED: Final[frozenset[str]] = frozenset({"Icon", "IconButton", "Fab", "NavItem"})
+
+#: Kinds whose `checked` is meaningful. Anything else reports None, which is
+#: what distinguishes an unchecked checkbox from a button.
+CHECKABLE: Final[frozenset[str]] = frozenset({"Checkbox", "Radio", "Switch"})
+
+#: Kinds whose `selected` is meaningful.
+SELECTABLE: Final[frozenset[str]] = frozenset({"Tab", "NavItem", "Segment", "ListItem", "MenuItem"})
+
+
+def role_for(kind: str) -> str | None:
+    """The ARIA role for a widget kind, or None if it should not be announced."""
+    if kind in SILENT:
+        return None
+    return ROLES.get(kind, "group")
+
+
+@dataclass(slots=True)
+class AccessibleNode:
+    """One node of the semantic tree.
+
+    A plain snapshot rather than a live view of the element: a bridge pushes
+    updates on its own schedule, and a test wants something stable to assert
+    against.
+    """
+
+    role: str
+    name: str = ""
+    #: Detail announced after the name -- a text field's supporting text, which
+    #: M3 says "should have its own accessibility label".
+    description: str = ""
+    #: Current content, for anything that has one: a field's text, a progress
+    #: indicator's fraction.
+    value: str = ""
+    bounds: Rect = field(default_factory=Rect)
+    focused: bool = False
+    disabled: bool = False
+    #: Tri-state. None means "not checkable at all", which is how an unchecked
+    #: checkbox differs from a button.
+    checked: bool | None = None
+    selected: bool | None = None
+    expanded: bool | None = None
+    modal: bool = False
+    #: The view file's `name:`, so a test can find a node the way an author
+    #: refers to it. Never announced -- it is a developer handle.
+    key: str | None = None
+    children: list[AccessibleNode] = field(default_factory=list)
+
+    def walk(self) -> Iterator[AccessibleNode]:
+        yield self
+        for child in self.children:
+            yield from child.walk()
+
+    def find(
+        self,
+        *,
+        role: str | None = None,
+        name: str | None = None,
+        key: str | None = None,
+    ) -> AccessibleNode | None:
+        """First node matching any combination of role, name and key.
+
+        The everyday use: ask for "the button called Confirm" instead of for a
+        rectangle at some coordinate. `key` matches the view file's `name:`,
+        which is how a test refers to a control that has no visible label.
+        """
+        for node in self.walk():
+            if (
+                (role is None or node.role == role)
+                and (name is None or node.name == name)
+                and (key is None or node.key == key)
+            ):
+                return node
+        return None
+
+
+def _label_of(element: Any) -> str:
+    """What a reader should call this element.
+
+    Never the view file's `name:` -- that is a developer handle, and announcing
+    "sw_primary" would be worse than silence.
+
+    For an icon-bearing control `text:` holds the *glyph name*, so the label
+    comes from `supporting_text:` instead. An icon-only control with no
+    supporting text therefore has no accessible name at all, and reports one
+    rather than reading "chevron_right" at somebody.
+    """
+    order = ("supporting",) if str(element.spec.widget) in ICON_NAMED else ("text", "supporting")
+    for attr in order:
+        value = getattr(element, attr, "") or ""
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _node_for(element: Any) -> AccessibleNode | None:
+    """Snapshot one element, or None if it should not be announced."""
+    kind = str(element.spec.widget)
+    role = role_for(kind)
+    if role is None:
+        return None
+
+    style = element.spec.style
+    #: A filter chip toggles, so it reads as a checkbox rather than a button --
+    #: the other chip variants act on a press and do not.
+    filter_chip = kind == "Chip" and style.variant == "filter"
+    if kind == "Chip":
+        role = "checkbox" if filter_chip else "button"
+
+    node = AccessibleNode(
+        role=role,
+        name=_label_of(element),
+        bounds=element.absolute_rect(),
+        focused=bool(getattr(element.state, "focused", False)),
+        disabled=bool(getattr(element, "effective_disabled", False)),
+        checked=bool(element.checked) if (kind in CHECKABLE or filter_chip) else None,
+        selected=bool(element.selected) if kind in SELECTABLE else None,
+        modal=bool(style.modal),
+        key=element.spec.name,
+    )
+
+    if kind == "TextField":
+        # "Text field supporting text should have its own accessibility label",
+        # so it is a description rather than being glued onto the name.
+        node.name = (element.spec.text or "").strip()
+        node.description = (getattr(element, "supporting", "") or "").strip()
+        node.value = getattr(element, "content", "") or ""
+    elif role == "progressbar":
+        node.value = str(element.number)
+    elif role in ("dialog", "menu", "tooltip", "status"):
+        node.expanded = bool(element.is_open)
+    return node
+
+
+def accessibility_tree(root: Any, overlays: Any = None) -> AccessibleNode:
+    """Snapshot the semantic tree for a mounted element tree.
+
+    A silent element is skipped but its children are kept and lifted to its
+    parent, so a `Row` wrapping three buttons does not bury them behind a node
+    that says only "group" -- and a `Spacer` disappears entirely rather than
+    becoming an empty announcement.
+
+    Visible overlays are appended to the root. A dialog is not a child of
+    whatever it covers, and a reader should reach it last, which is where the
+    modal flag then tells it to stay.
+    """
+
+    def build(element: Any) -> list[AccessibleNode]:
+        children: list[AccessibleNode] = []
+        for child in element.children:
+            if hasattr(child, "spec"):
+                children.extend(build(child))
+        node = _node_for(element)
+        if node is None:
+            return children
+        node.children = children
+        return [node]
+
+    built = build(root)
+    tree = built[0] if built else AccessibleNode(role="group")
+    if overlays is not None:
+        for entry in overlays.visible():
+            tree.children.extend(build(entry.element))
+    return tree
+
+
+class Bridge:
+    """The seam a platform adapter plugs into.
+
+    Nothing implements this, deliberately. It is here so the shape of the
+    missing half is written down rather than guessed at later: a bridge is
+    handed the tree when it changes and pushes it to AT-SPI, UIA or
+    NSAccessibility. `accesskit` is the obvious candidate and brings a native
+    dependency, which is an application's decision rather than the framework's.
+    """
+
+    def update(self, tree: AccessibleNode) -> None:  # pragma: no cover - a seam
+        raise NotImplementedError

@@ -15,6 +15,7 @@ from .config import Settings
 from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
 from .motion import Ticker
 from .paint import DisplayList
+from .runtime.accessibility import AccessibleNode, accessibility_tree
 from .runtime.engine import Engine
 from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
 from .runtime.hotreload import HotReloader
@@ -271,6 +272,16 @@ class App:
         # application with nothing animating still renders nothing.
         if self.motion.active and self.engine is not None:
             self.engine.request_draw()
+
+    def accessibility_tree(self) -> AccessibleNode:
+        """Snapshot what this interface *means*, for a bridge or for a test.
+
+        Built on demand rather than maintained: nothing consumes it every
+        frame, and a tree that is rebuilt when asked cannot go stale. See
+        `runtime/accessibility.py` -- the platform bridge that would show this
+        to a screen reader is not built.
+        """
+        return accessibility_tree(self.root, self.overlays)
 
     def set_theme(self, theme: Theme) -> None:
         """One palette upload. No relayout, no display-list rebuild."""

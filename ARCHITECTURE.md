@@ -26,7 +26,7 @@ pyCopper is a **distributable** desktop GUI framework: users `pip install pycopp
 | Web, mobile, or embedded targets | **Desktop-only, and not merely for now** — see §1.2.1. |
 | Touch input | No touch, stylus, or gesture handling. Pointer, keyboard, and scroll wheel only. |
 | Complex text shaping (Arabic, Devanagari, CJK vertical) | Requires HarfBuzz; a seam is designed in, see §5.7. |
-| Accessibility tree (AT-SPI / UIA / NSAccessibility) | Large, platform-specific. Architecturally reserved, not built. |
+| Screen-reader bridge (AT-SPI / UIA / NSAccessibility) | Native and per-OS. The *semantic tree* is built (§5.11); the bridge that would push it to a platform is not. |
 | CSS compatibility | The style vocabulary is MD3-shaped, not CSS-shaped. |
 | Hot-reload of Python application logic | YAML reload only. Python reload is a different, much harder problem. |
 | Multi-window | Single window in v1; the engine is written so the canvas is not a singleton. |
@@ -762,6 +762,47 @@ of glfw" or the process segfaults (citing pygfx/pygfx#642). An `Engine` reached
 from a module-level `App` — how every example here is written — outlives even
 that, so closing the window destroyed the native window and left a live wgpu
 surface pointing at it.
+
+### 5.11 The accessibility tree — `runtime/accessibility.py`
+
+`App.accessibility_tree()` snapshots what the interface *means*: roles, names,
+descriptions, values, states and bounds, derived from the element tree on
+demand. Built when asked rather than maintained, because nothing consumes it
+per frame and a tree rebuilt on request cannot go stale.
+
+**What is deliberately absent is the bridge.** AT-SPI, UIA and NSAccessibility
+are native, per-OS work; `accesskit` is the obvious candidate and would bring a
+native dependency, which is an application's decision rather than the
+framework's. `Bridge` writes the shape of that missing half down so it is not
+guessed at later, and a test pins that it raises — if a bridge ever lands, that
+test should fail and be rewritten. Until then nothing in the codebase may imply
+a screen reader can read a pyCopper application, because it cannot.
+
+The tree is still worth its keep: it is what a bridge would be handed, and it
+lets a test ask for "the button named Confirm" instead of for a rectangle.
+
+**Roles are sourced where M3 states one**, which is rarely: "The role is
+'textbox'", the "role of 'progressbar'", a list is a "List box" so its items
+are options, a navigation item's "role is 'tab'", and a navigation container's
+"role is not announced". Everything else is the conventional ARIA role and is
+marked as convention, so a reader can tell a quotation from a judgement. A test
+asserts that every `WidgetKind` is either mapped or explicitly silenced, so a
+new widget cannot quietly default to "group" — the role that says nothing.
+
+Three rules the tree enforces, each of which is a bug it prevents:
+
+- **A view file's `name:` is never announced.** It is a developer handle;
+  "sw_primary" read aloud is worse than silence. It travels as `key` so tests
+  can still find a node by it.
+- **An icon name is never announced.** For `Icon`, `IconButton`, `Fab` and
+  `NavItem`, `text:` holds a Material Symbols glyph name — a navigation item
+  announced itself as "home" rather than "Home" until a test caught it. The
+  label comes from `supporting_text:`, and an icon-only control without one
+  reports *no* name, which is a real gap in the view rather than something to
+  paper over.
+- **Silent nodes do not bury their children.** A `Spacer` disappears and a
+  navigation container's items are lifted into its place, so a reader never
+  walks through a level that says only "group".
 
 ### 5.9.1 Editable text — `text/editing.py`, `widgets/textfield.py`
 
