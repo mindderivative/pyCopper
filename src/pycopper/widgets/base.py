@@ -444,6 +444,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
     from . import material as m
     from . import navigation as n
+    from . import overlays as o
 
     return {
         WidgetKind.CARD: m.CardElement,
@@ -465,6 +466,13 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.SEGMENT: n.SegmentElement,
         WidgetKind.LIST_ITEM: n.ListItemElement,
         WidgetKind.LINEAR_PROGRESS: n.LinearProgressElement,
+        WidgetKind.DIALOG: o.DialogElement,
+        WidgetKind.MENU: o.MenuElement,
+        WidgetKind.MENU_ITEM: o.MenuItemElement,
+        WidgetKind.TOOLTIP: o.TooltipElement,
+        WidgetKind.SNACKBAR: o.SnackbarElement,
+        WidgetKind.BOTTOM_SHEET: o.BottomSheetElement,
+        WidgetKind.SIDE_SHEET: o.SideSheetElement,
     }
 
 

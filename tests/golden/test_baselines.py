@@ -542,3 +542,220 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
     app.attach(engine)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("overlay", np.asarray(engine.canvas.draw()))
+
+
+def test_overlay_components_baseline(render_scene, assert_golden) -> None:
+    """The six real M3 overlay components, rather than hand-built stand-ins.
+
+    Deliberately separate from `test_overlay_baseline`, which stays as it is:
+    that one proves the *host* can float an arbitrary widget, this one proves
+    the components themselves render to their M3 anatomy. A side sheet, an
+    anchored menu, a tooltip and a snackbar are placed at once because their
+    placements do not collide.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 20, "spacing": 12},
+            "children": [
+                {
+                    "name": "top",
+                    "widget": "Row",
+                    "style": {"width": "expand", "height": 40, "spacing": 12},
+                    "children": [
+                        {
+                            "name": "menu_btn",
+                            "widget": "Button",
+                            "text": "Actions",
+                            "style": {"width": 130, "height": 40, "variant": "outlined"},
+                        },
+                        {"name": "gap", "widget": "Spacer", "style": {"width": 30}},
+                        {
+                            "name": "tip_btn",
+                            "widget": "IconButton",
+                            "text": "info",
+                            "style": {"variant": "standard"},
+                        },
+                    ],
+                },
+            ],
+        },
+        "overlays": [
+            {
+                "name": "menu",
+                "widget": "Menu",
+                "open": "true",
+                "style": {"placement": "anchor", "anchor": "menu_btn", "width": 200},
+                "children": [
+                    {"name": "cut", "widget": "MenuItem", "text": "Cut", "supporting_text": "^X"},
+                    {"name": "copy", "widget": "MenuItem", "text": "Copy", "supporting_text": "^C"},
+                    {"name": "paste", "widget": "MenuItem", "text": "Paste"},
+                ],
+            },
+            {
+                "name": "tip",
+                "widget": "Tooltip",
+                "text": "More information",
+                "open": "true",
+                "style": {"placement": "anchor", "anchor": "tip_btn"},
+            },
+            {
+                "name": "sheet",
+                "widget": "SideSheet",
+                "open": "true",
+                "style": {"placement": "right", "width": 190},
+                "children": [
+                    {
+                        "name": "sheet_title",
+                        "widget": "Text",
+                        "text": "Side sheet",
+                        "style": {"font_size": 16},
+                    }
+                ],
+            },
+            {
+                "name": "snack",
+                "widget": "Snackbar",
+                "text": "Item archived",
+                "supporting_text": "Undo",
+                "open": "true",
+                "style": {"placement": "bottom", "width": 320},
+            },
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=560, height=320, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("overlay_components", np.asarray(engine.canvas.draw()))
+
+
+def test_dialog_baseline(render_scene, assert_golden) -> None:
+    """A modal Dialog over its 32% scrim, shrink-wrapped around its content.
+
+    Its own frame: a centred modal dialog would sit on top of the
+    bottom-anchored snackbar in the frame above.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 20, "spacing": 12},
+            "children": [
+                {
+                    "name": "bg",
+                    "widget": "ListItem",
+                    "text": "Background content",
+                    "supporting_text": "Dimmed by the 32% scrim",
+                    "style": {"width": "expand"},
+                }
+            ],
+        },
+        "overlays": [
+            {
+                "name": "dlg",
+                "widget": "Dialog",
+                "text": "Delete this item?",
+                "supporting_text": "This action cannot be undone, and the item "
+                "will not be recoverable.",
+                "open": "true",
+                "style": {"modal": True, "scrim": True, "width": 360},
+                "children": [
+                    {
+                        "name": "actions",
+                        "widget": "Row",
+                        "style": {
+                            "width": "expand",
+                            "height": 40,
+                            "spacing": 8,
+                            "main_alignment": "end",
+                        },
+                        "children": [
+                            {
+                                "name": "cancel",
+                                "widget": "Button",
+                                "text": "Cancel",
+                                "style": {"width": 90, "height": 40, "variant": "text"},
+                            },
+                            {
+                                "name": "delete",
+                                "widget": "Button",
+                                "text": "Delete",
+                                "style": {"width": 90, "height": 40, "variant": "filled"},
+                            },
+                        ],
+                    }
+                ],
+            },
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=460, height=300, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("dialog", np.asarray(engine.canvas.draw()))
+
+
+def test_bottom_sheet_baseline(render_scene, assert_golden) -> None:
+    """A BottomSheet with its drag handle, flush with the window's bottom edge.
+
+    Its own frame too -- it shares the bottom placement with the snackbar.
+    The handle is drawn but not draggable; see `BottomSheetElement`.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 20},
+            "children": [
+                {
+                    "name": "bg",
+                    "widget": "Text",
+                    "text": "Background content",
+                    "style": {"font_size": 16},
+                }
+            ],
+        },
+        "overlays": [
+            {
+                "name": "sheet",
+                "widget": "BottomSheet",
+                "open": "true",
+                "style": {"handle": True, "scrim": True, "modal": True},
+                "children": [
+                    {
+                        "name": "sheet_title_pad",
+                        "widget": "Container",
+                        "style": {"padding": [16, 16, 16, 4]},
+                        "children": [
+                            {
+                                "name": "sheet_title",
+                                "widget": "Text",
+                                "text": "Bottom sheet",
+                                "style": {"font_size": 16},
+                            }
+                        ],
+                    },
+                    {
+                        "name": "sheet_item",
+                        "widget": "ListItem",
+                        "text": "An action",
+                        "supporting_text": "With supporting text",
+                        "style": {"width": "expand"},
+                    },
+                ],
+            },
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=440, height=300, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("bottom_sheet", np.asarray(engine.canvas.draw()))

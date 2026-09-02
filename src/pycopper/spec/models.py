@@ -67,6 +67,14 @@ class WidgetKind(StrEnum):
     SEGMENT = "Segment"
     LIST_ITEM = "ListItem"
     LINEAR_PROGRESS = "LinearProgress"
+    # Overlay components (see runtime/overlay.py and widgets/overlays.py)
+    DIALOG = "Dialog"
+    MENU = "Menu"
+    MENU_ITEM = "MenuItem"
+    TOOLTIP = "Tooltip"
+    SNACKBAR = "Snackbar"
+    BOTTOM_SHEET = "BottomSheet"
+    SIDE_SHEET = "SideSheet"
 
 
 class SizeSpec:
@@ -284,6 +292,10 @@ class StyleSpec(_Frozen):
     dismissable: bool = True
     #: Gap between an anchored overlay and its anchor, in logical px.
     offset: float = Field(default=4.0, ge=0)
+    #: Draw a bottom sheet's drag handle. Off by default: the handle is an
+    #: affordance for a drag gesture that needs a motion system to implement,
+    #: so showing one by default would promise behaviour that does not exist.
+    handle: bool = False
 
     # text
     font_size: float = Field(default=14.0, gt=0)

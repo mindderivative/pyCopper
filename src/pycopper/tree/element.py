@@ -324,6 +324,35 @@ class ElementMixin:
         self._cached_origin = absolute
         self._needs_paint = False
 
+    #: Where this widget sits when used as an overlay and the view does not
+    #: say. A component named `BottomSheet` should not need `placement: bottom`
+    #: spelled out; None means "no opinion", which resolves to `style.placement`.
+    DEFAULT_PLACEMENT: str | None = None
+
+    #: Docked overlays sit flush against their window edge; floating ones keep
+    #: a margin. This is the same distinction M3 draws by rounding only a
+    #: sheet's inner corners -- the outer edge is against the window, so a gap
+    #: there would leave the unrounded corners hanging in mid-air.
+    DOCKED: bool = False
+
+    @property
+    def resolved_placement(self) -> str:
+        """Placement actually used, in precedence order.
+
+        1. An explicit `placement:` in the view always wins -- detected with
+           pydantic's `model_fields_set`, so an explicitly written `center` is
+           distinguishable from the field's default of `center`.
+        2. An `anchor:` with no placement means the designer wants anchoring;
+           naming an anchor and then centring the overlay is never intended.
+        3. Otherwise the component's own default.
+        """
+        style = self.style
+        if "placement" in style.model_fields_set:
+            return str(style.placement)
+        if style.anchor:
+            return "anchor"
+        return self.DEFAULT_PLACEMENT or str(style.placement)
+
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
         """Corner radii this element actually paints with.

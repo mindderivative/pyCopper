@@ -251,6 +251,14 @@ along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.
 
+**Building an overlay component:** declare it in the top-level `overlays:` list
+and let `runtime/overlay.py` own placement, scrim, modality and dismissal --
+the widget supplies anatomy only. Give it a `DEFAULT_PLACEMENT` so the view
+need not state the obvious, and `DOCKED = True` if it sits flush with a window
+edge. Remember that an M3 minimum width **cannot** override the constraints it
+is given: a node must return a size its constraints permit, so clamp with
+`_clamped_width` rather than returning the minimum unconditionally.
+
 **Verifying a widget visually:** add it to `examples/gallery/view.yaml` and
 regenerate the golden baseline (ARCHITECTURE.md §11.1). The gallery is the
 golden corpus, so a widget that appears there is regression-tested from then

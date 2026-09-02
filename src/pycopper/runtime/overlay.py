@@ -63,6 +63,11 @@ class OverlayEntry:
         return bool(self.element.style.dismissable)
 
     @property
+    def placement(self) -> str:
+        """Resolved placement -- see `ElementMixin.resolved_placement`."""
+        return str(self.element.resolved_placement)
+
+    @property
     def key(self) -> str:
         """Stable handle for dismissal tracking: the name if given, else the
         positional id."""
@@ -162,18 +167,21 @@ class OverlayHost:
     def _place(self, entry: OverlayEntry, window: Size, root: Any) -> Offset:
         style = entry.element.style
         size = entry.element.size
-        placement = style.placement
+        placement = entry.placement
+        #: A docked overlay (a sheet) is flush with its edge; a floating one
+        #: (snackbar, menu, tooltip) keeps clear of it.
+        margin = 0.0 if entry.element.DOCKED else MARGIN
 
         if placement == "anchor" and style.anchor:
             return self._anchored(entry, window, root)
         if placement == "top":
-            return Offset((window.width - size.width) / 2, MARGIN)
+            return Offset((window.width - size.width) / 2, margin)
         if placement == "bottom":
-            return Offset((window.width - size.width) / 2, window.height - size.height - MARGIN)
+            return Offset((window.width - size.width) / 2, window.height - size.height - margin)
         if placement == "left":
-            return Offset(MARGIN, (window.height - size.height) / 2)
+            return Offset(margin, (window.height - size.height) / 2)
         if placement == "right":
-            return Offset(window.width - size.width - MARGIN, (window.height - size.height) / 2)
+            return Offset(window.width - size.width - margin, (window.height - size.height) / 2)
         return Offset((window.width - size.width) / 2, (window.height - size.height) / 2)
 
     def _anchored(self, entry: OverlayEntry, window: Size, root: Any) -> Offset:
@@ -268,6 +276,6 @@ class OverlayHost:
             if entry.modal:
                 self.dismiss(entry)
                 return True
-            if entry.dismissable and entry.element.style.placement == "anchor":
+            if entry.dismissable and entry.placement == "anchor":
                 self.dismiss(entry)
         return self.has_modal

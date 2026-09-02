@@ -38,6 +38,16 @@ def ask(event) -> None:
 
 
 @app.handler
+def dismiss(event) -> None:
+    """Closes the dialog. Both of its buttons use this.
+
+    The overlay host also closes it on Escape or a click outside, but a
+    dialog's own actions must work without relying on that.
+    """
+    confirming.set(False)
+
+
+@app.handler
 def reset(event) -> None:
     clicks.set(0)
 

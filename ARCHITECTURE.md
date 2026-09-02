@@ -829,10 +829,10 @@ would leave the parent's Flex reserving space for something that floats.
 ```yaml
 root: { ... }
 overlays:
-  - id: confirm
-    widget: Card
+  - name: confirm
+    widget: Dialog
     open: "{{ show.get() }}"          # templated, like text: and value:
-    style: { placement: center, modal: true, scrim: true }
+    style: { modal: true, scrim: true }
 ```
 
 The host runs its own layout and paint pass after the main tree's, and is
@@ -840,7 +840,7 @@ consulted **first** during hit testing because it is on top.
 
 | Concern | Behaviour |
 |---|---|
-| Placement | `center`, `anchor` (to another element's id), or an edge |
+| Placement | `center`, `anchor` (to another element's `name`), or an edge |
 | Anchoring | placed below the anchor, **flipping above** when it would overflow |
 | Scrim | M3's 32% `scrim` token, sized to the window |
 | Modality | a modal swallows every press outside itself; the tree beneath is unreachable |
@@ -850,6 +850,27 @@ consulted **first** during hit testing because it is on top.
 Dismissals are tracked separately from the `open:` binding and reconciled each
 frame, so an overlay closed by clicking outside can still be reopened by its
 signal — otherwise the dismissal would outlive the state change.
+
+#### 5.13.1 Placement a component does not have to declare
+
+`placement:` defaults to `center` for every widget, which is wrong for most of
+the components that actually float: a widget named `BottomSheet` should not
+have to be told it belongs at the bottom. Two rules fix that without taking
+control away from the view, resolved in `ElementMixin.resolved_placement`:
+
+1. An explicit `placement:` always wins. "Explicit" is decided by pydantic's
+   `model_fields_set`, so a written `center` is distinguishable from the
+   field's default of `center` — which a plain equality check cannot do.
+2. Failing that, an `anchor:` implies `placement: anchor`. Naming an anchor and
+   then centring the overlay is never what was meant.
+3. Failing that, the component's own `DEFAULT_PLACEMENT`: `bottom` for
+   Snackbar and BottomSheet, `right` for SideSheet, `center` for Dialog.
+
+**Docked versus floating.** A sheet sits flush against its window edge; a
+snackbar, menu or tooltip keeps an 8dp margin from it. This is not decoration:
+M3 rounds only a sheet's *inner* corners, and a gap outside a square corner
+leaves it hanging in mid-air. Components set `DOCKED` and the host drops the
+margin for them.
 
 Two bugs this work surfaced, both pre-existing and both now fixed:
 
@@ -861,9 +882,18 @@ Two bugs this work surfaced, both pre-existing and both now fixed:
   from `style.width` regardless of axis, and a Column's main axis is its
   *height*. An anchored menu stretched to the bottom of the window.
 
-### 5.12 Material Design 3 components — `widgets/material.py`
+And one surfaced by building the components on top of it:
 
-Nine components translated from their M3 specs. Dimensions are M3's own dp
+- **M3 minimum widths violated their constraints.** A Menu clamped itself to
+  its 112dp minimum regardless of the space offered, so a Menu laid out in
+  50dp raised outright (`layout/node.py` asserts that a node returns a size its
+  constraints permit) while a Dialog was silently clipped. An M3 minimum is an
+  aspiration that yields to a narrower parent, not a floor — see
+  `_clamped_width`.
+
+### 5.12 Material Design 3 components — `widgets/material.py`, `navigation.py`, `overlays.py`
+
+Components translated from their M3 specs. Dimensions are M3's own dp
 figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 
 | Widget | M3 spec | Notes |
@@ -890,9 +920,41 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
 | `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
 
+**Wave 3** added the six components the overlay layer (§5.13) exists for, in
+`widgets/overlays.py`. They contribute M3 *anatomy* only — container token,
+shape, and the padding between the parts — because the host already owns
+placement, scrim, modality and dismissal. A Dialog does not know it is centred.
+
+| Widget | M3 spec | Notes |
+|---|---|---|
+| `Dialog` | 28dp radius, 24dp padding, 280–560dp wide, height **dynamic** | headline + `supporting_text` + actions as its child |
+| `Menu` | 4dp radius, 112–280dp wide, 8dp vertical padding | `surface_container` |
+| `MenuItem` | 48dp high, 12dp side padding | denser than `ListItem`'s 56/72/88dp; `supporting_text` is the trailing shortcut |
+| `Tooltip` | 24dp high, 8dp side padding | `inverse_surface` / `inverse_on_surface` |
+| `Snackbar` | 48dp growing to 64dp | `inverse_surface`; action label in `inverse_primary` |
+| `BottomSheet` | 28dp **top** corners, max 640dp wide | optional 32×4dp drag handle, 22dp above and below |
+| `SideSheet` | 16dp leading corners, max 400dp, 24dp padding | corners follow the docked edge |
+
+Three notes on fidelity, since the point of citing a spec is that the citation
+can be checked:
+
+- **Snackbar's page carries no measurement table.** Its 4dp radius is inferred
+  from the extra-small step of the shape scale and its 600dp width cap is a
+  desktop-reasonable choice. Both are marked as inferred in the source; every
+  other number in the module is quoted.
+- **Tooltip's table is internally inconsistent** — a 24dp container with "8dp
+  padding" cannot also fit a body-small label, so the 8dp is read as the
+  horizontal inset and the vertical one is whatever centres the label.
+- **The menu implemented is M3's *baseline* menu, not the vertical menu** M3
+  now leads with. The newer variant's shape morphing and vibrant colour need a
+  motion system and a theme engine, neither of which exists yet.
+
 **Bottom-anchored navigation is deliberately absent.** M3's Navigation Bar and
 Bottom App Bar are mobile patterns (§1.2.1); the rail and drawer are their
-desktop counterparts.
+desktop counterparts. A `BottomSheet` is not an exception to this: it is a
+desktop-legitimate surface for secondary content, and its drag handle is drawn
+as an affordance but is **not draggable**, since dragging needs the motion
+system pyCopper does not have. It is off by default for that reason.
 
 Four of these share one shape — a container of items where exactly one is
 selected — modelled once as `_SelectionContainer`: the container carries
