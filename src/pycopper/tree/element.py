@@ -152,7 +152,11 @@ class ElementMixin:
     _error_template: Template | None
     _error: str
     _cached: np.ndarray | None
-    _cached_origin: Offset | None
+    #: Everything the cached slice was built from. Compared whole, because a
+    #: cached slice holds *resolved physical geometry* -- if any of these
+    #: differs, the instances in it are drawn in the wrong place or at the
+    #: wrong size, and nothing downstream will notice.
+    _cached_key: tuple[Any, ...] | None
     _needs_paint: bool
     _text_engine: TextEngine | None
     _ticker: Ticker | None
@@ -181,7 +185,7 @@ class ElementMixin:
         self._error_template = spec.error_template()
         self._error = spec.error or ""
         self._cached = None
-        self._cached_origin = None
+        self._cached_key = None
         self._needs_paint = True
         self._text_engine = None
         self._ticker = None
@@ -491,12 +495,23 @@ class ElementMixin:
     def paint(self, ctx: PaintContext, origin: Offset) -> None:
         """Emit this subtree into the display list, back to front.
 
-        A clean subtree at an unchanged origin is spliced from its cached slice
-        -- 0.002 ms per 1000 instances versus 3.27 ms to rebuild (§12.1).
+        A clean subtree whose geometry has not moved is spliced from its cached
+        slice -- 0.002 ms per 1000 instances versus 3.27 ms to rebuild (§12.1).
+
+        **Geometry, not just position.** The key used to be the absolute origin
+        alone, which made a window resize paint stale frames: a stretched row
+        keeps its origin and changes width, so it passed the check and was
+        spliced from its old, narrower slice. Rows that happened to shift
+        vertically repainted and rows that did not stayed stale, which is why
+        the symptom was several different widths in one frame rather than an
+        obviously frozen window. Size, pixel ratio and the inherited clip are
+        all in the key for the same reason -- each is baked into the instances
+        the slice holds.
         """
         absolute = origin + self.offset
 
-        if not self._needs_paint and self._cached is not None and self._cached_origin == absolute:
+        key = (absolute, self.size, ctx.pixel_ratio, ctx.clip, ctx.clip_radii)
+        if not self._needs_paint and self._cached is not None and self._cached_key == key:
             ctx.display_list.extend(self._cached)
             return
 
@@ -514,7 +529,7 @@ class ElementMixin:
 
         self.paint_focus_ring(ctx, absolute)
         self._cached = ctx.display_list.snapshot(start)
-        self._cached_origin = absolute
+        self._cached_key = key
         self._needs_paint = False
 
     #: Where this widget sits when used as an overlay and the view does not

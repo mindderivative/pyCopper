@@ -13,6 +13,7 @@ Two different standards, needed for two different jobs:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 from uniseg.graphemecluster import grapheme_clusters
 from uniseg.linebreak import line_break_units
@@ -52,8 +53,12 @@ def line_break_units_of(text: str) -> list[str]:
     return list(line_break_units(text))
 
 
-def break_opportunities(text: str) -> list[BreakOpportunity]:
-    """Every legal wrap position in *text*, in order."""
+#: Memoised for the same reason as `_clusters`, and it matters more: wrapping
+#: asks for a paragraph's break positions once per candidate line and again on
+#: every relayout, and they do not depend on the width being tried. The tuple
+#: is returned as a list so callers keep a value they may mutate.
+@lru_cache(maxsize=1024)
+def _break_opportunities(text: str) -> tuple[BreakOpportunity, ...]:
     out: list[BreakOpportunity] = []
     offset = 0
     for unit in line_break_units(text):
@@ -67,12 +72,38 @@ def break_opportunities(text: str) -> list[BreakOpportunity]:
                 mandatory=mandatory,
             )
         )
-    return out
+    return tuple(out)
+
+
+def break_opportunities(text: str) -> list[BreakOpportunity]:
+    """Every legal wrap position in *text*, in order."""
+    return list(_break_opportunities(text))
+
+
+#: Memoised because segmentation is pure and expensive, and the same strings
+#: come back constantly: wrapping asks for every candidate prefix of a
+#: paragraph at every width it is tried at, and a caret asks for the whole
+#: field's boundaries on every keystroke. Profiling a window resize put uniseg
+#: at 54% of the frame, all of it recomputing answers it had already given.
+#: Bounded, because the keys are arbitrary user text.
+@lru_cache(maxsize=4096)
+def _clusters(text: str) -> tuple[str, ...]:
+    return tuple(grapheme_clusters(text))
+
+
+@lru_cache(maxsize=4096)
+def _boundaries(text: str) -> tuple[int, ...]:
+    out = [0]
+    offset = 0
+    for cluster in _clusters(text):
+        offset += len(cluster)
+        out.append(offset)
+    return tuple(out)
 
 
 def clusters(text: str) -> list[str]:
     """UAX #29 grapheme clusters -- what a user calls 'characters'."""
-    return list(grapheme_clusters(text))
+    return list(_clusters(text))
 
 
 def cluster_boundaries(text: str) -> list[int]:
@@ -80,12 +111,7 @@ def cluster_boundaries(text: str) -> list[int]:
 
     These are the only positions a caret may legally occupy.
     """
-    out = [0]
-    offset = 0
-    for cluster in grapheme_clusters(text):
-        offset += len(cluster)
-        out.append(offset)
-    return out
+    return list(_boundaries(text))
 
 
 def previous_boundary(text: str, offset: int) -> int:

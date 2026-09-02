@@ -364,6 +364,8 @@ every box as a glyph rather than fail.
 
 **Subtree caching.** Each Element caches the instance slice it produced. A clean subtree's cached slice is copied wholesale into the frame buffer; only `needs_paint` subtrees re-emit. Because instances carry absolute coordinates, a subtree that merely *moved* still needs re-emission — this is a deliberate simplicity trade, revisitable by adding a per-instance transform index.
 
+**The cache key is the whole geometry the slice was built from** — absolute origin, size, pixel ratio, and the inherited clip — not the origin alone. Keying on origin alone shipped, and made window resizing paint stale frames: a row stretched across a Column keeps its origin when the window widens and changes only its width, so it passed the check and was spliced from its older, narrower slice. The symptom was not an obviously frozen window but *several different widths in one frame*, because rows that also shifted vertically did repaint and rows that did not stayed stale. Everything in the key is baked into the physical coordinates the slice holds, and nothing downstream can notice that they are wrong.
+
 ### 5.6 Theme — `theme/`
 
 The MD3 token set is computed once from the seed via `materialyoucolor` and packed into a **single contiguous `float32` palette buffer** uploaded as a storage buffer.
@@ -494,15 +496,18 @@ Output is numpy from the start, so stage 7 writes glyph instances vectorised (§
 
 #### 5.7.4 Caching
 
-Three caches, in descending hit rate. Without them the perf budget in §12 is unreachable.
+Four caches, in descending hit rate. Without them the perf budget in §12 is unreachable.
 
 | Cache | Key | Value | Invalidated by |
 |---|---|---|---|
 | **Shaped run** | `(text, face, size, script, direction, features, lang)` | `ShapedRun` | Text or style change |
 | **Paragraph layout** | `(run ids, available width, align)` | Line boxes | Reflow / resize |
+| **Segmentation** | `text` | UAX #14 break positions, UAX #29 clusters | Nothing — bounded LRU |
 | **Glyph raster** | `(face, px_size, gid, subpixel_bucket)` | Atlas rect | DPI change, LRU eviction |
 
-Static labels — the majority of any interface — hit all three caches and cost nothing per frame beyond copying a cached instance slice.
+Static labels — the majority of any interface — hit all four and cost nothing per frame beyond copying a cached instance slice.
+
+**The segmentation cache is keyed on text alone**, which is what makes it the one that saves a resize. Break positions and grapheme clusters do not depend on the width being tried, but wrapping asks for them once per *candidate line* and again on every relayout — so dragging a window recomputed the same UAX #14 and #29 answers hundreds of times a second. Profiling a gallery resize put uniseg at **54% of the frame**; memoising these two pure functions took a resize frame from 17.6 ms to 7.3 ms, and 1.3 ms once line breaking was memoised as well. Bounded LRU, because the keys are arbitrary user text.
 
 #### 5.7.5 Rasterisation and the atlas
 
