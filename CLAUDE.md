@@ -13,6 +13,12 @@ explicit ask — this instruction doesn't authorize that.
 
 ## Memory policy
 
+> **Maintainer's environment only.** This section configures the maintainer's
+> local Claude Code setup and its MCP knowledge-graph server. It is not a
+> requirement for building, testing, or contributing to pyCopper, and nothing
+> in the codebase depends on it. Contributors can ignore it entirely; the
+> commit policy above is the part that applies to everyone.
+
 **System Instructions for MCP-Enabled Agent**
 
 1. **User Identification:**
@@ -40,7 +46,7 @@ explicit ask — this instruction doesn't authorize that.
 
 5. **Two Stores — Which One Is Canonical:**
 - The MCP knowledge graph is **canonical**. It holds the full detail, is not scoped to one project, and carries all entities and relations. **When the two stores disagree, the graph wins.**
-- The file-based memory at `~/.claude/projects/-home-phil-pyDev-projects-pyCopper/memory/` is the **project-scoped summary**, loaded automatically into context each session. It keeps working agreements in full and reduces project detail to short pointers naming the relevant graph entity.
+- The file-based memory in this project's Claude Code memory directory is the **project-scoped summary**, loaded automatically into context each session. It keeps working agreements in full and reduces project detail to short pointers naming the relevant graph entity.
 - New project detail goes into the **graph first** (`add_observations`, or `create_entities` for something genuinely new). Only edit a file in the summary when the summary itself has become wrong, or a new working agreement is established. **Do not mirror full detail back into it** — two complete copies drift, which is what this split exists to prevent.
 
 6. **If Memory Writes Fail:**

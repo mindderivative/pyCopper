@@ -22,12 +22,27 @@ what that role means.
 
 ## Before anything else
 
-Check that `M3-References/` exists in the repo root. It is the user's personal
-reference library and is **not tracked in git**, so it can be missing in a
-fresh checkout or a worktree. If it's missing, say so plainly and stop. Do not
-fall back on training knowledge of Material Design: the entire point of this
-library is an authoritative current source, and recalled M3 detail is reliably
-stale or version-mixed (M2 vs M3 vs M3 Expressive).
+Check that `M3-References/` exists in the repo root. **It is deliberately not
+tracked in git**, so it is absent from every fresh clone -- including this one,
+most likely.
+
+If it is missing, say so plainly and stop. Do **not** fall back on training
+knowledge of Material Design: the whole point of the library is an
+authoritative current source, and recalled M3 detail is reliably stale or
+version-mixed (M2 vs M3 vs M3 Expressive). Answering from memory is the one
+failure this skill exists to prevent.
+
+**What the library is, and why it is not in the repo.** It is a local extract
+of the published Material Design 3 guidance from `m3.material.io` -- roughly
+2.2 MB of component and style pages. It is Google's material, not this
+project's, so it is not redistributed here.
+
+**Without it**, say that the reference library is unavailable and point at
+`m3.material.io` directly. Everything already built has its sourced figures
+quoted in `ARCHITECTURE.md` and in the widget docstrings, so an existing
+widget's spec can be checked there -- and where a value was *not* in the source
+it is explicitly marked as unsourced. That is the right fallback: cite what was
+recorded at the time, never a recollection of the spec.
 
 ## Path 1: A specific component
 
