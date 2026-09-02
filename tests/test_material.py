@@ -9,6 +9,7 @@ from pycopper.layout import Constraints, Size
 from pycopper.paint import NO_TOKEN, DisplayList, Kind
 from pycopper.spec import SpecError, WidgetKind, parse_view
 from pycopper.widgets import build_element
+from pycopper.widgets.base import measure_text
 
 LOOSE = Constraints.loose(Size(400, 400))
 
@@ -81,6 +82,58 @@ def test_unknown_variant_is_rejected_at_load() -> None:
 )
 def test_control_matches_the_m3_size(kind: str, expected: Size) -> None:
     assert laid_out(widget=kind).size == expected
+
+
+def test_a_button_sizes_itself_without_being_told() -> None:
+    """A Button written with no `style:` used to lay out 0x0 and draw nothing.
+
+    It paints its label rather than holding it as a child, so the container
+    layout it inherited measured an absent child and returned nothing --
+    while HEIGHT and MIN_WIDTH sat declared and unused. Every example carried
+    an explicit size or a stylesheet class, so no golden ever caught it.
+
+    M3: "Container Height: 40dp", "Minimum Width: 64dp", "Padding: Horizontal
+    24dp".
+    """
+    from pycopper.widgets.base import ButtonElement
+
+    button = laid_out(widget="Button", text="Confirm")
+    assert button.size.height == ButtonElement.HEIGHT == 40.0
+    assert button.size.width > ButtonElement.MIN_WIDTH, "it grew to fit its label"
+
+    label = measure_text("Confirm", ButtonElement.LABEL_ROLE, engine=button.text_engine)
+    assert button.size.width == pytest.approx(label.width + 2 * ButtonElement.PAD_X)
+
+
+def test_a_button_with_no_label_still_meets_the_minimum() -> None:
+    from pycopper.widgets.base import ButtonElement
+
+    assert laid_out(widget="Button").size == Size(ButtonElement.MIN_WIDTH, ButtonElement.HEIGHT)
+
+
+def test_an_explicit_size_still_wins() -> None:
+    """The intrinsic size is a floor, not an override -- every existing view
+    sets its own and must keep it."""
+    button = laid_out(widget="Button", text="Confirm", style={"width": 130, "height": 44})
+    assert button.size == Size(130, 44)
+
+
+def test_a_stretched_button_keeps_its_height() -> None:
+    """`cross_alignment: stretch` gives it the row's width. It used to take
+    the width and stay zero high, which is the same bug wearing a disguise."""
+    from pycopper.layout import Constraints
+    from pycopper.spec import parse_view
+    from pycopper.widgets import build_element
+
+    view = {
+        "name": "col",
+        "widget": "Column",
+        "style": {"cross_alignment": "stretch"},
+        "children": [{"name": "b", "widget": "Button", "text": "Wide"}],
+    }
+    root = build_element(parse_view(view).root)
+    root.layout(Constraints(0.0, 300.0, 0.0, 200.0))
+    assert root.find("b").size == Size(300.0, 40.0)
 
 
 @pytest.mark.parametrize(

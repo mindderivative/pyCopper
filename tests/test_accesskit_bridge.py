@@ -30,8 +30,6 @@ VIEW = {
                 "name": "go",
                 "widget": "Button",
                 "text": "Confirm",
-                # Sized explicitly: a Button with no size lays out 0x0, which
-                # is a separate layout bug and not this file's subject.
                 "style": {"width": 130, "height": 40},
                 "handlers": {"on_click": "hit"},
             },

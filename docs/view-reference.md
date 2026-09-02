@@ -510,7 +510,7 @@ optional bridge pushes it to the platform.
 ```python
 from pycopper.runtime.accesskit_bridge import AccessKitBridge, available
 
-if available() is None:                      # a sentence when it cannot run
+if available() is None:  # a sentence when it cannot run
     app.bind_accessibility(AccessKitBridge(window_title="My app"))
 ```
 
@@ -889,7 +889,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 
 | Widget | M3 spec |
 |---|---|
-| `Button` | 40dp high, full radius. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
+| `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
 | `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. |
 | `Fab` | 56dp standard, 40 small, 96 large. |
 | `Checkbox` | 18dp box, 2dp radius. |

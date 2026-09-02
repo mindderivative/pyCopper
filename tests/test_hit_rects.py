@@ -73,6 +73,9 @@ def test_a_minimum_grows_a_small_control_around_its_centre() -> None:
 
 
 def test_a_minimum_never_shrinks_a_control_that_already_exceeds_it() -> None:
+    """Sized explicitly here because the assertion is about the hit rect
+    matching the paint rect, and pinning both to a stated number says that
+    more plainly than deriving one from the label."""
     root = tree(
         row(
             {

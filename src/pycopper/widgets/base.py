@@ -314,8 +314,16 @@ class ButtonElement(ContainerElement):
     tokens come from the variant unless the view sets them explicitly.
     """
 
+    #: "Container Height: 40dp", "Minimum Width: 64dp", "Padding: Horizontal
+    #: 24dp ... Vertical 10dp" -- quoted from the same anatomy table. These
+    #: were declared and never used: a Button has no child element, so it
+    #: inherited a Padding layout that measured its (absent) child and returned
+    #: nothing. A button written without an explicit size laid out 0x0 and drew
+    #: nothing at all. Every example carried a size or a stylesheet class,
+    #: which is why no golden ever caught it.
     HEIGHT: Final = 40.0
     MIN_WIDTH: Final = 64.0
+    PAD_X: Final = 24.0
     CURSOR = "pointer"
 
     #: "Typography: md.sys.typescale.label-large (14sp / 20dp line height,
@@ -323,6 +331,22 @@ class ButtonElement(ContainerElement):
     #: rather than Regular. The whole role travels as one object so its size,
     #: weight and tracking cannot arrive at measure and paint separately.
     LABEL_ROLE: Final = TYPE_SCALE["label-large"]
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        """Size to the label, floored at M3's minimum.
+
+        A Button paints its label rather than holding it as a child, so there
+        is nothing for the inherited container layout to measure. It has to
+        measure the text itself -- with the same role its paint pass uses, or
+        the box would be sized for one rendering and drawn in another.
+        """
+        outer = self.sized(constraints, self.style)
+        label = (
+            measure_text(self._text, self.LABEL_ROLE, engine=self.text_engine)
+            if self._text.strip()
+            else Size(0.0, 0.0)
+        )
+        return outer.constrain(Size(max(self.MIN_WIDTH, label.width + 2 * self.PAD_X), self.HEIGHT))
 
     #: Only the `elevated` variant rests above the surface; M3 puts filled,
     #: tonal and outlined buttons at level 0.
