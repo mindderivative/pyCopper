@@ -372,6 +372,9 @@ Stated plainly so you can design around it:
   nowhere to attach.
 - **The M3 type scale as named roles.** Widgets take a raw `font_size`;
   `label-large` and friends are not modelled.
+- **Drag gestures.** A bottom sheet's drag handle and a scrollbar's thumb are
+  drawn but do not respond to a drag; both are affordances for a gesture that
+  is not wired to the pointer yet.
 - **Separate hit and paint rects**, so M3's 48dp minimum touch target cannot be
   expressed on a smaller visible control. This is deliberate — pyCopper is
   pointer-only.
