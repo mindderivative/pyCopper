@@ -25,7 +25,7 @@ from .runtime.viewmodel import ViewModel, ViewModelError
 from .spec import SpecError, ViewSpec, WidgetKind, WidgetSpec, load_view
 from .theme import TOKEN_ORDER, Palette, Theme, is_token
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 __all__ = [
     "DURATION",

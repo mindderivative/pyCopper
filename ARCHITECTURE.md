@@ -770,16 +770,45 @@ descriptions, values, states and bounds, derived from the element tree on
 demand. Built when asked rather than maintained, because nothing consumes it
 per frame and a tree rebuilt on request cannot go stale.
 
-**What is deliberately absent is the bridge.** AT-SPI, UIA and NSAccessibility
-are native, per-OS work; `accesskit` is the obvious candidate and would bring a
-native dependency, which is an application's decision rather than the
-framework's. `Bridge` writes the shape of that missing half down so it is not
-guessed at later, and a test pins that it raises — if a bridge ever lands, that
-test should fail and be rewritten. Until then nothing in the codebase may imply
-a screen reader can read a pyCopper application, because it cannot.
+**The bridge is optional and lives in `accesskit_bridge.py`.** AccessKit owns
+the per-platform half — AT-SPI over D-Bus on Linux, UIA on Windows,
+NSAccessibility on macOS — so pyCopper does not. It is a native wheel, so it is
+an extra (`pip install 'pycopper[a11y]'`) and an application opts in with
+`App.bind_accessibility`. Without one bound, nothing reaches a screen reader.
+Today's build serves AT-SPI; `available()` returns a *sentence* rather than a
+bool, because "not available" with no reason is the least useful thing an
+accessibility feature can say.
 
-The tree is still worth its keep: it is what a bridge would be handed, and it
-lets a test ask for "the button named Confirm" instead of for a rectangle.
+**Verified against the live accessibility bus**, not just unit-tested. With
+`org.a11y.Status.ScreenReaderEnabled` set true, the gallery appears in the
+AT-SPI registry and its window object reports `Name: 'pyCopper gallery'` with
+its content beneath. Three things only that exercise could have found:
+
+- **AccessKit stays dormant while nothing is listening.** With no screen reader
+  the adapter never registers, which is `update_if_active` doing its job and is
+  why a per-frame push costs nothing.
+- **The tree's root must be a `WINDOW` carrying the title.** Handing AccessKit
+  our own root — a `Column`, which converts to `GROUP` — left AT-SPI listing
+  the application as `python3.14`, the process name, for want of anything
+  better. The bridge now wraps the view in a titled window node.
+- **The adapter must be shut down deterministically.** AccessKit runs a D-Bus
+  task that calls back into Python, and left alive at interpreter shutdown it
+  panics — "The Python interpreter is not initialized", from pyo3's GIL
+  handling. Exactly the shape of the wgpu surface outliving its window (§5.8.2).
+  `AccessKitBridge.close()` drops it and `App.run` calls it in a `finally`; a
+  test suite that leaked one took the whole run down at exit, which is how this
+  was found.
+
+**Actions cross a thread boundary.** A reader activating a button calls back
+from AccessKit's D-Bus task, and pyCopper's signals are thread-affine — acting
+there raises `ThreadAffinityError`, the guardrail working. Requests are queued
+and `App.update` drains them on the engine thread. A bridge that could only
+*read* would be half a feature: announcing a button nobody can press is not
+access.
+
+The tree is worth its keep with or without a bridge: it is what the bridge is
+handed, and it lets a test ask for "the button named Confirm" instead of for a
+rectangle.
 
 **Roles are sourced where M3 states one**, which is rarely: "The role is
 'textbox'", the "role of 'progressbar'", a list is a "List box" so its items

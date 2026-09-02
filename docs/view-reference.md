@@ -504,12 +504,21 @@ Two consequences worth knowing:
 
 ## Accessibility
 
-**Read this first: there is no platform bridge.** pyCopper builds the semantic
-tree — roles, names, states, bounds — and nothing that shows it to a screen
-reader. AT-SPI, UIA and NSAccessibility are native, per-OS work and are not
-built. Claiming accessibility you do not have is worse than claiming none, so
-this is the honest position: the half that belongs to the toolkit exists, and
-the half that belongs to the platform does not.
+pyCopper builds the semantic tree — roles, names, states, bounds — and an
+optional bridge pushes it to the platform.
+
+```python
+from pycopper.runtime.accesskit_bridge import AccessKitBridge, available
+
+if available() is None:                      # a sentence when it cannot run
+    app.bind_accessibility(AccessKitBridge(window_title="My app"))
+```
+
+**It is opt-in and Linux-only today.** The bridge needs `accesskit`, a native
+wheel, so it is an extra: `pip install 'pycopper[a11y]'`. AccessKit ships its
+Windows and macOS adapters in their own platform wheels, so this build serves
+AT-SPI and `available()` says so rather than leaving it to be discovered.
+Without a bridge bound, nothing reaches a screen reader.
 
 ```python
 tree = app.accessibility_tree()
@@ -517,9 +526,14 @@ confirm = tree.find(role="button", name="Confirm")
 assert confirm.bounds.width == 130
 ```
 
-It is worth having anyway. It is what any bridge would be handed, and it lets a
-test ask for *the button called Confirm* rather than for a rectangle at some
-coordinate.
+The tree is worth having with or without a bridge: it is what the bridge is
+handed, and it lets a test ask for *the button called Confirm* rather than for
+a rectangle at some coordinate.
+
+A reader can also *operate* the interface — every clickable role advertises the
+click action, and requests are applied on the engine thread a frame later,
+because AccessKit delivers them from its own D-Bus thread and pyCopper's
+signals are thread-affine.
 
 **Roles are sourced where M3 states one** — a text field is `textbox`, a
 progress indicator has the "role of 'progressbar'", a navigation item is `tab`,

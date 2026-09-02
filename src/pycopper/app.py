@@ -15,9 +15,9 @@ from .config import Settings
 from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
 from .motion import Ticker
 from .paint import DisplayList
-from .runtime.accessibility import AccessibleNode, accessibility_tree
+from .runtime.accessibility import AccessibleNode, Bridge, accessibility_tree
 from .runtime.engine import Engine
-from .runtime.events import EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
+from .runtime.events import Event, EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
 from .runtime.hotreload import HotReloader
 from .runtime.overlay import OverlayHost
 from .runtime.signals import batch, bind_thread
@@ -89,6 +89,8 @@ class App:
         #: view file -> the ViewModel bound to it. One per file: including a
         #: fragment five times gives five copies of the view and one ViewModel.
         self._view_models: dict[str, ViewModel] = {}
+        #: Optional platform bridge. None until an application binds one.
+        self._a11y: Bridge | None = None
         self.engine: Engine | None = None
         self.reloader: HotReloader | None = None
         self.reload_errors: list[str] = []
@@ -245,6 +247,7 @@ class App:
         self.dispatcher.drain()
         self.motion.tick(self._frame_delta())
         self.layout_owner.flush()
+        self._drain_accessibility()
         size = self.logical_size()
         self.root.layout(Constraints.tight(size))
         self.overlays.layout(size, self.root)
@@ -268,10 +271,59 @@ class App:
         )
         self.root.paint(ctx, OFFSET_ZERO)
         self.overlays.paint(ctx, self.palette, self.logical_size())
+        if self._a11y is not None:
+            # Cheap while nothing is listening: the adapter skips the work when
+            # no screen reader is attached, which is what makes a per-frame
+            # push affordable rather than needing change detection of its own.
+            self._a11y.update(self.accessibility_tree())
         # The one legitimate reason to ask for another frame unprompted. An
         # application with nothing animating still renders nothing.
         if self.motion.active and self.engine is not None:
             self.engine.request_draw()
+
+    def bind_accessibility(self, bridge: Bridge) -> Bridge:
+        """Push this application's semantic tree to a platform adapter.
+
+        Opt-in, like the clipboard's seam: the bridge is a native dependency
+        and most applications will not want it. Once bound, the tree is pushed
+        whenever a frame is produced, and action requests -- a screen reader
+        pressing a button -- are drained on the engine thread.
+        """
+        self._a11y = bridge
+        bridge.update(self.accessibility_tree())
+        return bridge
+
+    @property
+    def accessibility(self) -> Bridge | None:
+        """The bound platform bridge, if an application bound one."""
+        return self._a11y
+
+    def _drain_accessibility(self) -> None:
+        """Act on what a screen reader asked for, on the engine thread.
+
+        AccessKit delivers requests from its own D-Bus task and pyCopper's
+        signals are thread affine, so they arrive queued rather than applied.
+        Only activation is honoured: it is the one action every clickable role
+        advertises, and inventing behaviour for the rest would be guessing at
+        what a reader meant.
+        """
+        bridge = self._a11y
+        if bridge is None:
+            return
+        drain = getattr(bridge, "drain", None)
+        target_of = getattr(bridge, "target_of", None)
+        if drain is None or target_of is None:
+            return
+        for request in drain():
+            node = target_of(request)
+            if node is None or node.key is None:
+                continue
+            element = self.root.find(node.key) or next(
+                (e for e in self.overlays.elements() if e.name == node.key), None
+            )
+            handler = element.handlers.get("on_click") if element is not None else None
+            if handler is not None:
+                handler(Event(EventType.CLICK, target=element))
 
     def accessibility_tree(self) -> AccessibleNode:
         """Snapshot what this interface *means*, for a bridge or for a test.
@@ -350,7 +402,16 @@ class App:
         bind_thread()
         engine = Engine(theme=self.theme, settings=self.settings)
         self.attach(engine)
-        engine.run()
+        try:
+            engine.run()
+        finally:
+            # A platform bridge runs a native thread that calls back into
+            # Python; left alive at interpreter shutdown it panics reaching for
+            # an interpreter that has finalised. Same shape as the GPU surface
+            # outliving its window -- see `Engine.close`.
+            close = getattr(self._a11y, "close", None)
+            if close is not None:
+                close()
 
 
 def run(app: App) -> None:

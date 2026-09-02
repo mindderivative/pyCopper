@@ -1,15 +1,16 @@
 """The accessibility tree: what an interface *means*, apart from how it looks.
 
-**Read this before believing pyCopper is accessible.** What is here is the
-semantic tree -- roles, names, states, bounds -- and nothing that shows it to a
-screen reader. A platform bridge (AT-SPI on Linux, UIA on Windows,
-NSAccessibility on macOS) is native, per-OS work and is *not* built. Claiming
-accessibility you do not have is worse than claiming none, so this says plainly
-what it is: the half that belongs to the toolkit, and a seam for the half that
-belongs to the platform.
+This module is the half that belongs to the toolkit: what the interface means,
+with no notion of any platform. `accesskit_bridge` is the half that belongs to
+the platform, and is optional -- an application binds it with
+`App.bind_accessibility` and pays for a native wheel only if it wants one.
+**Without a bridge bound, nothing reaches a screen reader**; the tree is still
+worth having, because it is what a bridge is handed and because it lets a test
+ask for "the button named Confirm" rather than for a pixel.
 
-It earns its place even so. It is the prerequisite for any bridge, and it lets
-a test ask for "the button named Confirm" rather than for a pixel.
+Today the bridge covers AT-SPI on Linux. Windows and macOS need their own
+AccessKit platform wheels and are untested here, which `available()` says
+rather than leaving to be discovered.
 
 **Roles are sourced where M3 states one**, which is not often -- a text field is
 "textbox", a progress indicator has the "role of 'progressbar'", a list is a
@@ -248,11 +249,14 @@ def accessibility_tree(root: Any, overlays: Any = None) -> AccessibleNode:
 class Bridge:
     """The seam a platform adapter plugs into.
 
-    Nothing implements this, deliberately. It is here so the shape of the
-    missing half is written down rather than guessed at later: a bridge is
-    handed the tree when it changes and pushes it to AT-SPI, UIA or
-    NSAccessibility. `accesskit` is the obvious candidate and brings a native
-    dependency, which is an application's decision rather than the framework's.
+    A bridge is handed the tree when it changes and pushes it to AT-SPI, UIA
+    or NSAccessibility. `accesskit_bridge.AccessKitBridge` implements it for
+    AT-SPI; it is an optional extra because it brings a native wheel, so an
+    application opts in with `App.bind_accessibility` rather than paying for it
+    by default.
+
+    This base raises, so a bridge that forgets to implement `update` fails
+    loudly rather than silently announcing nothing.
     """
 
     def update(self, tree: AccessibleNode) -> None:  # pragma: no cover - a seam

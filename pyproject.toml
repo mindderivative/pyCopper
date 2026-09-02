@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pycopper"
-version = "1.4.0"
+version = "1.5.0"
 description = "A GPU-accelerated declarative desktop GUI framework for Python"
 readme = "README.md"
 license = "MIT"
@@ -54,6 +54,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The screen-reader bridge. A native wheel, and only worth installing for an
+# application that wants one -- so it is an extra rather than a dependency.
+# AccessKit ships its Windows and macOS adapters in their own platform wheels;
+# the Linux wheel carries the AT-SPI adapter this uses.
+a11y = ["accesskit>=0.7,<0.8"]
 dev = [
     "pytest>=8.0",
     "hypothesis>=6.100",
@@ -61,6 +66,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "types-PyYAML>=6.0",
+    "accesskit>=0.7,<0.8",
 ]
 
 [project.urls]
@@ -110,6 +116,12 @@ ignore = ["N803", "N806"]  # graphics math uses conventional capitalised names
 # coming from MVVM will recognise. The framework accepts either casing, so a
 # project that would rather satisfy N999 can use `*_viewmodel.py` instead.
 "**/*_ViewModel.py" = ["N999"]
+
+[[tool.mypy.overrides]]
+# accesskit is a native wheel with no py.typed marker. Scoped to the one
+# module that imports it, so a missing stub elsewhere still fails.
+module = ["accesskit", "accesskit.*"]
+ignore_missing_imports = true
 
 [tool.mypy]
 python_version = "3.12"

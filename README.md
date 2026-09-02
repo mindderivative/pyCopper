@@ -100,6 +100,11 @@ versioning and pinned by a test; adding to it is a minor release, changing or
 removing anything in it is a major one. (1.1 was that rule in action: motion
 added four names and nothing else moved.)
 
+**v1.5 — the screen-reader bridge.** `app.bind_accessibility(AccessKitBridge(...))`
+pushes the semantic tree to AT-SPI, and a reader can activate controls as well
+as read them. Optional: `pip install 'pycopper[a11y]'`. Verified against the
+live accessibility bus on KDE Plasma.
+
 **v1.4 — the accessibility tree.** `AccessibleNode` joins `__all__`.
 `app.accessibility_tree()` reports roles, names, states and bounds. There is no
 screen-reader bridge, and the docs say so rather than implying otherwise.
@@ -144,7 +149,7 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 
 | Absent | Consequence |
 |---|---|
-| A screen-reader bridge | The semantic tree is built; AT-SPI / UIA / NSAccessibility are not, so no screen reader can read it yet |
+| A Windows or macOS screen-reader bridge | The AT-SPI bridge works; the other two need AccessKit's platform wheels and are untested |
 | IME preedit | Committed characters only, so CJK input methods are unsupported |
 | Clipboard access without focus | Copy and paste use the system clipboard, but Wayland grants that only to a focused window with a real keypress behind it — true of Ctrl+C/Ctrl+V, not of a background thread |
 
