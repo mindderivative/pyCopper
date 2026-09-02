@@ -351,6 +351,11 @@ class StyleSpec(_Frozen):
     #: absolute figure, the way M3 states tracking -- it does not scale with
     #: `font_size`, so a role's tracking stays correct only at that role's size.
     letter_spacing: float = Field(default=0.0, ge=-100.0, le=100.0)
+    #: Fixed line height in logical px. None keeps the font's own, which is
+    #: what most text wants; a type-scale role sets it. The extra space is
+    #: split evenly above and below the glyphs, so raising it does not move
+    #: centred text -- the box measures taller and the label stays put.
+    line_height: float | None = Field(default=None, gt=0.0, le=1000.0)
     #: An M3 type-scale role, resolved to `font_size` at load against the
     #: view's `type_scale:`. Naming a role with no scale defined is an error,
     #: not a silent fallback -- pyCopper ships no figures for these (see

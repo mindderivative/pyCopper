@@ -345,7 +345,8 @@ They agree with every value the reference library corroborates independently,
 and settle the one it contradicts itself on: `headline-large` appears there as
 both 32sp and 36sp, and the token source says **32**. Tests pin both facts.
 
-A role also carries its **weight** and its **tracking**. `title-medium`,
+A role carries three more tokens beside its size: **weight**, **tracking** and
+**line height**. `title-medium`,
 `title-small` and every `label-*` role are Medium (500), the rest Regular
 (400); Roboto ships both faces, so those are genuinely Medium rather than
 emboldened Regular. Tracking becomes `letter_spacing`, and nine of the fifteen
@@ -361,10 +362,16 @@ pixel, and `display-large` the only negative one at −0.25.
 | `body-large`, `label-medium`, `label-small` | 0.5 |
 | everything else | 0 |
 
-An explicit `font_weight:` or `letter_spacing:` beside a role wins — naming a
-role states an intent, and writing either beside it states a more specific one.
-Overriding a role's size in `type_scale:` leaves both alone: they are separate
-tokens, and resizing a role says nothing about them.
+Line height becomes `line_height`, a fixed height in logical px replacing the
+font's own. The two do not differ much, and not always in the same direction:
+Roboto wants 67px at `display-large` where M3 asks for 64, and 19px at
+`body-large` where M3 asks for 24.
+
+An explicit `font_weight:`, `letter_spacing:` or `line_height:` beside a role
+wins — naming a role states an intent, and writing one of these beside it
+states a more specific one. Overriding a role's size in `type_scale:` leaves
+all three alone: they are separate tokens, and resizing a role says nothing
+about them.
 
 Tracking is **absolute**, in logical px, the way M3 states it — it does not
 scale with `font_size`, so a role's tracking is only right at that role's size.
@@ -374,8 +381,15 @@ value, a quarter-pixel at the largest figure in the scale; the alternative is
 special-casing line ends in the measurement, the caret and the paint pen
 separately, and those three drifting apart is a worse bug than a quarter-pixel.
 
-Line height is recorded per role but not applied: paragraph line height comes
-from the font's own metrics.
+Line height is **absolute** too, and the extra space is split evenly above and
+below the glyphs, the way CSS distributes half-leading. That has a useful
+consequence: raising a line's height does not move centred text. A button's
+label measures 20px tall instead of 17 and sits in exactly the same place. Text
+positioned from its *top* does move, by half the difference.
+
+A line height shorter than the font's own is allowed and does occur in the
+scale; the leading is simply negative, and lines close up rather than the
+glyphs being cropped.
 
 ## Text selection
 
@@ -718,6 +732,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `text_style` | an M3 type-scale role, resolved against `type_scale:` |
 | `font_weight` | 400 or 500 (Roboto ships both); resolves to the nearest available |
 | `letter_spacing` | tracking in logical px, added after each grapheme cluster |
+| `line_height` | a fixed line height in logical px; unset keeps the font's own |
 | `icon_size` | dp, default 24 |
 | `icon_fill` | 0–1. M3 uses this for selected state — prefer it to swapping icon names. |
 | `icon_weight` | 100–700 |
@@ -746,9 +761,6 @@ Stated plainly so you can design around it:
   content parallax, and app-bar collapse. Set `reduce_motion` in `Settings` to
   make timed transitions arrive at once — it does not affect app-bar collapse
   or carousel parallax, which follow a position rather than a clock.
-- **Line height from the type scale.** Recorded per role but not applied — a
-  line's height comes from the font's own metrics. Size, weight and tracking
-  *are* applied.
 - **Editable text.** Text can be selected and copied, not typed into: no
   caret blink, no insertion, no undo. A text field is its own piece of work.
 - **A system clipboard.** Copying is in-process with a documented seam for a

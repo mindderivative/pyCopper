@@ -1543,8 +1543,24 @@ mismatch detector — a label measured and painted with different metrics leaves
 two entries where there should be one — and a deliberate mutation confirms it
 fails when the tracking is dropped.
 
-`line_height` remains recorded but unapplied: paragraph line height comes from
-the font's own metrics.
+**Line height completes the scale.** A role's height replaces the font's own,
+and the difference is split evenly above and below the glyphs -- CSS
+half-leading. That distribution is the whole design: it means raising a line's
+height does not move centred text. A button's label measures 20dp tall instead
+of 17 and its baseline lands in exactly the same place, which is why applying
+line height moved only three baselines out of a dozen. Text positioned from its
+top does move, by half the difference.
+
+Negative leading is allowed and occurs in the real scale -- Roboto wants 67px
+at `display-large` where M3 asks for 64 -- so lines close up rather than glyphs
+being cropped.
+
+All four of a role's tokens are now applied. The `TypeStyle` a widget holds
+carries every one of them, so the "cannot half-arrive" property scales with the
+token set rather than degrading as it grows; the mismatch test compares the
+whole metric tuple, and a positional `key[-1]` in it silently moved from
+tracking to line height the moment the fourth token landed, which is why it now
+indexes by name.
 
 ### 5.18 Disabled state
 

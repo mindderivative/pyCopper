@@ -12,6 +12,7 @@ settle the one it contradicts itself on.
 
 from __future__ import annotations
 
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -343,17 +344,29 @@ def test_a_label_is_measured_and_painted_with_one_set_of_metrics(
 
     engine, display_list = _paint_once(spec, 200.0, 80.0)
     assert any(s["flags"][0] == Kind.GLYPH for s in display_list.view), "no label was drawn"
-    metrics = {(k[1], k[3], k[5]) for k in engine._layouts if k[0] == label}
+    metrics = {(k[1], k[3], k[5], k[6]) for k in engine._layouts if k[0] == label}
     assert len(metrics) == 1, f"measure and paint disagreed: {metrics}"
 
 
-def test_a_button_label_carries_its_roles_tracking_into_the_paint_pass() -> None:
+def test_a_button_label_carries_its_whole_role_into_the_paint_pass() -> None:
     """The positive case behind the test above: not merely consistent, but
-    consistent at the figure `label-large` actually specifies."""
+    consistent at the figures `label-large` actually specifies.
+
+    Indexed by name rather than position -- the cache key has grown twice as
+    the scale was applied, and `key[-1]` silently moved from tracking to line
+    height the second time.
+    """
+    role = TYPE_SCALE["label-large"]
     engine, _ = _paint_once({"name": "b", "widget": "Button", "text": "Confirm"}, 200.0, 80.0)
     (key,) = [k for k in engine._layouts if k[0] == "Confirm"]
-    assert key[1] == TYPE_SCALE["label-large"].size == 14.0
-    assert key[-1] == TYPE_SCALE["label-large"].tracking == 0.1
+    size, face, tracking, line_height = key[1], key[3], key[5], key[6]
+    assert (size, face[1], tracking, line_height) == (14.0, 500, 0.1, 20.0)
+    assert (size, face[1], tracking, line_height) == (
+        role.size,
+        role.weight,
+        role.tracking,
+        role.line_height,
+    )
 
 
 # --------------------------------------------------------------- tracking
@@ -433,3 +446,94 @@ def test_shaping_stays_size_and_tracking_independent() -> None:
         engine.layout("Shared", px=16.0, tracking=tracking)
     _, misses = engine.shaper.stats
     assert misses == 1, "tracking re-shaped the run"
+
+
+# ------------------------------------------------------------ line height
+
+
+def test_a_role_resolves_its_line_height() -> None:
+    parsed = view(None, {"text_style": "body-large"})
+    assert parsed.root.style.line_height == TYPE_SCALE["body-large"].line_height == 24.0
+
+
+def test_an_explicit_line_height_beats_the_role() -> None:
+    parsed = view(None, {"text_style": "body-large", "line_height": 30.0})
+    assert parsed.root.style.line_height == 30.0
+
+
+def test_unset_line_height_keeps_the_fonts_own() -> None:
+    """The default is None, not a number: most text is not part of a scale, and
+    a framework-wide figure would be a worse guess than the face's metrics."""
+    parsed = view(None, {"font_size": 14})
+    assert parsed.root.style.line_height is None
+
+
+def test_line_height_sets_the_measured_height() -> None:
+    from pycopper.text import TextEngine
+
+    engine = TextEngine()
+    assert engine.layout("One line", px=14.0, line_height=40.0).size.height == 40.0
+    assert engine.layout("", px=14.0, line_height=40.0).size.height == 40.0, "empty text too"
+
+
+def test_leading_is_split_evenly_so_centred_text_does_not_move() -> None:
+    """The reason this is half-leading and not space added below: a button's
+    label measures 20dp tall instead of 17, and stays exactly where it was.
+    """
+    from pycopper.text import TextEngine
+
+    role = TYPE_SCALE["label-large"]
+    engine = TextEngine()
+    scaled = engine.layout("Confirm", px=role.size, line_height=role.line_height)
+    natural = engine.layout("Confirm", px=role.size)
+    assert scaled.size.height == 20.0 and natural.size.height == 17.0
+    centred = [(40.0 - p.size.height) / 2 + p.lines[0].baseline for p in (scaled, natural)]
+    assert centred[0] == centred[1] == 24.5
+
+
+def test_a_line_height_below_the_fonts_own_is_allowed() -> None:
+    """It occurs in the real scale -- Roboto wants 67px at display-large where
+    M3 asks for 64 -- so negative leading has to close lines up rather than
+    crop them."""
+    from pycopper.text import TextEngine
+    from pycopper.text.fontdb import FontRequest
+
+    engine = TextEngine()
+    natural = engine.db.face_for(FontRequest()).metrics(57.0).line_height
+    assert TYPE_SCALE["display-large"].line_height < natural
+    para = engine.layout("Ag", px=57.0, line_height=TYPE_SCALE["display-large"].line_height)
+    assert para.size.height == 64.0
+    assert para.lines[0].baseline < natural, "the baseline rose with the line"
+
+
+def test_line_height_stacks_every_line() -> None:
+    from pycopper.text import TextEngine
+
+    para = TextEngine().layout(
+        "wrap this text over several lines please", px=14.0, max_width=80.0, line_height=20.0
+    )
+    assert len(para.lines) > 1
+    assert para.size.height == 20.0 * len(para.lines)
+    baselines = [line.baseline for line in para.lines]
+    assert all(b - a == 20.0 for a, b in pairwise(baselines))
+
+
+def test_every_role_now_resolves_all_four_tokens() -> None:
+    """The scale is fully applied. If a fifth token is ever added to
+    `TypeStyle`, this is the test that should fail."""
+    from dataclasses import fields
+
+    assert [f.name for f in fields(TYPE_SCALE["body-large"])] == [
+        "size",
+        "line_height",
+        "weight",
+        "tracking",
+    ]
+    parsed = view(None, {"text_style": "title-small"})
+    role = TYPE_SCALE["title-small"]
+    assert (
+        parsed.root.style.font_size,
+        parsed.root.style.line_height,
+        parsed.root.style.font_weight,
+        parsed.root.style.letter_spacing,
+    ) == (role.size, role.line_height, role.weight, role.tracking)

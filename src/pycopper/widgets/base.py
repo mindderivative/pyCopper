@@ -214,17 +214,22 @@ class StackElement(_StyledMixin, Stack):
         return super().perform_layout(self.sized(constraints, self.style))
 
 
-def _face_of(font: float | TypeStyle, weight: int, tracking: float) -> tuple[float, int, float]:
-    """``(size, weight, tracking)`` from either a raw size or a type-scale role.
+def _face_of(
+    font: float | TypeStyle,
+    weight: int,
+    tracking: float,
+    line_height: float | None,
+) -> tuple[float, int, float, float | None]:
+    """``(size, weight, tracking, line_height)`` from a raw size or a role.
 
-    A role is passed as **one object** on purpose. Three loose numbers that must
-    match between a widget's measure and its paint are three chances to
+    A role is passed as **one object** on purpose. Four loose numbers that must
+    match between a widget's measure and its paint are four chances to
     disagree, and a weight mismatch is exactly the bug that got in when the
     scale's weights were applied. A role cannot half-arrive.
     """
     if isinstance(font, TypeStyle):
-        return (font.size, font.weight, font.tracking)
-    return (float(font), weight, tracking)
+        return (font.size, font.weight, font.tracking, font.line_height)
+    return (float(font), weight, tracking, line_height)
 
 
 def measure_text(
@@ -235,23 +240,27 @@ def measure_text(
     max_width: float | None = None,
     weight: int = 400,
     tracking: float = 0.0,
+    line_height: float | None = None,
 ) -> Size:
     """Shaped metrics for *text*. Memoised by the engine.
 
     `font` is either a raw size in logical px or a `TypeStyle` role, which
-    carries its own weight and tracking and overrides the keyword arguments.
+    carries its own weight, tracking and line height and overrides the keyword
+    arguments.
 
-    Weight selects a real face and tracking adds width per cluster, so metrics
-    differ on both -- which is why layout and paint must pass the same values
-    or they will disagree about how wide a label is.
+    Weight selects a real face, tracking adds width per cluster and line height
+    sets the box's height, so metrics differ on all three -- which is why layout
+    and paint must pass the same values or they will disagree about how large a
+    label is.
     """
-    size, face_weight, track = _face_of(font, weight, tracking)
+    size, face_weight, track, leading = _face_of(font, weight, tracking, line_height)
     return (engine or default_text_engine()).measure(
         text,
         px=size,
         max_width=max_width,
         request=FontRequest(weight=face_weight),
         tracking=track,
+        line_height=leading,
     )
 
 
@@ -267,6 +276,7 @@ def paint_text(
     alignment: str = TextAlignment.START,
     weight: int = 400,
     tracking: float = 0.0,
+    line_height: float | None = None,
 ) -> int:
     """Emit shaped glyphs at logical position ``(x, y)``.
 
@@ -274,7 +284,7 @@ def paint_text(
     from the font's own ascent, so lines sit correctly whatever face is used.
     ``font`` takes a raw size or a `TypeStyle` role, as `measure_text` does.
     """
-    size, face_weight, track = _face_of(font, weight, tracking)
+    size, face_weight, track, leading = _face_of(font, weight, tracking, line_height)
     paragraph = ctx.text.layout(
         text,
         px=size,
@@ -282,6 +292,7 @@ def paint_text(
         alignment=alignment,
         request=FontRequest(weight=face_weight),
         tracking=track,
+        line_height=leading,
     )
     return ctx.text.emit(
         ctx.display_list,
@@ -476,6 +487,7 @@ class TextElement(_StyledMixin, Padding):
             max_width=width if width > 0 else None,
             request=FontRequest(weight=self.style.font_weight),
             tracking=self.style.letter_spacing,
+            line_height=self.style.line_height,
         )
 
     def _offset_at(self, x: float, y: float) -> int:
@@ -557,6 +569,7 @@ class TextElement(_StyledMixin, Padding):
             max_width=wrap,
             weight=self.style.font_weight,
             tracking=self.style.letter_spacing,
+            line_height=self.style.line_height,
         )
 
     def perform_layout(self, constraints: Constraints) -> Size:
@@ -606,6 +619,7 @@ class TextElement(_StyledMixin, Padding):
             max_width=max(0.0, self.size.width - self._padding.horizontal) or None,
             weight=self.style.font_weight,
             tracking=self.style.letter_spacing,
+            line_height=self.style.line_height,
         )
 
 

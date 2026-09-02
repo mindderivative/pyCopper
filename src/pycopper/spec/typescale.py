@@ -21,19 +21,20 @@ as both 32sp and 36sp in the same file: it is **32**.
 
 Sizes are converted from the source's `rem` at the CSS default of 16px/rem.
 
-`size`, `weight` and `tracking` are all applied: a role resolves to
-`font_size`, `font_weight` and `letter_spacing`. Roboto ships the Regular and
+**All four tokens are applied.** A role resolves to `font_size`,
+`font_weight`, `letter_spacing` and `line_height`. Roboto ships the Regular and
 Medium faces the scale asks for, so `title-medium` is genuinely Medium rather
 than emboldened Regular.
 
-Tracking is an **absolute** figure in logical px, not a multiple of the size --
-that is how the source states it (`letter-spacing` in rem, converted at the
-same 16px/rem as the sizes), and it is why a role's tracking is only right at
-that role's size. Eleven of the fifteen roles track 0.
+Tracking and line height are **absolute** figures in logical px, not multiples
+of the size -- that is how the source states them (both in rem, converted at
+the same 16px/rem as the sizes), and it is why a role's figures are only right
+at that role's size. Nine of the fifteen roles track something.
 
-`line_height` is recorded but not applied: paragraph layout takes its line
-height from the font's own metrics. Recorded rather than dropped, because it
-belongs to the same token set and an application will want it.
+A role's line height is not always taller than the font's own: Roboto wants 67px
+at `display-large`, where M3 asks for 64. Both directions work, because the
+difference is split evenly above and below the glyphs rather than added below
+them.
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ __all__ = ["TYPE_SCALE", "TypeScaleError", "TypeStyle", "apply_type_scale"]
 
 @dataclass(frozen=True, slots=True)
 class TypeStyle:
-    """One role's tokens. `line_height` is not applied -- see the module docstring."""
+    """One role's four tokens, all of which a `text_style:` resolves."""
 
     size: float
     line_height: float
@@ -106,6 +107,8 @@ def _resolve(node: WidgetSpec, scale: dict[str, float]) -> WidgetSpec:
             fields["font_weight"] = known.weight
         if "letter_spacing" not in node.style.model_fields_set:
             fields["letter_spacing"] = known.tracking
+        if "line_height" not in node.style.model_fields_set:
+            fields["line_height"] = known.line_height
         style = StyleSpec(**fields)
 
     if style is None and all(a is b for a, b in zip(children, node.children, strict=True)):

@@ -79,6 +79,10 @@ class Paragraph:
     #: M3's largest), which is the price of every consumer deriving its
     #: positions from one advance array instead of special-casing line ends.
     tracking: float = 0.0
+    #: Fixed line height in logical px, or None for the font's own. The extra
+    #: space is split evenly above and below the glyphs -- CSS half-leading --
+    #: so raising a line's height does not move centred text.
+    line_height: float | None = None
     base_direction: str = Direction.LTR
 
     @property
@@ -126,23 +130,25 @@ def layout_text(
     request: FontRequest | None = None,
     alignment: str = Alignment.START,
     tracking: float = 0.0,
+    line_height: float | None = None,
     cache: ShapeCache | None = None,
 ) -> Paragraph:
     """Shape, break, and position *text*.
 
     ``max_width`` of None lays the text out as a single unwrapped line.
     ``tracking`` is letter spacing in logical px -- an absolute figure, the way
-    M3's type-scale tokens state it, not a multiple of the font size.
+    M3's type-scale tokens state it, not a multiple of the font size. So is
+    ``line_height``, which replaces the font's own; None keeps it.
     """
     req = request or FontRequest()
     # NOT `cache or ShapeCache()`: an empty ShapeCache is falsy (__len__ == 0),
     # so that form silently discards the caller's cache on first use.
     shaper = ShapeCache() if cache is None else cache
     primary = db.face_for(req)
-    para = Paragraph(text=text, px=px, tracking=tracking)
+    para = Paragraph(text=text, px=px, tracking=tracking, line_height=line_height)
 
     if not text:
-        para.size = Size(0.0, primary.metrics(px).line_height)
+        para.size = Size(0.0, line_height or primary.metrics(px).line_height)
         para.box_width = max_width or 0.0
         return para
 
@@ -178,9 +184,14 @@ def layout_text(
     y = 0.0
     widest = 0.0
     for line in lines:
-        ascent, height = _line_metrics(line.runs, px, primary)
+        ascent, natural = _line_metrics(line.runs, px, primary)
+        height = natural if line_height is None else line_height
+        # Half-leading, as CSS distributes it: the glyphs keep their own
+        # ascent and descent and sit in the middle of the taller line box.
+        # That is what makes a raised line height leave centred text where it
+        # was -- a button's label does not move, its box just measures taller.
         line.height = height
-        line.baseline = y + ascent
+        line.baseline = y + (height - natural) / 2.0 + ascent
         y += height
         widest = max(widest, line.width)
 

@@ -361,10 +361,11 @@ on. Run the example with hot reload on and edit the YAML live while iterating.
 
 **Not available yet -- design around these, and say so when a spec needs one:**
 
-- **Type-scale line height.** Size, weight and tracking are applied; line
-  height is recorded per role but not, because a line takes its height from the
-  font's own metrics. Use `text_style:` rather than a raw `font_size` when a
-  component's M3 role is known.
+- **The type scale is fully applied.** A `text_style:` role resolves to size,
+  weight, tracking *and* line height, so use one rather than a raw `font_size`
+  whenever a component's M3 role is known. Line height is distributed as CSS
+  half-leading, which means it changes what a label *measures* without moving
+  a centred one.
 
   Inside a widget, hold the role itself -- `LABEL_ROLE: Final =
   TYPE_SCALE["label-large"]` -- and pass that one object to both `measure_text`

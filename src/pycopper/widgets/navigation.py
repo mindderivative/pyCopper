@@ -341,8 +341,11 @@ class TopAppBarElement(_StyledMixin, Flex):
     PAD: Final = 16.0
     #: variant -> expanded height. Small and centre-aligned do not collapse.
     EXPANDED: Final = {"medium": 112.0, "large": 152.0}
-    #: Headline size while expanded, shrinking to title-large on collapse.
-    HEADLINE: Final = 28.0
+    #: The expanded headline, shrinking to title-large on collapse. Held as a
+    #: role so the size and the line height shrink together -- interpolating
+    #: one and pinning the other would tighten the leading as the bar moved.
+    HEADLINE_ROLE: Final = TYPE_SCALE["headline-medium"]
+    HEADLINE: Final = HEADLINE_ROLE.size
 
     def __init__(self, spec: WidgetSpec) -> None:
         Flex.__init__(self, axis=Axis.HORIZONTAL, spacing=spec.style.spacing or 8.0)
@@ -432,16 +435,21 @@ class TopAppBarElement(_StyledMixin, Flex):
             return
         token = content_token(ctx, style, "on_surface")
         size = style.font_size if style.font_size != 14.0 else TITLE_SIZE
+        leading = TITLE_ROLE.line_height
         if self.expanded_height > self.HEIGHT:
             # The headline shrinks to title-large as the bar becomes a small
             # one, so the two forms agree at the moment of arrival.
             size = self.HEADLINE + (size - self.HEADLINE) * t
+            leading = (
+                self.HEADLINE_ROLE.line_height + (leading - self.HEADLINE_ROLE.line_height) * t
+            )
         label = measure_text(
             title,
             size,
             engine=self.text_engine,
             weight=TITLE_ROLE.weight,
             tracking=TITLE_ROLE.tracking,
+            line_height=leading,
         )
         x = (
             absolute.x + (self.size.width - label.width) / 2
@@ -457,6 +465,7 @@ class TopAppBarElement(_StyledMixin, Flex):
             token,
             weight=TITLE_ROLE.weight,
             tracking=TITLE_ROLE.tracking,
+            line_height=leading,
         )
 
 
