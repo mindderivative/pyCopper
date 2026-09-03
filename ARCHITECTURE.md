@@ -462,6 +462,31 @@ Measured after the change, the same sweep is flat at 13–15 ms across every wid
 
 **A femtopixel of slack is required, and that is not a fudge.** A `Text` shrink-wraps to its ink extent and the paint pass then lays it out again at *exactly* that width, so the fit test is evaluated at precise equality on every frame drawing unwrapped text. `np.sum` adds pairwise and `np.cumsum` sequentially; for `"title-small"` the two orders differ by 7e-15 px, which was enough to wrap it to "title-" / "small" so the widget measured one line and painted two. `FIT_EPSILON` is set far below a subpixel and far above float64 noise, and `test_text_laid_out_at_its_own_ink_width_stays_on_one_line` pins the invariant for all fifteen type-scale roles.
 
+**Glyphs can be coloured individually.** `TextEngine.emit` takes `spans` --
+`(start, end, value)` over **paragraph source offsets**, where the value is a
+palette token or a literal RGBA. This is what syntax highlighting and ANSI
+colour both need, and they are the same requirement.
+
+Source offsets rather than glyph indices, because that is what a lexer or an
+escape-sequence parser produces and because the two do not correspond: a
+ligature is one glyph for several characters, and a blank glyph is dropped
+entirely, so `"def foo"` emits six quads and not seven. Doing the mapping once
+here is what stops every consumer getting ligatures wrong differently.
+`GlyphPlacement.offset` carries the paragraph-absolute offset for it — only
+meaningful for LTR text, since an RTL paragraph's runs are reordered into
+visual order (the R9 boundary again).
+
+The mapping is a `searchsorted` over span starts, not a lookup per glyph, and
+the result is written as whole columns like every other instance field. **990
+glyphs with 124 spans cost 1.659 ms against 1.599 ms unspanned** — a 4%
+difference, where a per-glyph Python loop would have reproduced the scalar-emit
+problem §12.2 records. Text with no spans builds no arrays at all and follows
+exactly the path it did before.
+
+A token themes with the rest of the interface and a literal colour does not,
+which makes the literal correct only where the colour genuinely is fixed: an
+ANSI escape's is, a syntax theme's should be tokens.
+
 #### 5.7.2 Fonts, coverage, and fallback — `text/fontdb.py`
 
 `FontDB` maps `(family, weight, style)` to a concrete face and owns the fallback chain.

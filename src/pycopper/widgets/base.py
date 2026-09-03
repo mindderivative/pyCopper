@@ -8,6 +8,7 @@ slotted layout base and the mixin coexist without an instance-layout conflict.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Final
 
 from ..layout import (
@@ -277,6 +278,7 @@ def paint_text(
     weight: int = 400,
     tracking: float = 0.0,
     line_height: float | None = None,
+    spans: Sequence[tuple[int, int, int | tuple[float, float, float, float]]] | None = None,
 ) -> int:
     """Emit shaped glyphs at logical position ``(x, y)``.
 
@@ -301,6 +303,7 @@ def paint_text(
         y=y,
         pixel_ratio=ctx.pixel_ratio,
         token=token,
+        spans=spans,
         clip=ctx.clip,
         clip_radii=ctx.clip_radii,
     )

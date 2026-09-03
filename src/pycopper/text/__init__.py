@@ -7,6 +7,7 @@ runs, paragraph layouts, and rasterised glyphs in the atlas.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -49,6 +50,57 @@ __all__ = [
 ]
 
 _NO_CLIP = (0.0, 0.0, 0.0, 0.0)
+
+
+def _span_arrays(
+    spans: Sequence[tuple[int, int, int | tuple[float, float, float, float]]] | None,
+    offsets: list[int],
+    color: tuple[float, float, float, float],
+    token: int,
+) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Map source-offset spans onto per-glyph colour and token columns.
+
+    Returns ``(None, None)`` when there is nothing to map, so the ordinary
+    monochrome path writes a broadcast scalar exactly as it did before -- this
+    must not make unhighlighted text more expensive.
+
+    The mapping is a `searchsorted` over the span starts rather than a lookup
+    per glyph: §12's rule is that per-glyph Python misses the frame budget, and
+    a syntax-highlighted editor is precisely where that would bite.
+    """
+    if not spans or not offsets:
+        return None, None
+
+    ordered = sorted(spans, key=lambda s: s[0])
+    starts = np.fromiter((s[0] for s in ordered), dtype=np.int64, count=len(ordered))
+    ends = np.fromiter((s[1] for s in ordered), dtype=np.int64, count=len(ordered))
+
+    # Per span: a token index, or NO_TOKEN plus a literal colour. A token span
+    # keeps the caller's colour because the shader multiplies the resolved
+    # token by `literal.a` -- that is how opacity survives theming.
+    span_tokens = np.full(len(ordered), token, dtype=np.uint32)
+    span_colors = np.tile(np.asarray(color, dtype=np.float32), (len(ordered), 1))
+    for i, (_, _, value) in enumerate(ordered):
+        if isinstance(value, int):
+            span_tokens[i] = value
+        else:
+            span_tokens[i] = NO_TOKEN
+            span_colors[i] = value
+
+    offs = np.asarray(offsets, dtype=np.int64)
+    # The last span starting at or before each glyph...
+    idx = np.searchsorted(starts, offs, side="right") - 1
+    # ...which only applies if the glyph is also before that span's end. Spans
+    # are half-open and need not cover the text; anything uncovered keeps the
+    # caller's own colour.
+    safe = np.clip(idx, 0, None)
+    inside = (idx >= 0) & (offs < ends[safe])
+
+    colors = np.tile(np.asarray(color, dtype=np.float32), (len(offs), 1))
+    tokens = np.full(len(offs), token, dtype=np.uint32)
+    colors[inside] = span_colors[safe[inside]]
+    tokens[inside] = span_tokens[safe[inside]]
+    return colors, tokens
 
 
 class TextEngine:
@@ -183,6 +235,7 @@ class TextEngine:
         pixel_ratio: float = 1.0,
         token: int = NO_TOKEN,
         color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
+        spans: Sequence[tuple[int, int, int | tuple[float, float, float, float]]] | None = None,
         clip: tuple[float, float, float, float] = _NO_CLIP,
         clip_radii: tuple[float, float, float, float] = _NO_CLIP,
     ) -> int:
@@ -190,6 +243,24 @@ class TextEngine:
 
         Rasterisation happens at the **physical** size, so text is sharp at any
         DPI; layout stays in logical units (ARCHITECTURE.md 7).
+
+        `spans` colours parts of the text differently: ``(start, end, value)``
+        over **paragraph source offsets**, where *value* is either a palette
+        token index or a literal RGBA tuple. Half-open, and they must not
+        overlap. This is what syntax highlighting and ANSI need.
+
+        **Source offsets, not glyph indices**, because that is what a lexer
+        produces and because the two do not correspond -- a ligature is one
+        glyph for several characters. Mapping happens here, once, so every
+        consumer gets ligatures right the same way.
+
+        A token themes with the rest of the interface and a literal colour does
+        not, which makes the literal correct only where the colour genuinely is
+        fixed -- an ANSI escape's is; a syntax theme's should be tokens.
+
+        Spans cost nothing when absent: the scalar path writes one broadcast
+        column exactly as before, and the mapping below is vectorised rather
+        than a lookup per glyph.
         """
         dpr = pixel_ratio
         px_physical = paragraph.px * dpr
@@ -199,6 +270,7 @@ class TextEngine:
         # instance write is not: collect first, then write whole columns.
         rects: list[tuple[float, float, float, float]] = []
         uvs: list[tuple[float, float, float, float]] = []
+        offsets: list[int] = []
         for place in paragraph.placements():
             pen_x = (x + place.x) * dpr
             pen_y = (y + place.y) * dpr
@@ -210,14 +282,19 @@ class TextEngine:
                 (pen_x + entry.left, pen_y - entry.top, float(entry.width), float(entry.height))
             )
             uvs.append(entry.uv(atlas_size))
+            if spans is not None:
+                offsets.append(place.offset)
 
         if not rects:
             return 0
+        colors_arr, tokens_arr = _span_arrays(spans, offsets, color, token)
         display_list.add_glyphs(
             np.asarray(rects, dtype=np.float32),
             np.asarray(uvs, dtype=np.float32),
             color=color,
             token=token,
+            colors=colors_arr,
+            tokens=tokens_arr,
             clip=clip,
             clip_radii=clip_radii,
         )

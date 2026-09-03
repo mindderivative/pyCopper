@@ -366,6 +366,8 @@ class DisplayList:
         *,
         color: tuple[float, float, float, float] = _WHITE,
         token: int = NO_TOKEN,
+        colors: np.ndarray | None = None,
+        tokens: np.ndarray | None = None,
         clip: tuple[float, float, float, float] = _ZERO4,
         clip_radii: tuple[float, float, float, float] = _ZERO4,
     ) -> int:
@@ -374,6 +376,12 @@ class DisplayList:
         The scalar :meth:`add_glyph` costs roughly 4 microseconds per glyph,
         which exceeds the text budget at around 400 glyphs. Writing whole
         columns at once is the same rule §12 states for boxes.
+
+        Pass `colors` (N, 4) or `tokens` (N,) to colour glyphs individually --
+        what syntax highlighting and ANSI need. A palette `token` themes with
+        the rest of the interface; a literal colour does not, which is the
+        right trade only when the colour is genuinely fixed, as an ANSI
+        sequence's is.
         """
         rects = np.asarray(rects, dtype=np.float32)
         uvs = np.asarray(uvs, dtype=np.float32)
@@ -390,12 +398,15 @@ class DisplayList:
         s["radii"] = 0.0
         s["clip"] = clip
         s["clip_radii"] = clip_radii
-        s["fill"] = color
+        # `colors` and `tokens` are per glyph; the scalars are the whole run.
+        # Both go through the same column write, so a syntax-highlighted line
+        # costs exactly what a monochrome one does.
+        s["fill"] = color if colors is None else colors
         s["border"] = 0.0
         s["params"] = 0.0
         s["flags"][:, 0] = Kind.GLYPH
         s["flags"][:, 1] = 0
-        s["flags"][:, 2] = token
+        s["flags"][:, 2] = token if tokens is None else tokens
         s["flags"][:, 3] = NO_TOKEN
         return start
 

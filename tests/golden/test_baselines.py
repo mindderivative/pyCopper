@@ -1683,6 +1683,68 @@ def test_multiline_field_baseline(render_scene, assert_golden) -> None:
     assert_golden("multiline_field", np.asarray(engine.canvas.draw()))
 
 
+def test_text_spans_baseline(render_scene, assert_golden) -> None:
+    """Per-glyph colour, which nothing but pixels can confirm.
+
+    An instance assertion proves the right token reached the right glyph. It
+    cannot prove the shader resolved it -- a mistake in the fill column or in
+    `resolve` would leave every assertion passing and every word one colour.
+
+    The lines mix both kinds deliberately: palette tokens, which follow a theme
+    change, and a literal RGBA, which does not. A terminal needs the literal
+    because ANSI's colours are not palette roles; a syntax theme should use
+    tokens for exactly the opposite reason.
+    """
+    theme = Theme(seed=SEED, dark=True)
+    engine_box: list = []
+
+    KEYWORD, NAME, NUMBER, COMMENT = "primary", "tertiary", "secondary", "outline"
+
+    def paint(dl):
+        engine = engine_box[0]
+        pal = engine.palette
+
+        def at(text: str, word: str, role: str):
+            """A span for `word` in `text`. Computed, not counted -- hand
+            counting put two of these off by one, and the picture still looked
+            plausible enough not to say so."""
+            i = text.index(word)
+            return (i, i + len(word), pal.index(role))
+
+        line1 = "def total(items, rate=0.07):"
+        spans1 = [
+            at(line1, "def", KEYWORD),
+            at(line1, "total", NAME),
+            at(line1, "0.07", NUMBER),
+        ]
+        line2 = "    return sum(items) * rate  # tax"
+        spans2 = [
+            at(line2, "return", KEYWORD),
+            at(line2, "sum", NAME),
+            at(line2, "# tax", COMMENT),
+        ]
+        line3 = "ERROR  build failed"
+        spans3 = [(0, 5, (0.94, 0.30, 0.30, 1.0))]
+
+        for i, (text, spans) in enumerate([(line1, spans1), (line2, spans2), (line3, spans3)]):
+            para = engine.text.layout(text, px=15.0)
+            engine.text.emit(
+                dl,
+                para,
+                x=12.0,
+                y=14.0 + i * 26.0,
+                pixel_ratio=1.0,
+                token=pal.index("on_surface"),
+                spans=spans,
+            )
+
+    _, engine = render_scene(lambda dl: None, width=300, height=104, theme=theme)
+    engine_box.append(engine)
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("text_spans", np.asarray(engine.canvas.draw()))
+
+
 def test_shapes_baseline(render_scene, assert_golden) -> None:
     """The polygon branch, which nothing but pixels can check.
 

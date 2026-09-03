@@ -62,7 +62,18 @@ class GlyphPlacement:
     gid: int
     x: float
     y: float  # baseline y
+    #: Index into the run's own text. Kept because it is what shaping produces.
     cluster: int
+    #: Index into the **paragraph's** text -- what a caller reasons in. A
+    #: syntax highlighter or an ANSI parser produces spans over the source, so
+    #: without this every consumer would have to re-derive the mapping through
+    #: line and run offsets, and each would get ligatures wrong differently.
+    #:
+    #: Only meaningful for left-to-right text: an RTL paragraph's runs are
+    #: reordered into visual order, so accumulating their lengths no longer
+    #: tracks source position. Stated rather than silently wrong -- it is the
+    #: same boundary as R9.
+    offset: int = 0
 
 
 @dataclass(slots=True)
@@ -115,21 +126,31 @@ class Paragraph:
         out: list[GlyphPlacement] = []
         for line in self.lines:
             pen = line.x
+            # Runs partition the line's text in order, so a run's position
+            # within the line is the total length of the runs before it. There
+            # is nowhere better to keep this: a ShapedRun is cached by (text,
+            # face, direction, script), so giving it a position would poison
+            # the cache for every other place the same word appears.
+            run_start = 0
             for run in line.runs:
                 scale = run.face.scale_for(self.px)
                 advances = run.advances_px(self.px, self.tracking)
+                base = line.start + run_start
                 for i in range(len(run)):
                     ox, oy = run.offsets[i]
+                    cluster = int(run.clusters[i])
                     out.append(
                         GlyphPlacement(
                             face=run.face,
                             gid=int(run.glyphs[i]),
                             x=pen + float(ox) * scale,
                             y=line.baseline - float(oy) * scale,
-                            cluster=int(run.clusters[i]),
+                            cluster=cluster,
+                            offset=base + cluster,
                         )
                     )
                     pen += float(advances[i])
+                run_start += len(run.text)
         return out
 
 
