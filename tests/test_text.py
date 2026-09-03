@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from pycopper.assets import DEFAULT_FONT, MEDIUM_FONT
+from pycopper.spec.typescale import TYPE_SCALE
 from pycopper.text import (
     Direction,
     Face,
@@ -326,3 +327,42 @@ def test_higher_dpi_rasterises_larger() -> None:
     te.emit(lo, para, x=0, y=0, pixel_ratio=1.0)
     te.emit(hi, para, x=0, y=0, pixel_ratio=2.0)
     assert hi.view[0]["rect"][2] > lo.view[0]["rect"][2]
+
+
+# ------------------------------------------------- wrapping at the ink width
+
+
+@pytest.mark.parametrize("role", sorted(TYPE_SCALE))
+def test_text_laid_out_at_its_own_ink_width_stays_on_one_line(role: str) -> None:
+    """The knife-edge every `Text` sits on.
+
+    A Text shrink-wraps to its ink extent and the paint pass then lays it out
+    again at exactly that width, so this fit test is evaluated at precise
+    equality on every frame that draws unwrapped text. It has to hold with no
+    slack at all.
+
+    It broke when candidate widths began coming from a cumulative-advance
+    table: `np.sum` adds pairwise and `np.cumsum` sequentially, and at
+    `title-small` the two orders differ by 7e-15 px. That was enough to wrap
+    "title-small" to "title-" / "small", so the widget measured one line and
+    painted two, and the golden showed rows overlapping. The pixels caught it;
+    this states the rule directly.
+    """
+    style = TYPE_SCALE[role]
+    request = FontRequest(weight=style.weight)
+    kwargs = {"px": style.size, "request": request, "tracking": style.tracking}
+    unwrapped = layout_text(role, FontDB(), max_width=None, **kwargs)
+    rewrapped = layout_text(role, FontDB(), max_width=unwrapped.size.width, **kwargs)
+    assert rewrapped.line_count == 1, (
+        f"{role!r} wrapped when laid out at its own {unwrapped.size.width} px width"
+    )
+    assert rewrapped.size.width == pytest.approx(unwrapped.size.width)
+
+
+def test_a_line_is_broken_where_it_genuinely_exceeds_the_box() -> None:
+    """The other side of the epsilon: it must not let real overflow through.
+    A tolerance loose enough to hide a wrap would be worse than the bug."""
+    para = layout_text("aaaa bbbb", FontDB(), px=14.0, max_width=None)
+    assert (
+        layout_text("aaaa bbbb", FontDB(), px=14.0, max_width=para.size.width - 1.0).line_count == 2
+    )

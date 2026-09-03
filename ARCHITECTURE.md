@@ -436,7 +436,13 @@ Seven stages, each owned by exactly one dependency. Everything below the line wa
 
 **Stages 4 and 5 interleave.** Line breaking needs measured advances, which only shaping produces; but shaping context can cross a break.
 
-The intended design is to shape each run once for the paragraph, break on cumulative advances, and re-shape only lines whose break fell inside a cluster or ligature. **The M4 implementation does not do this yet**: `_wrap_block` re-shapes the growing candidate prefix at every break opportunity, which is quadratic in break count. The `ShapeCache` absorbs most of the repetition, but a cold 43-character wrapped line still measures **4.9 ms** (§12.2). It is one-time per unique string and free thereafter, so it does not affect steady-state frames — but it is a real deviation from this section and a tracked follow-up, not a design choice.
+Each block is shaped **once**. Candidate breaks are measured by looking up cumulative advances — one shaped pass attributes every glyph's advance to the source offset of its cluster, so any span costs a subtraction — and only the lines actually emitted are shaped again. That second shaping is not overhead: a line needs its own runs to paint, and shaping context legitimately differs either side of a break, which is also what corrects the table's two approximations (kerning across a cut, and a break falling inside a ligature).
+
+**The M4 implementation did not do this**, and re-shaped the growing candidate prefix at every break opportunity. The cost that removed is worth stating precisely, because the original note here had it in the wrong variable. `line_start` advances after each emitted line, so the prefix restarts every line and the quadratic term is in break opportunities **per line**, not per paragraph — which is why paragraph length always measured linear and the regression hid. The cost therefore scaled with *how wide the window was*: one 351-character paragraph at a 120 px wrap width cost 15.5 ms, and the same text on one 3840 px line cost **107.9 ms**. A wide window holding a long line was the worst case, which is an entirely ordinary thing for a desktop application to be.
+
+Measured after the change, the same sweep is flat at 13–15 ms across every width from 120 px to 3840 px — the worst case improving **8.4×** — and the width dependence is gone rather than reduced (§12.2).
+
+**A femtopixel of slack is required, and that is not a fudge.** A `Text` shrink-wraps to its ink extent and the paint pass then lays it out again at *exactly* that width, so the fit test is evaluated at precise equality on every frame drawing unwrapped text. `np.sum` adds pairwise and `np.cumsum` sequentially; for `"title-small"` the two orders differ by 7e-15 px, which was enough to wrap it to "title-" / "small" so the widget measured one line and painted two. `FIT_EPSILON` is set far below a subpixel and far above float64 noise, and `test_text_laid_out_at_its_own_ink_width_stays_on_one_line` pins the invariant for all fifteen type-scale roles.
 
 #### 5.7.2 Fonts, coverage, and fallback — `text/fontdb.py`
 
@@ -2238,7 +2244,8 @@ Measured on the reference machine. The text budget from the table above is 1.5 m
 | Cached subtree splice (static text) | **0.003 ms** | ✅ |
 | Emit ~1000 glyphs, vectorised | **1.77 ms** | ⚠️ worst case only |
 | Emit ~1000 glyphs, scalar (before optimisation) | 4.26 ms | ❌ replaced |
-| Layout, cold cache (43 chars, wrapped) | **4.89 ms** | ⚠️ one-time per string |
+| Layout, cold cache (43 chars, wrapped) | **1.92 ms** | ⚠️ one-time per string; was 4.89 before §5.7.1 |
+| Wrap, 351 chars on one 3840 px line | **12.8 ms** | ✅ was 107.9; the cost no longer scales with line width |
 
 Two things this establishes:
 
@@ -2286,13 +2293,13 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | # | Risk | Severity | Mitigation / status |
 |---|---|---|---|
 | R1 | Python frame budget insufficient at high element counts | High | Retained mode + typed invalidation + numpy paint are all aimed here. Benchmark early, at M2, not at M6. |
-| R2 | ~~Text scope creep~~ | **Closed** | **Delivered in M4.** Shaping, fallback, segmentation, itemisation, atlas, and paragraph layout all ship and are tested. Residual work is narrow and tracked separately: the quadratic wrap in §5.7.1, and RTL caret semantics (R9). |
+| R2 | ~~Text scope creep~~ | **Closed** | **Delivered in M4.** Shaping, fallback, segmentation, itemisation, atlas, and paragraph layout all ship and are tested. Residual work is now RTL caret semantics (R9) alone; the quadratic wrap in §5.7.1 is closed. |
 | R3 | `wgpu-native` backend variance across Vulkan/Metal/DX12 | Medium | Keep WGSL conservative; golden tests per platform; no optional GPU features. |
 | R4 | Single draw call broken by a future feature | Medium | Stated as a design constraint (§1.3). Clipping already solved analytically; transforms and blend modes are the next pressure points. |
 | R5 | IME / CJK text *input* unsupported | Medium | **Open.** GLFW preedit support is limited; likely needs platform code or a rendercanvas contribution. Note this is input only — CJK *rendering* is covered by Tier 1. |
 | R9 | RTL caret/selection semantics (Tier 3) | Medium | Deferred to v1.1 and stated as such. Reordering is solved; bidirectional caret affinity is independent UI work. |
 | R10 | ~~Bundled font licensing and size~~ | **Closed** | **Resolved.** Roboto and Noto Sans are both **SIL OFL 1.1**, compatible with MIT, with licence texts redistributed alongside them (§5.7.2). Note Roboto was *relicensed*: builds predating its move to `ofl/` in `google/fonts` — including the v2.137 copy some distributions still ship — are Apache-2.0 instead. Size resolved at ≈920 KB by instancing static faces and bundling only the Latin/Greek/Cyrillic Noto family. |
-| R6 | No accessibility tree | Medium | **Open.** Architecturally reserved: the Element tree is the natural source for AT-SPI/UIA. Not v1. |
+| R6 | ~~No accessibility tree~~ | **Closed** | **Delivered.** `runtime/accessibility.py` builds the semantic tree from the Element tree as reserved; `runtime/accesskit_bridge.py` pushes it to AT-SPI through AccessKit and was verified against a live screen reader. Windows and macOS need their own AccessKit platform wheels and are untested here, which `available()` reports rather than leaving to be discovered. |
 | R7 | Over-invalidation silently costs frames | Medium | Tested directly (§11) rather than left to profiling. |
 | R8 | Atlas thrashing under many fonts/sizes | Low | LRU + skyline; budgeted at 2048², growable to 4096². |
 

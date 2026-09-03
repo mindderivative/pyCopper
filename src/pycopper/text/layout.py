@@ -2,9 +2,15 @@
 
 Stages 4 and 5 of the pipeline interleave (ARCHITECTURE.md 5.7.1). Line
 breaking needs measured advances, which only shaping produces, but shaping
-context can cross a break. pyCopper shapes each candidate segment and breaks on
-measured width -- so a break that lands inside a ligature is resolved on
+context can cross a break. A break that lands inside a ligature is resolved on
 *source clusters*, never on glyph indices.
+
+The block is shaped **once**, and candidate breaks are measured by looking up
+cumulative advances rather than by re-shaping the growing prefix. Only the
+lines actually emitted are shaped again, which they must be regardless -- a
+line needs its own runs to paint, and shaping context legitimately differs
+either side of a break. That makes the cost linear in break opportunities
+instead of quadratic in the number *per line*.
 """
 
 from __future__ import annotations
@@ -12,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Final
+
+import numpy as np
 
 from ..layout import SIZE_ZERO, Size
 from .font import Face
@@ -21,6 +29,19 @@ from .segment import break_opportunities
 from .shaping import ShapeCache, ShapedRun
 
 __all__ = ["Alignment", "GlyphPlacement", "Paragraph", "TextLine", "layout_text"]
+
+#: Slack allowed when asking whether a line fits.
+#:
+#: Not a fudge factor -- it is there because a `Text` shrink-wraps to its own
+#: ink width and the paint pass then re-wraps it at exactly that width, so the
+#: fit test is evaluated at precise equality every single time. `np.sum` adds
+#: pairwise and `np.cumsum` adds sequentially, and for `"title-small"` at
+#: `title-small` the two orders differ by 7e-15 px -- enough, at exact
+#: equality, to wrap a word onto a second line and make the widget paint taller
+#: than it measured. A line that overflows by a femtopixel has not overflowed.
+#: Chosen far below a subpixel and far above float64 noise at any width a
+#: window can have.
+FIT_EPSILON: Final = 1e-6
 
 #: Hard line terminators, written as escapes -- the literal characters are
 #: invisible in source and trip ambiguous-character lints.
@@ -164,6 +185,47 @@ def layout_text(
             width += run.width(px, tracking)
         return runs, width
 
+    def prefix_widths(segment: str) -> np.ndarray | None:
+        """Pen x at every source offset in *segment*: ``table[o]`` is the width
+        of ``segment[:o]``, so any span costs one subtraction.
+
+        This is what replaces re-shaping each candidate prefix. It shapes the
+        segment once and attributes each glyph's advance to the source offset
+        of the cluster it belongs to, which is why a ligature -- one glyph for
+        several characters -- lands wholly on its first character rather than
+        being smeared across them.
+
+        Two approximations, both deliberate and both corrected downstream by
+        the exact re-shape of the line that is actually emitted:
+
+        * shaping context crosses a break, so kerning either side of a cut is
+          not what the cut-down line will really have;
+        * a break falling *inside* a ligature measures as though the whole
+          ligature followed it.
+
+        Returns None for a segment containing any RTL item, where logical and
+        visual order differ and a left-to-right prefix sum has no meaning.
+        Callers fall back to re-shaping, which is correct if slower -- and the
+        bundled fonts carry no RTL glyphs, so this path is untested by
+        anything but its own bail-out (R9).
+        """
+        per_char = np.zeros(len(segment), dtype=np.float64)
+        for item in itemize(segment, db, req):
+            if item.is_rtl:
+                return None
+            run = shaper.get(item.text, item.face, direction=item.direction, script=item.script)
+            if not len(run):
+                continue
+            # `clusters` index into the item's own text; shift to the segment.
+            at = np.asarray(run.clusters, dtype=np.intp) + item.start
+            # `add.at` rather than `per_char[at] += ...`: several glyphs can
+            # share one cluster (a base and its combining marks) and fancy
+            # indexing would keep only the last of them.
+            np.add.at(per_char, at, run.advances_px(px, tracking))
+        table = np.zeros(len(segment) + 1, dtype=np.float64)
+        np.cumsum(per_char, out=table[1:])
+        return table
+
     # Hard breaks split the paragraph first; wrapping happens inside each block.
     blocks: list[tuple[int, str]] = []
     start = 0
@@ -178,7 +240,7 @@ def layout_text(
 
     lines: list[TextLine] = []
     for offset, block in blocks:
-        lines.extend(_wrap_block(block, offset, max_width, shape_segment))
+        lines.extend(_wrap_block(block, offset, max_width, shape_segment, prefix_widths))
 
     # Stack the lines, then apply horizontal alignment.
     y = 0.0
@@ -214,6 +276,7 @@ def _wrap_block(
     offset: int,
     max_width: float | None,
     shape_segment: Callable[[str], tuple[list[ShapedRun], float]],
+    prefix_widths: Callable[[str], np.ndarray | None],
 ) -> list[TextLine]:
     """Greedy wrap of one hard-break-delimited block."""
     stripped = block.rstrip(HARD_BREAK_CHARS)
@@ -224,22 +287,33 @@ def _wrap_block(
         runs, width = shape_segment(stripped)
         return [TextLine(runs, offset, offset + len(block), width)]
 
+    table = prefix_widths(stripped)
+
+    def measure(start: int, end: int) -> float:
+        """Width of ``stripped[start:end]``, trailing whitespace excluded.
+
+        Trailing spaces hang past the wrap box rather than pushing a word onto
+        the next line, which is what every text engine does and what makes a
+        space-separated line break where the eye expects.
+        """
+        while end > start and stripped[end - 1].isspace():
+            end -= 1
+        if table is not None:
+            return float(table[end] - table[start])
+        return shape_segment(stripped[start:end])[1] if end > start else 0.0
+
     lines: list[TextLine] = []
     line_start = 0
     last_fit = 0
-
     for op in [o.offset for o in break_opportunities(stripped)]:
-        candidate = stripped[line_start:op].rstrip()
-        _, width = shape_segment(candidate) if candidate else ([], 0.0)
-        if width <= max_width:
+        if measure(line_start, op) <= max_width + FIT_EPSILON:
             last_fit = op
             continue
         # Overflowed. Emit up to the last opportunity that fitted; if none did,
         # this one unbreakable unit overflows on its own line rather than
         # vanishing.
         cut = last_fit if last_fit > line_start else op
-        runs, w = shape_segment(stripped[line_start:cut].rstrip())
-        lines.append(TextLine(runs, offset + line_start, offset + cut, w))
+        lines.append(_emit(stripped, offset, line_start, cut, shape_segment))
         line_start = cut
         last_fit = cut
 
@@ -248,3 +322,21 @@ def _wrap_block(
         lines.append(TextLine(runs, offset + line_start, offset + len(block), w))
 
     return lines or [TextLine([], offset, offset + len(block), 0.0)]
+
+
+def _emit(
+    stripped: str,
+    offset: int,
+    start: int,
+    cut: int,
+    shape_segment: Callable[[str], tuple[list[ShapedRun], float]],
+) -> TextLine:
+    """One finished line, shaped for real.
+
+    The break was chosen from the cumulative-advance table, which is an
+    approximation across ligatures and kerning. This is where the line gets its
+    true width -- and it is not extra work, because a line needs its own runs
+    to paint whatever decided where it ended.
+    """
+    runs, width = shape_segment(stripped[start:cut].rstrip())
+    return TextLine(runs, offset + start, offset + cut, width)
