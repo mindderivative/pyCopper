@@ -329,6 +329,24 @@ Two consequences worth stating, both surfaced by tests:
 
 **Intrinsic sizing** (`get_min_intrinsic_width` etc.) is supported but explicitly opt-in and memoised per layout pass, because it is the one construct in this model that can go quadratic.
 
+**Shapes are a shader branch, not a rasterised path** (`Kind.POLYGON`, the
+`Shape` widget). M3 has no shape *component* but it does have a shape *system*
+— "the Material shape library contains many types of shapes that can all morph
+seamlessly into each other", with shape morph on the expressive motion scheme.
+The obvious implementation is to compile shapes into glyph outlines and reuse
+the text atlas; that is right for static SVG artwork and wrong here, because a
+glyph is cached by `(glyph, size, axes)` and the atlas has no per-entry
+eviction (§5.7.3). A shape that morphs or spins changes that key every frame.
+This is the third design this trap has decided, after the icon `FILL` axis and
+the resize pixel ratio (§5.8.1), so shapes stay parametric: `sides`, `rotation`
+and `corner_radius` are instance floats, animating them is paint-only, and a
+morph costs nothing beyond the interpolation itself. Cost is independent of
+side count — the fragment folds a sample point into one sector, so a triangle
+and a 64-gon are the same price. Rounding is measured on the **apothem**, not
+the circumradius, so a rounded hexagon stays the size of a sharp one; at the
+maximum it collapses to its inscribed circle, which is one of the two ways to
+morph to a circle (raising `sides` is the other, and reaches the circumcircle).
+
 `layout/algorithms.py` provides: `Box` (single child + padding/alignment), `Row` / `Column` (main-axis flex distribution in two sub-passes — inflexible children first, then remaining space to flex weights), `Stack` (z-ordered overlay), `Scroll` (unbounded child constraint on one axis, clipping viewport), and `TextBox` (delegates to §5.7).
 
 **This module imports nothing from `render/` or `wgpu`.** It is exercised entirely by unit tests.

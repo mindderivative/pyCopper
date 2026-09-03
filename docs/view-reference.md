@@ -884,6 +884,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | `Text` | Shaped, kerned, wrapped. `font_size` in dp. |
 | `Icon` | Material Symbols. Name goes in `text:`; `icon_size`, `icon_fill`, `icon_weight`. |
 | `Divider` | 1dp `outline_variant`. `full_bleed` / `inset`. |
+| `Shape` | A regular polygon: `sides`, `rotation`, `corner_radius`, `background`, `border`. 48dp unless sized. Drawn as a distance field, not a rasterised path, so every one of those is **free to animate**. |
 
 ### Buttons and controls
 
@@ -1026,6 +1027,8 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `icon_size` | dp, default 24 |
 | `icon_fill` | 0–1. M3 uses this for selected state — prefer it to swapping icon names. |
 | `icon_weight` | 100–700 |
+| `sides` | `Shape` — 3 or more. A **float**: 5.5 is a real shape, so a square morphs continuously into a hexagon. |
+| `rotation` | `Shape` — degrees, clockwise |
 
 ### Component-specific
 

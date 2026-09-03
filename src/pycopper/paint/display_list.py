@@ -33,6 +33,7 @@ class Kind(IntEnum):
     IMAGE = 2
     SHADOW = 3
     ARC = 4
+    POLYGON = 5
 
 
 #: Sentinel in ``flags.z`` / ``flags.w`` meaning "use the literal colour".
@@ -187,6 +188,52 @@ class DisplayList:
         s["uv"] = _ZERO4
         s["params"] = (thickness, start, sweep, 0.0)
         s["flags"] = (Kind.ARC, 0, token, NO_TOKEN)
+        return i
+
+    def add_polygon(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        *,
+        sides: float,
+        rotation: float = 0.0,
+        corner_radius: float = 0.0,
+        color: tuple[float, float, float, float] = _WHITE,
+        token: int = NO_TOKEN,
+        border_width: float = 0.0,
+        border_color: tuple[float, float, float, float] = _ZERO4,
+        border_token: int = NO_TOKEN,
+        clip: tuple[float, float, float, float] = _ZERO4,
+        clip_radii: tuple[float, float, float, float] = _ZERO4,
+        opacity: float = 1.0,
+    ) -> int:
+        """Emit a regular polygon inscribed in the given box.
+
+        `sides` is a float rather than an int, and deliberately: the shader
+        folds a sample point into one sector, so a value between two whole
+        numbers is a real shape rather than a rounding error. That is what lets
+        a square morph continuously into a hexagon instead of snapping.
+
+        The polygon is inscribed in the **shorter** side, as an arc is, so a
+        non-square rect gives a regular polygon rather than a stretched one.
+
+        `rotation` is radians clockwise, matching the direction arcs measure.
+        `corner_radius` rounds the vertices; at its maximum the shape becomes
+        the inscribed circle.
+        """
+        i = self._count
+        s = self._next()[0]
+        s["rect"] = (x, y, width, height)
+        s["radii"] = _ZERO4
+        s["clip"] = clip
+        s["clip_radii"] = clip_radii
+        s["fill"] = (color[0], color[1], color[2], color[3] * opacity)
+        s["border"] = border_color
+        s["uv"] = _ZERO4
+        s["params"] = (border_width, sides, rotation, corner_radius)
+        s["flags"] = (Kind.POLYGON, 0, token, border_token)
         return i
 
     def add_shadow(

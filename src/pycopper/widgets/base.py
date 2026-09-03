@@ -713,6 +713,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     return {
         WidgetKind.CARD: m.CardElement,
         WidgetKind.DIVIDER: m.DividerElement,
+        WidgetKind.SHAPE: m.ShapeElement,
         WidgetKind.CHECKBOX: m.CheckboxElement,
         WidgetKind.RADIO: m.RadioElement,
         WidgetKind.SWITCH: m.SwitchElement,

@@ -18,8 +18,10 @@ const KIND_GLYPH:  u32 = 1u;
 const KIND_IMAGE:  u32 = 2u;
 const KIND_SHADOW: u32 = 3u;
 const KIND_ARC:    u32 = 4u;
+const KIND_POLYGON: u32 = 5u;
 
 const TAU: f32 = 6.28318530718;
+const PI:  f32 = 3.14159265359;
 
 // Sentinel meaning "use the literal colour, not a palette lookup".
 const NO_TOKEN: u32 = 0xFFFFFFFFu;
@@ -49,6 +51,7 @@ struct VertexIn {
     @location(7) uv         : vec4<f32>,   // u0, v0, u1, v1
     @location(8) params     : vec4<f32>,   // border_w, blur, shadow_dx, shadow_dy
                                            // KIND_ARC: thickness, start, sweep, _
+                                           // KIND_POLYGON: border_w, sides, rot, corner_r
     @location(9) flags      : vec4<u32>,   // kind, atlas, fill_token, border_token
 };
 
@@ -75,7 +78,7 @@ fn vs_main(in: VertexIn) -> VertexOut {
     // their own geometry. Textured kinds need no padding -- the atlas sample is
     // already antialiased, and padding would break the UV mapping.
     var pad = 0.0;
-    if (kind == KIND_BOX || kind == KIND_ARC) {
+    if (kind == KIND_BOX || kind == KIND_ARC || kind == KIND_POLYGON) {
         pad = 1.5;
     } else if (kind == KIND_SHADOW) {
         pad = in.params.y * 3.0 + max(abs(in.params.z), abs(in.params.w)) + 2.0;
@@ -118,6 +121,38 @@ fn sd_rounded_box(p: vec2<f32>, half: vec2<f32>, r: vec4<f32>) -> f32 {
     let radius = select(pair.y, pair.x, p.x < 0.0);
     let q = abs(p) - half + radius;
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - radius;
+}
+
+// Exact signed distance to a regular `n`-gon of circumradius `r`, centred on
+// the origin with a vertex at 12 o'clock and turned `rot` radians clockwise --
+// the same direction ARC measures, and for the same reason: screen y grows
+// downward, so matching M3's clockwise convention keeps the two consistent.
+//
+// The point is folded into a single sector by its angle, then measured against
+// that sector's one edge. **The cost does not grow with the number of sides**,
+// which is what makes a 3-gon and a 64-gon the same price -- and why morphing
+// between them is free rather than something to budget for.
+//
+// `n` is a float on purpose. Between whole numbers the shape passes through
+// non-regular intermediates, so animating it is continuous instead of a jump.
+fn sd_regular_polygon(p_in: vec2<f32>, r: f32, n: f32, rot: f32) -> f32 {
+    let c = cos(rot);
+    let s = sin(rot);
+    // Rotate the sample point by -rot, which turns the shape by +rot.
+    let q0 = vec2<f32>(c * p_in.x + s * p_in.y, c * p_in.y - s * p_in.x);
+    let an  = PI / n;
+    let acs = vec2<f32>(cos(an), sin(an));
+    // Angle from screen-up, folded into one sector. **Negated y**: the frame
+    // grows downward, so folding from +Y would put the first vertex at 6
+    // o'clock -- a triangle pointing down. Found by evaluating the field at
+    // the four compass points rather than by looking at it.
+    let raw  = atan2(q0.x, -q0.y);
+    let span = 2.0 * an;
+    let bn   = raw - span * floor(raw / span) - an;
+    var q = length(q0) * vec2<f32>(cos(bn), abs(sin(bn)));
+    q = q - r * acs;
+    q.y = q.y + clamp(-q.y, 0.0, r * acs.y);
+    return length(q) * sign(q.x);
 }
 
 // Signed distance to a circular arc of half-aperture `sc` = (sin, cos), centre
@@ -211,6 +246,32 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
             d = sd_arc(vec2<f32>(rotated.x, -rotated.y), vec2<f32>(sin(hb), cos(hb)), ra, rb);
         }
         color = premultiply(fill) * coverage(d);
+
+    } else if (kind == KIND_POLYGON) {
+        // Inscribed in the shorter side, as ARC is -- a non-square rect gives a
+        // regular polygon rather than a stretched one. Non-uniform scaling
+        // would break the distance field and with it the analytic AA.
+        let n   = max(in.params.y, 3.0);
+        let r   = min(half.x, half.y);
+        let an  = PI / n;
+        // Rounding offsets the shape inward then back out, so the polygon is
+        // shrunk by the radius measured on the APOTHEM, not the circumradius --
+        // otherwise a rounded hexagon would come out smaller than a sharp one.
+        // At the maximum the polygon collapses to a point and the result is its
+        // inscribed circle, which is one of the two ways to morph to a circle
+        // (raising `sides` is the other).
+        let cr  = clamp(in.params.w, 0.0, r * cos(an));
+        let d   = sd_regular_polygon(p, r - cr / cos(an), n, in.params.z) - cr;
+        let outer = coverage(d);
+
+        let bw = in.params.x;
+        if (bw > 0.0) {
+            let inner = coverage(d + bw);
+            color = premultiply(fill) * inner
+                  + premultiply(border) * max(0.0, outer - inner);
+        } else {
+            color = premultiply(fill) * outer;
+        }
 
     } else if (kind == KIND_GLYPH) {
         // R8 coverage atlas tinted by the fill colour.

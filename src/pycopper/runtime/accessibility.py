@@ -74,7 +74,19 @@ ROLES: Final[dict[str, str]] = {
 #: Kinds a screen reader should never hear about. A navigation *container's*
 #: "role is not announced" per M3; the rest are layout or decoration with
 #: nothing to say that their children do not say better.
-SILENT: Final[frozenset[str]] = frozenset({"Spacer", "Icon", "NavigationRail", "NavigationDrawer"})
+SILENT: Final[frozenset[str]] = frozenset(
+    {
+        "Spacer",
+        "Icon",
+        "NavigationRail",
+        "NavigationDrawer",
+        # A Shape is decoration. It has no label and nothing to do, so a reader
+        # stopping on it would announce "group" and waste the user's time. An
+        # application that means a shape to be meaningful should give it a Text
+        # or wrap it in a control, exactly as it would for an Icon.
+        "Shape",
+    }
+)
 
 #: Kinds whose `text:` is a Material Symbols glyph name rather than a label.
 #: Announcing "home" instead of "Home" is the sort of bug that only shows up

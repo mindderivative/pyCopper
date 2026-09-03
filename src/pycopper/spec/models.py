@@ -80,6 +80,7 @@ class WidgetKind(StrEnum):
     SIDE_SHEET = "SideSheet"
     SCROLL_VIEW = "ScrollView"
     TEXT_FIELD = "TextField"
+    SHAPE = "Shape"
 
 
 class SizeSpec:
@@ -422,6 +423,21 @@ class StyleSpec(_Frozen):
     #: 0 = outlined, 1 = filled. M3 uses this for selected/unselected states.
     icon_fill: float = Field(default=0.0, ge=0, le=1)
     icon_weight: float = Field(default=400.0, ge=100, le=700)
+
+    # shapes. A regular polygon is an analytic SDF like the rounded box, not a
+    # rasterised path, which is what makes these free to animate: `sides` and
+    # `rotation` are instance floats, so changing them per frame costs nothing
+    # and never touches the glyph atlas.
+    #:
+    #: Number of sides. **A float on purpose** -- the shader folds a sample
+    #: point into one sector, so 5.5 is a real shape rather than a rounding
+    #: error, and a square morphs continuously into a hexagon. Below 3 there is
+    #: no polygon, and `corner_radius` at its maximum gives a circle.
+    sides: float = Field(default=6.0, ge=3)
+    #: Rotation in **degrees**, clockwise -- the direction arcs measure. Degrees
+    #: rather than radians because a view file is authored by hand, and 30 is
+    #: easier to reason about than 0.5236.
+    rotation: float = 0.0
 
 
 class WidgetSpec(_Frozen):

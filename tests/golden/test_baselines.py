@@ -1683,6 +1683,75 @@ def test_multiline_field_baseline(render_scene, assert_golden) -> None:
     assert_golden("multiline_field", np.asarray(engine.canvas.draw()))
 
 
+def test_shapes_baseline(render_scene, assert_golden) -> None:
+    """The polygon branch, which nothing but pixels can check.
+
+    An SDF is right or it is subtly wrong -- a vertex off by a degree, a corner
+    radius measured on the circumradius instead of the apothem, antialiasing
+    that breaks where the sector folds. None of that shows up in an instance
+    assertion; all of it shows up here.
+
+    The two routes to a circle are both in frame: the 24-gon at top right
+    approaches its circumcircle, and the fully rounded hexagon below it
+    collapses to its inscribed circle. They are deliberately different sizes,
+    because that is the consequence of rounding on the apothem.
+    """
+
+    def cell(name, **style):
+        return {"name": name, "widget": "Shape", "style": {"width": 64, "height": 64, **style}}
+
+    rows = [
+        [
+            cell("tri", sides=3, background="primary"),
+            cell("sq", sides=4, background="secondary"),
+            cell("pent", sides=5, background="tertiary"),
+            cell("hex", sides=6, background="primary_container"),
+        ],
+        [
+            cell("oct", sides=8, background="secondary_container"),
+            cell("many", sides=24, background="tertiary_container"),
+            cell("round_hex", sides=6, corner_radius=32, background="primary"),
+            cell("half", sides=6, corner_radius=8, background="secondary"),
+        ],
+        [
+            cell("spun", sides=3, rotation=30, background="primary"),
+            cell("spun2", sides=4, rotation=45, background="secondary"),
+            cell("frac", sides=5.5, background="tertiary"),
+            {
+                "name": "outlined",
+                "widget": "Shape",
+                "style": {
+                    "width": 64,
+                    "height": 64,
+                    "sides": 6,
+                    "background": "surface",
+                    "border": {"width": 3, "color": "primary"},
+                },
+            },
+        ],
+    ]
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 16, "spacing": 12},
+            "children": [
+                {"name": f"r{i}", "widget": "Row", "style": {"spacing": 12}, "children": r}
+                for i, r in enumerate(rows)
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=336, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("shapes", np.asarray(engine.canvas.draw()))
+
+
 def test_unsized_widgets_baseline(render_scene, assert_golden) -> None:
     """Every self-sizing widget, with no `style:` at all.
 

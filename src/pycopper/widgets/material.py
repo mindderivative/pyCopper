@@ -19,6 +19,7 @@ correspondingly more.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Final
 
 from ..layout import Constraints, EdgeInsets, Padding, Size
@@ -331,6 +332,79 @@ class DividerElement(_StyledMixin, Padding):
             style.thickness,
             token=ctx.palette.index(style.background or "outline_variant"),
             radius=0.0,
+        )
+
+
+class ShapeElement(_StyledMixin, Padding):
+    """A regular polygon, drawn as an analytic distance field.
+
+    **M3 has no shape component**, but it does have a shape *system*: "the
+    Material shape library contains many types of shapes that can all morph
+    seamlessly into each other", and shape morph "uses the expressive motion
+    scheme by default" (Styles > Shape > Shape Morph). The library itself is a
+    Figma kit and a per-platform API rather than a table of figures, so the
+    shapes here are pyCopper's own -- the *system* is what is borrowed.
+
+    **Why this is a shader branch and not a rasterised path.** The obvious
+    alternative is to compile shapes into glyph outlines and reuse the text
+    atlas. That works, and it is exactly what to do for static SVG artwork --
+    but a glyph is cached by `(glyph, size, axes)`, and the atlas has no
+    per-entry eviction. A shape that morphs, spins or scales changes that key
+    every frame and thrashes the whole atlas. That is the same trap that
+    quantised the icon FILL axis to six steps and that ruled out compensating
+    the pixel ratio during a resize; this is the third time it has decided a
+    design, so shapes stay parametric.
+
+    The payoff: `sides`, `rotation` and `corner_radius` are instance floats.
+    Animating them costs *nothing* -- no rasterisation, no cache key, no atlas
+    -- so morphing is a paint-only change, and a `Shape` is as cheap to animate
+    as it is to draw. It sits in the same single draw call as everything else.
+
+    Two ways to reach a circle, which is worth knowing when choosing a morph:
+    raise `sides` (the polygon grows into its circumcircle), or raise
+    `corner_radius` to its maximum (it collapses to its *inscribed* circle).
+    """
+
+    #: Nothing in M3 sets a size for a shape that has no catalogue entry, so
+    #: this is pyCopper's own and stated as such: large enough to read as a
+    #: shape rather than a dot, small enough not to dominate a row.
+    DEFAULT_SIZE: Final = 48.0
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, EdgeInsets())
+        self.init_element(spec)
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        return outer.constrain(Size(self.DEFAULT_SIZE, self.DEFAULT_SIZE))
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        from ..paint import NO_TOKEN
+
+        style = self.style
+        dpr = ctx.pixel_ratio
+        border = style.border
+        border_token = NO_TOKEN if border is None else ctx.palette.index(border.color)
+        ctx.display_list.add_polygon(
+            absolute.x * dpr,
+            absolute.y * dpr,
+            self.size.width * dpr,
+            self.size.height * dpr,
+            sides=style.sides,
+            # Authored in degrees, because a view file is written by hand.
+            rotation=math.radians(style.rotation),
+            # `corner_radius` is per-corner for a box; a regular polygon has one
+            # radius for every vertex, so the first entry is the one that means
+            # anything here. Taking the max instead would make a stray per-corner
+            # value silently change the shape.
+            corner_radius=style.corner_radius[0] * dpr,
+            token=ctx.palette.index(style.background or "primary"),
+            color=(1.0, 1.0, 1.0, style.opacity),
+            border_width=0.0 if border is None else border.width * dpr,
+            border_token=border_token,
+            border_color=(1.0, 1.0, 1.0, 1.0),
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
         )
 
 
