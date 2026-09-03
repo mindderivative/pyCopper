@@ -249,3 +249,84 @@ def test_shadow_offset_shifts_it(render_scene) -> None:
     left = int(frame[64, 36, 0])
     right = int(frame[64, 92, 0])
     assert right < left, "shadow did not shift right"
+
+
+# ---------------------------------------------------------------- segment
+#
+# No widget draws these yet -- Canvas and node-graph edges, the two the
+# `pyCopper Widget Backlog` names, are both still unbuilt. These are the M2-
+# style acceptance tests for the primitive itself.
+
+
+def test_segment_fills_its_capsule(render_scene) -> None:
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(30, 64, 98, 64, thickness=20.0, color=RED)
+
+    frame, _ = render_scene(paint)
+    assert tuple(frame[64, 64, :3]) == (255, 0, 0), "midpoint should be filled"
+
+
+def test_outside_the_segment_is_untouched(render_scene) -> None:
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(30, 64, 98, 64, thickness=20.0, color=RED)
+
+    frame, _ = render_scene(paint)
+    assert frame[10, 64, 0] < 50, "segment leaked far above its line"
+
+
+def test_thickness_bounds_the_stroke(render_scene) -> None:
+    """thickness=20 means a 10px radius either side of the line, at a point
+    away from both caps where only the perpendicular distance matters."""
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(30, 64, 98, 64, thickness=20.0, color=RED)
+
+    frame, _ = render_scene(paint)
+    assert frame[64 + 9, 64, 0] > 200, "9px off-axis should still be inside"
+    assert frame[64 + 15, 64, 0] < 50, "15px off-axis should be outside a 10px-radius stroke"
+
+
+def test_the_cap_is_round_not_square(render_scene) -> None:
+    """A butt/flat cap would stop dead at x=98. A capsule's round cap bulges
+    past it by up to the radius -- the same distance field property that gives
+    `add_arc`'s ends their curve with no extra geometry."""
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(30, 64, 98, 64, thickness=20.0, color=RED)
+
+    frame, _ = render_scene(paint)
+    # 7px straight past the endpoint, on axis: inside a 10px-radius cap.
+    assert frame[64, 105, 0] > 200, "round cap did not bulge past the endpoint"
+    # (107, 64+9): outside the 10px-radius circle around the endpoint
+    # (distance ~12.7), but inside the square a naive bounding-box-shaped cap
+    # would wrongly paint (x within [98, 108], y within [54, 74]).
+    assert frame[64 + 9, 107, 0] < 50, "cap reads square rather than round"
+
+
+def test_past_the_cap_is_untouched(render_scene) -> None:
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(30, 64, 98, 64, thickness=20.0, color=RED)
+
+    frame, _ = render_scene(paint)
+    assert frame[64, 115, 0] < 50, "17px past the endpoint should be well outside the cap"
+
+
+def test_a_zero_length_segment_paints_a_disc(render_scene) -> None:
+    """The degenerate `a == b` case the shader's `max(dot(ba, ba), 1e-6)`
+    guards -- it must not divide by zero and vanish."""
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(64, 64, 64, 64, thickness=20.0, color=RED)
+
+    frame, _ = render_scene(paint)
+    assert tuple(frame[64, 64, :3]) == (255, 0, 0)
+    assert frame[64, 64 + 15, 0] < 50, "disc radius should still be bounded by the thickness"
+
+
+def test_segment_respects_its_clip(render_scene) -> None:
+    def paint(dl: DisplayList) -> None:
+        dl.add_segment(0, 64, 128, 64, thickness=20.0, color=RED, clip=(0, 0, 64, 128))
+
+    frame, _ = render_scene(paint)
+    assert tuple(frame[64, 30, :3]) == (255, 0, 0), "inside the clip should be drawn"
+    assert frame[64, 100, 0] < 50, "outside the clip should be removed"

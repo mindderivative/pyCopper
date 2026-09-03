@@ -19,6 +19,7 @@ const KIND_IMAGE:  u32 = 2u;
 const KIND_SHADOW: u32 = 3u;
 const KIND_ARC:    u32 = 4u;
 const KIND_POLYGON: u32 = 5u;
+const KIND_SEGMENT: u32 = 6u;
 
 const TAU: f32 = 6.28318530718;
 const PI:  f32 = 3.14159265359;
@@ -44,6 +45,7 @@ struct VertexIn {
     // --- per instance ---
     @location(1) rect       : vec4<f32>,   // x, y, w, h  (physical px)
     @location(2) radii      : vec4<f32>,   // tl, tr, br, bl
+                                           // KIND_SEGMENT: ax, ay, bx, by (endpoints, rect-centre-relative)
     @location(3) clip       : vec4<f32>,
     @location(4) clip_radii : vec4<f32>,
     @location(5) fill       : vec4<f32>,
@@ -52,6 +54,7 @@ struct VertexIn {
     @location(8) params     : vec4<f32>,   // border_w, blur, shadow_dx, shadow_dy
                                            // KIND_ARC: thickness, start, sweep, _
                                            // KIND_POLYGON: border_w, sides, rot, corner_r
+                                           // KIND_SEGMENT: thickness, _, _, _
     @location(9) flags      : vec4<u32>,   // kind, atlas, fill_token, border_token
 };
 
@@ -78,7 +81,7 @@ fn vs_main(in: VertexIn) -> VertexOut {
     // their own geometry. Textured kinds need no padding -- the atlas sample is
     // already antialiased, and padding would break the UV mapping.
     var pad = 0.0;
-    if (kind == KIND_BOX || kind == KIND_ARC || kind == KIND_POLYGON) {
+    if (kind == KIND_BOX || kind == KIND_ARC || kind == KIND_POLYGON || kind == KIND_SEGMENT) {
         pad = 1.5;
     } else if (kind == KIND_SHADOW) {
         pad = in.params.y * 3.0 + max(abs(in.params.z), abs(in.params.w)) + 2.0;
@@ -174,6 +177,22 @@ fn sd_arc(p: vec2<f32>, sc: vec2<f32>, ra: f32, rb: f32) -> f32 {
 // sd_arc: its wedge test degenerates at half-aperture pi and seams at the join.
 fn sd_ring(p: vec2<f32>, ra: f32, rb: f32) -> f32 {
     return abs(length(p) - ra) - rb;
+}
+
+// Exact signed distance to the line segment from `a` to `b`. Subtracting a
+// radius from this field gives a capsule, and every point on the segment is
+// rounded uniformly by doing so -- the caps come out round with no extra
+// geometry, the same way sd_arc's cap case falls out of the ring distance
+// rather than being drawn separately.
+//
+// `max(dot(ba, ba), 1e-6)` guards a degenerate `a == b`: without it a
+// zero-length segment divides by zero and the capsule becomes a disc, which
+// is the only sane thing for a point to render as anyway.
+fn sd_segment(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
+    let pa = p - a;
+    let ba = b - a;
+    let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    return length(pa - ba * h);
 }
 
 // Analytic coverage from a distance field. This is the whole antialiasing story.
@@ -272,6 +291,15 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         } else {
             color = premultiply(fill) * outer;
         }
+
+    } else if (kind == KIND_SEGMENT) {
+        // Endpoints travel in `radii` -- unused by a stroke, which has no
+        // corners -- rather than `uv`, which is already spoken for by the
+        // interpolated texture coordinate GLYPH and IMAGE need. Both ends are
+        // in the same rect-centre-relative frame `p` is, matching every other
+        // kind's convention.
+        let d = sd_segment(p, in.radii.xy, in.radii.zw) - in.params.x * 0.5;
+        color = premultiply(fill) * coverage(d);
 
     } else if (kind == KIND_GLYPH) {
         // R8 coverage atlas tinted by the fill colour.

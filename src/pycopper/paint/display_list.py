@@ -34,6 +34,7 @@ class Kind(IntEnum):
     SHADOW = 3
     ARC = 4
     POLYGON = 5
+    SEGMENT = 6
 
 
 #: Sentinel in ``flags.z`` / ``flags.w`` meaning "use the literal colour".
@@ -234,6 +235,53 @@ class DisplayList:
         s["uv"] = _ZERO4
         s["params"] = (border_width, sides, rotation, corner_radius)
         s["flags"] = (Kind.POLYGON, 0, token, border_token)
+        return i
+
+    def add_segment(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        *,
+        thickness: float,
+        color: tuple[float, float, float, float] = _WHITE,
+        token: int = NO_TOKEN,
+        clip: tuple[float, float, float, float] = _ZERO4,
+        clip_radii: tuple[float, float, float, float] = _ZERO4,
+        opacity: float = 1.0,
+    ) -> int:
+        """Emit a capsule -- a line segment with round caps -- from one point to another.
+
+        Round caps come free from the distance field, the same way `add_arc`'s
+        do: subtracting a radius rounds every point on the segment uniformly,
+        so the ends need no extra geometry. `thickness` is the capsule's own
+        full width, matching `add_arc`'s convention -- not a border added to
+        something else, which is why there is no separate `border_*` here.
+
+        The instance's `rect` is the tight bounding box of the capsule (both
+        endpoints, expanded by the radius); the endpoints themselves travel in
+        `radii`, relative to that box's centre, since a stroke has no corners
+        to need per-corner radii for.
+        """
+        r = thickness * 0.5
+        min_x = min(x1, x2) - r
+        min_y = min(y1, y2) - r
+        width = max(x1, x2) + r - min_x
+        height = max(y1, y2) + r - min_y
+        cx = min_x + width * 0.5
+        cy = min_y + height * 0.5
+        i = self._count
+        s = self._next()[0]
+        s["rect"] = (min_x, min_y, width, height)
+        s["radii"] = (x1 - cx, y1 - cy, x2 - cx, y2 - cy)
+        s["clip"] = clip
+        s["clip_radii"] = clip_radii
+        s["fill"] = (color[0], color[1], color[2], color[3] * opacity)
+        s["border"] = _ZERO4
+        s["uv"] = _ZERO4
+        s["params"] = (thickness, 0.0, 0.0, 0.0)
+        s["flags"] = (Kind.SEGMENT, 0, token, NO_TOKEN)
         return i
 
     def add_shadow(

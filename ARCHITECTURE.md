@@ -1564,6 +1564,61 @@ Three details that are not obvious:
   `(thickness, start, sweep, _)`. No struct growth: the instance stays 144
   bytes, and every field stays vec4-aligned.
 
+### 5.15.1 Segment/capsule rendering — `KIND_SEGMENT`, `add_segment`
+
+There is no transform anywhere in the instance struct (§4), and arcs are
+circular only, so **a diagonal straight line could not be drawn at all**. This
+was flagged while surveying the seventeen-widget backlog: it blocks Canvas and
+node-graph edges specifically, the two widgets with no M3 grounding that are
+built from pyCopper's own primitives. It is a sixth fragment branch, following
+`KIND_POLYGON` exactly — one more instance of the same unit quad, no new draw
+call.
+
+The distance field is exact, not a swept-circle approximation:
+
+```wgsl
+fn sd_segment(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
+    let pa = p - a;
+    let ba = b - a;
+    let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+```
+
+Subtracting a radius from this field gives a capsule, and every point on the
+segment is rounded uniformly by doing so — **round caps come free**, exactly
+the way `sd_arc`'s wedge/cap split gives arcs theirs (§5.15), with no separate
+cap geometry to draw. `max(dot(ba, ba), 1e-6)` guards the degenerate `a == b`:
+without it a zero-length segment divides by zero; with it, the capsule becomes
+a disc, which is the only sane rendering for a point anyway.
+
+**No spare instance field held two endpoints, so `radii` carries them.** A
+stroke has no corners, so the per-corner radii `KIND_BOX` uses there are
+unused by every existing non-box kind already — `radii` becomes
+`(ax, ay, bx, by)`, both endpoints in the same rect-centre-relative frame the
+fragment shader's `p` is already in. `uv` was the other candidate and the
+wrong one: it survives to the fragment stage as an *interpolated* `vec2`
+(mixed across the quad's corners for texture sampling), not the flat `vec4`
+the vertex stage receives, so it cannot carry two flat 2-D points the way
+`radii` can. `add_segment` computes the instance's `rect` itself, as the tight
+bounding box of both endpoints expanded by the radius — callers give it two
+points and a thickness, not a box.
+
+**`thickness` is the capsule's own width**, matching `add_arc`'s convention:
+this is the shape being drawn, not a border added to something else, so
+`KIND_SEGMENT` has no border and no separate stroke colour the way
+`KIND_BOX`/`KIND_POLYGON` do.
+
+No widget draws a segment yet — Canvas and node-graph are still unbuilt, so
+this ships as a tested engine primitive alone, the way `KIND_BOX` and
+`KIND_SHADOW` were tested directly in `tests/golden/test_primitives.py` before
+any widget existed at M2. `tests/test_segment.py` covers the instance
+encoding; `tests/golden/test_primitives.py` renders it, including a test that
+specifically distinguishes a round cap from a naively squared-off
+bounding-box cap — a point inside the capsule's true circular cap but outside
+the notional square one it would occupy if `sd_segment`'s rounding were done
+wrong.
+
 ### 5.17 Motion — `motion/`
 
 One property governs the whole design: **an idle pyCopper application renders
