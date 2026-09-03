@@ -712,19 +712,65 @@ across 24 that reused the swapchain. wgpu reconfigures the surface whenever the
 size differs, so during a drag it tears down and recreates the
 `VkSwapchainKHR` on every pixel.
 
-Amortising that would cut ~23% from the frame, which at ~385 configures a
-second is roughly a halving of the queueing component of the lag. It cannot be
-done from here. wgpu decides to reconfigure by comparing the canvas's physical
-size against the configured one, and that size arrives from GLFW through
-rendercanvas; pyCopper supplies only a draw callback and has no seam at which
-to hold a stale swapchain. Rounding the swapchain up to a coarse multiple *is*
-possible on Wayland in principle — commit an oversized buffer and declare a
-smaller `xdg_surface.set_window_geometry`, which is how client-side shadows
-work — but GLFW owns the `xdg_surface`, and neither rendercanvas nor wgpu
-exposes window geometry or `wp_viewporter` cropping. `set_scissor_rect` does
-not substitute: the swapchain image *is* the window's buffer, so an oversized
-one is displayed oversized. This is an upstream limitation, recorded here with
-the numbers that would support raising it.
+**That rebuild is now amortised, and the note that said it could not be is
+corrected below.** `Settings.resize_bucket` (256 px, 0 disables) rounds the
+size the surface is configured at *up* to a multiple while the window is
+changing size, so the swapchain is rebuilt once per bucket instead of once per
+pixel. Measured on KDE Plasma during a live drag:
+
+| during a drag | acquire | redraws/s |
+|---|---|---|
+| exact size (before) | 1.35 – 1.88 ms | 350 – 455 |
+| pinned to 256 px | **0.043 – 0.053 ms** | **720 – 965** |
+
+Acquire falls ~35× and the resize path roughly doubles its frame rate, so the
+saving is larger than the acquire line alone. The pointer trailing is gone.
+
+**What the previous version of this paragraph got wrong.** It claimed pyCopper
+"supplies only a draw callback and has no seam at which to hold a stale
+swapchain". That is false. `GPUCanvasContext.set_physical_size` is public
+wgpu-py API — "External code needs to set the framebuffer size ... the
+application must call this" — and the size reaches wgpu along a chain pyCopper
+sits on the end of:
+
+```
+GLFW framebuffer callback -> rendercanvas _size_info -> _rc_set_size_dict
+    -> wgpu_context.set_physical_size() -> _has_new_size -> wgpuSurfaceConfigure
+```
+
+`Engine._pin_surface` overrides the last step. The claim was asserted from
+reading the call path rather than from trying it, and stood for several
+milestones.
+
+**The compositor scales an oversized buffer; it does not crop it.** The old
+paragraph guessed "an oversized one is displayed oversized", which is also
+wrong. This was settled by eye, because the two are indistinguishable from any
+number pyCopper can measure: a buffer 1024 px wide in a 900 px window is
+squeezed to fit. **That is why nothing else changes.** `_upload` already
+projects the *window* size, so content is drawn across the whole oversized
+buffer and the compositor's squeeze undoes the stretch exactly. Geometry comes
+out pixel-exact — this was checked with a 1 px grid, not assumed.
+
+The cost is one non-integer resample, which softens text: rendered at 900 px
+and displayed through a 1024→900 squeeze, small type is legible but visibly
+less crisp than native. Raising the pixel ratio to compensate makes it near
+perfect, and is deliberately **not** done — the glyph atlas has no per-entry
+eviction (§5.7.3), so changing the rasterisation size mid-drag trades a
+swapchain rebuild for an atlas rebuild. Instead the pin is released
+`SETTLE_FRAMES` after the last size change: soft while a drag is in flight,
+when nobody is reading, and exact the moment it stops. The engine requests
+those settling frames itself, because an `ondemand` application otherwise stops
+drawing when the drag does and would stay pinned indefinitely.
+
+Nothing here skips or throttles a frame. Every frame is still drawn and
+committed, which the reverted throttle above proved is not optional.
+
+`wp_viewporter` appears nowhere in wgpu-py, and `xdg_surface` geometry is not
+reachable either — `glfw.get_wayland_window` does expose the raw `wl_surface`,
+but GLFW owns the `xdg_surface` and fighting it for geometry is unnecessary now
+that the size seam works. The residual upstream observation is narrower than
+before: wgpu reconfigures on any size difference at all, and a toolkit that
+wants coarse swapchains has to lie to it about the size to get them.
 
 **X11 is not the way out, and that was tested rather than assumed.** GLFW can
 be pointed at its X11 backend with a `PLATFORM` init hint, and under a Wayland

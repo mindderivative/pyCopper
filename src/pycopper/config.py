@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     min_fps: float = Field(default=0.0, ge=0)
     max_fps: float = Field(default=60.0, gt=0)
 
+    #: Round the swapchain up to this many physical pixels while the window is
+    #: being resized, so wgpu rebuilds the VkSwapchainKHR once per bucket
+    #: instead of once per pixel. The buffer is then larger than the window and
+    #: the compositor scales it back, which is exact for geometry and slightly
+    #: soft for text -- so the pin is released a few frames after the drag
+    #: stops (ARCHITECTURE.md 5.8.1). 0 disables it.
+    resize_bucket: int = Field(default=256, ge=0)
+
     #: 'low-power' selects the integrated GPU on hybrid laptops -- wrong default
     #: for a framework that must handle full-window resizes at 60fps.
     power_preference: Literal["high-performance", "low-power"] = "high-performance"

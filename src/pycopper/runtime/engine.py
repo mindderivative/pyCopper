@@ -12,7 +12,7 @@ flag. Polling GLFW here would double-pump the event queue.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Final
 
 import wgpu
 
@@ -24,6 +24,34 @@ from ..theme import Palette, Theme
 from .clipboard import GlfwClipboard, clipboard
 
 __all__ = ["Engine"]
+
+
+#: Frames the surface stays pinned after the last size change. A resize draws
+#: synchronously per compositor configure, so this is a handful of frames after
+#: the drag stops, not a wall-clock delay.
+SETTLE_FRAMES: Final = 3
+
+
+def surface_size_for(
+    size: tuple[int, int],
+    previous: tuple[int, int],
+    settle: int,
+    bucket: int,
+) -> tuple[tuple[int, int], int]:
+    """The size to configure the surface at, and the new settle countdown.
+
+    Separated from `Engine` so the policy is testable without a window: it is
+    a decision about integers, and the GPU has no opinion about it.
+    """
+    if bucket <= 0:
+        return size, 0
+    if size != previous:
+        settle = SETTLE_FRAMES
+    elif settle:
+        settle -= 1
+    if settle:
+        return (-(-size[0] // bucket) * bucket, -(-size[1] // bucket) * bucket), settle
+    return size, settle
 
 
 class Engine:
@@ -58,6 +86,18 @@ class Engine:
 
         self._frame_count = 0
         self._instance_count = 0
+
+        #: Configures the swapchain. Public wgpu-py API ("External code needs
+        #: to set the framebuffer size"), reached through rendercanvas's
+        #: wrapper; None on a canvas that has no swapchain at all, such as the
+        #: offscreen one the golden suite renders through.
+        self._set_surface_size = getattr(
+            getattr(self.context, "_wgpu_context", None), "set_physical_size", None
+        )
+        #: Seeded with the real size so the first frame is never mistaken for a
+        #: resize -- which is also what keeps offscreen rendering exact.
+        self._last_size: tuple[int, int] = tuple(self.canvas.get_physical_size())
+        self._settle = 0
 
     def _make_canvas(self) -> Any:
         from rendercanvas.glfw import RenderCanvas
@@ -113,6 +153,39 @@ class Engine:
 
     # ---------------------------------------------------------------- frame
 
+    def _pin_surface(self) -> None:
+        """Hold the swapchain at a coarse size while the window is resizing.
+
+        wgpu reconfigures the surface whenever the size it is told differs from
+        the one it is configured at, and reconfiguring tears down and recreates
+        the `VkSwapchainKHR`. During a drag that happens on every pixel: 1.35
+        to 1.88 ms per frame against 0.043 measured on KDE Plasma, and it is
+        the whole of the pointer trailing (ARCHITECTURE.md 5.8.1).
+
+        Rounding the size up to `Settings.resize_bucket` makes the rebuild
+        happen once per bucket instead of once per pixel. **The buffer is then
+        larger than the window, and the compositor scales it back down** --
+        measured, not assumed; it does not crop. That is exactly why nothing
+        else here changes: the projection already describes the window
+        (`_upload`), so content is drawn across the whole oversized buffer and
+        the compositor's squeeze undoes the stretch. Geometry comes out exact.
+
+        The cost is one non-integer resample, which softens text slightly. So
+        the pin is released a few frames after the last size change: soft while
+        a drag is in flight, when nobody is reading, and pixel-exact the moment
+        it stops. Nothing is skipped or throttled -- every frame is still drawn
+        and committed, which the reverted throttle proved is not optional.
+        """
+        if self._set_surface_size is None:
+            return
+        size = tuple(self.canvas.get_physical_size())
+        target, self._settle = surface_size_for(
+            size, self._last_size, self._settle, self.settings.resize_bucket
+        )
+        self._last_size = size
+        if target != tuple(self.context._wgpu_context.physical_size):
+            self._set_surface_size(*target)
+
     def draw_frame(self) -> None:
         """One frame. Steps 6-9 of ARCHITECTURE.md 6; 1-5 arrive in M3.
 
@@ -123,6 +196,7 @@ class Engine:
         Measured on KDE Plasma, a throttle that skipped frames dropped a live
         resize from 466 redraws a second to 12 -- see ARCHITECTURE.md 5.8.1.
         """
+        self._pin_surface()
         self.display_list.clear()
         if self.painter is not None:
             self.painter(self.display_list)
@@ -143,6 +217,12 @@ class Engine:
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
         self._frame_count += 1
+        if self._settle:
+            # Nothing else will ask for these. Without them an `ondemand`
+            # application stops drawing the moment the drag does, and the
+            # surface would stay pinned -- and so slightly soft -- until
+            # something unrelated happened to need a frame.
+            self.canvas.request_draw()
 
     def _upload(self) -> None:
         """Palette, globals, and instance uploads (step 7)."""
