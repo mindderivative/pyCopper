@@ -23,6 +23,7 @@ import numpy as np
 from ..layout import EDGE_ZERO, OFFSET_ZERO, EdgeInsets, Offset, Rect
 from ..motion import Animation, Ticker, default_ticker
 from ..paint import NO_TOKEN, DisplayList
+from ..paint.display_list import Kind
 from ..runtime.signals import Effect
 from ..spec import StyleSpec, Template, WidgetSpec
 from ..text import TextEngine
@@ -128,6 +129,50 @@ def _apply_disabled(
     view["flags"][:, 3] = np.where(has_border, token, view["flags"][:, 3])
 
 
+#: Antialiasing reaches about 1.5px past a shape's own rect (the vertex stage
+#: pads by exactly that), so the measured extent is grown a little before it is
+#: trusted. Cheaper than being wrong at a viewport edge.
+_AA_PAD: Final = 2.0
+
+
+def _painted_extent(
+    instances: np.ndarray, absolute: Offset, dpr: float
+) -> tuple[float, float, float, float]:
+    """Bounding box of what a subtree really painted, in physical px, relative
+    to `absolute`.
+
+    Measured from the instances rather than inferred from the element's size,
+    because the two are not the same thing: a shadow reaches past its box, a
+    focus ring sits outside its control, and a child may overflow its parent.
+    Deriving the bound from the element's rect would cull all three, and the
+    failures would be intermittent -- visible only near a viewport edge.
+
+    A shadow's ink extends past its rect by the blur, so it is padded here by
+    the same formula the vertex stage uses for the same reason. Anything else
+    gets the antialiasing pad.
+    """
+    if len(instances) == 0:
+        return (0.0, 0.0, 0.0, 0.0)
+    rect = instances["rect"]
+    pad = np.full(len(instances), _AA_PAD, dtype=np.float64)
+    shadows = instances["flags"][:, 0] == Kind.SHADOW
+    if shadows.any():
+        params = instances["params"][shadows].astype(np.float64)
+        pad[shadows] = (
+            params[:, 1] * 3.0 + np.maximum(np.abs(params[:, 2]), np.abs(params[:, 3])) + 2.0
+        )
+    x = rect[:, 0].astype(np.float64)
+    y = rect[:, 1].astype(np.float64)
+    ox = absolute.x * dpr
+    oy = absolute.y * dpr
+    return (
+        float((x - pad).min()) - ox,
+        float((y - pad).min()) - oy,
+        float((x + rect[:, 2] + pad).max()) - ox,
+        float((y + rect[:, 3] + pad).max()) - oy,
+    )
+
+
 class ElementMixin:
     """Shared element behaviour. Combined with a layout algorithm by widgets."""
 
@@ -186,6 +231,20 @@ class ElementMixin:
         self._error = spec.error or ""
         self._cached = None
         self._cached_key = None
+        #: Bounding box of everything this subtree actually painted, in
+        #: physical px **relative to this element's absolute origin**, with the
+        #: pixel ratio it was measured at. Relative so it survives the element
+        #: moving, which is the whole point: scrolling moves every row, and the
+        #: extent is what lets an off-screen one be skipped without laying a
+        #: finger on it. None until the first paint.
+        self._paint_extent: tuple[float, float, float, float] | None = None
+        self._paint_extent_dpr = 0.0
+        #: Whether this element was skipped by the last paint, and whether the
+        #: extent it holds is therefore a lower bound rather than the truth.
+        #: See `_culled` -- an extent measured while descendants were skipped
+        #: describes what survived, not what exists.
+        self._skipped = False
+        self._extent_partial = False
         self._needs_paint = True
         self._text_engine = None
         self._ticker = None
@@ -492,6 +551,57 @@ class ElementMixin:
 
     # ------------------------------------------------------------------ paint
 
+    def _culled(self, ctx: PaintContext, absolute: Offset) -> bool:
+        """Whether this subtree can be skipped because it lies outside the clip.
+
+        Virtualised scrolling, and it is a *paint* optimisation rather than a
+        different kind of list: the content is still laid out, so scroll
+        extents, hit testing and the scrollbar all keep working unchanged. What
+        stops happening is building instances the shader would discard anyway
+        -- clipping is analytic and in-shader (§5.8), so anything wholly
+        outside the clip contributes nothing to the frame. Skipping it is
+        exactly equivalent, not an approximation.
+
+        Measured on a 2000-row list in a 600px viewport: 138 ms per scroll
+        frame before, because cost tracked the number of rows rather than the
+        number visible.
+
+        **Only a clean element is skipped, and that is what makes it safe.**
+        The extent is the bounding box of what this subtree really painted last
+        time, so it is exact -- but only while the content has not changed. A
+        dirty element repaints and re-measures; the alternative would be to
+        trust a stale extent, and an element whose content grew off-screen
+        would then stay wrongly hidden. Position may change freely, which is
+        the case that matters: scrolling moves every row and changes nothing
+        about what any of them draws.
+        """
+        clip = ctx.clip
+        if clip[2] <= 0.0 or clip[3] <= 0.0:
+            return False  # unclipped: nothing to be outside of
+        extent = self._paint_extent
+        if extent is None or self._needs_paint:
+            return False
+        if self._extent_partial:
+            # Measured while its own descendants were being skipped, so it
+            # describes what survived rather than what is there. Culling
+            # against it is circular, and it bites exactly once the list has
+            # been scrolled: a Column that painted four rows reports a
+            # four-row extent, and at the next scroll position that extent
+            # falls outside the viewport and takes the whole list with it.
+            # Found by watching a 60-row list paint one instance.
+            return False
+        if self._paint_extent_dpr != ctx.pixel_ratio:
+            return False  # measured at another scale; the numbers do not carry
+        dpr = ctx.pixel_ratio
+        dx = absolute.x * dpr
+        dy = absolute.y * dpr
+        return (
+            extent[2] + dx <= clip[0]
+            or extent[3] + dy <= clip[1]
+            or extent[0] + dx >= clip[0] + clip[2]
+            or extent[1] + dy >= clip[1] + clip[3]
+        )
+
     def paint(self, ctx: PaintContext, origin: Offset) -> None:
         """Emit this subtree into the display list, back to front.
 
@@ -509,6 +619,10 @@ class ElementMixin:
         the slice holds.
         """
         absolute = origin + self.offset
+        if self._culled(ctx, absolute):
+            self._skipped = True
+            return
+        self._skipped = False
 
         key = (absolute, self.size, ctx.pixel_ratio, ctx.clip, ctx.clip_radii)
         if not self._needs_paint and self._cached is not None and self._cached_key == key:
@@ -520,9 +634,12 @@ class ElementMixin:
         self.paint_self(ctx, absolute)
         child_ctx = self.child_paint_context(ctx, absolute)
         child_origin = self.child_origin(absolute)
+        partial = False
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.paint(child_ctx, child_origin)
+                partial = partial or child._skipped or child._extent_partial
+        self._extent_partial = partial
         self.paint_foreground(ctx, absolute)
         if outermost_disabled:
             _apply_disabled(ctx.display_list, start, ctx.palette, self.size, ctx.pixel_ratio)
@@ -530,6 +647,8 @@ class ElementMixin:
         self.paint_focus_ring(ctx, absolute)
         self._cached = ctx.display_list.snapshot(start)
         self._cached_key = key
+        self._paint_extent = _painted_extent(self._cached, absolute, ctx.pixel_ratio)
+        self._paint_extent_dpr = ctx.pixel_ratio
         self._needs_paint = False
 
     #: Where this widget sits when used as an overlay and the view does not

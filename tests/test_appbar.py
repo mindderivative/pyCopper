@@ -11,8 +11,10 @@ from __future__ import annotations
 import pytest
 
 from pycopper import App, Settings, Theme
+from pycopper.layout import Offset
 from pycopper.paint import NO_TOKEN, DisplayList
 from pycopper.theme import Palette
+from pycopper.tree.element import PaintContext
 from pycopper.widgets.navigation import TopAppBarElement
 
 PALETTE = Palette(Theme(dark=True))
@@ -216,21 +218,35 @@ def test_the_container_fills_with_surface_container_on_scroll() -> None:
 
 def test_the_headline_shrinks_as_the_bar_collapses() -> None:
     """So the expanded and small forms agree at the moment of arrival."""
-    app, _bar, body = app_with("large")
+    app, bar, body = app_with("large")
 
-    def glyph_count(dl: DisplayList) -> int:
-        return sum(1 for s in dl.view if int(s["flags"][0]) == 1)
+    def bar_glyphs() -> list:
+        """The bar's own glyphs, painted on their own.
 
-    big = DisplayList()
-    app.paint(big)
+        Filtering the app's display list by y does not work and the reason is
+        worth keeping: a row straddling the top of the viewport IS painted, and
+        the shader clips the part above it. So the frame legitimately contains
+        glyphs above the viewport line, and counting them would make this test
+        about scrolling rather than about the headline.
+        """
+        dl = DisplayList()
+        ctx = PaintContext(
+            display_list=dl,
+            palette=Palette(Theme(dark=True)),
+            text=bar.text_engine,
+            pixel_ratio=1.0,
+        )
+        bar.paint(ctx, Offset(0.0, 0.0))
+        return [s for s in dl.view if int(s["flags"][0]) == 1]
+
+    big_glyphs = bar_glyphs()
     body.set_scroll(88)
     settle(app)
-    small = DisplayList()
-    app.paint(small)
+    small_glyphs = bar_glyphs()
     # Same title, so the same glyphs -- but a smaller box for them.
-    assert glyph_count(big) == glyph_count(small)
-    widths_big = max(float(s["rect"][2]) for s in big.view if int(s["flags"][0]) == 1)
-    widths_small = max(float(s["rect"][2]) for s in small.view if int(s["flags"][0]) == 1)
+    assert len(big_glyphs) == len(small_glyphs)
+    widths_big = max(float(s["rect"][2]) for s in big_glyphs)
+    widths_small = max(float(s["rect"][2]) for s in small_glyphs)
     assert widths_small < widths_big
 
 

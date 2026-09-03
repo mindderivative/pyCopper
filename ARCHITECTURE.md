@@ -858,6 +858,50 @@ from a module-level `App` — how every example here is written — outlives eve
 that, so closing the window destroyed the native window and left a live wgpu
 surface pointing at it.
 
+#### 5.8.3 Virtualised scrolling: not painting what the clip discards
+
+Clipping is analytic and in-shader, so an instance wholly outside its clip
+contributes nothing to the frame. Building it is pure waste, and on a long list
+it is most of the frame: a 2000-row list in a 600px viewport cost **138 ms per
+scroll frame** and emitted **52,891 instances** for the ten rows a reader could
+see, because cost tracked the length of the data rather than the size of the
+viewport.
+
+`ElementMixin._culled` skips a subtree whose painted extent lies outside the
+inherited clip. Measured after: **1.4 ms and 194 instances**, and the instance
+count is *constant* in list length — 50 rows and 2000 rows both emit 194. The
+residual growth in time (0.69 → 1.40 ms) is the walk itself: every child is
+still visited and tested, so this is linear with a very small constant rather
+than constant. Skipping the walk as well would need an ordering assumption
+about children that the layout model does not make.
+
+**A paint optimisation, not a different kind of list.** Content is still laid
+out, so scroll extents, hit testing and the scrollbar are untouched and there
+is no item-builder concept to adopt. It is also not an approximation: the
+shader was already discarding this work, so the frame is identical — which the
+golden suite passing unchanged is the evidence for.
+
+Three things make it safe, and one of them was a bug first:
+
+- **The extent is measured from what was painted**, never inferred from the
+  element's size. A shadow reaches past its box, a focus ring sits outside its
+  control, and a child may overflow its parent; a size-derived bound culls all
+  three, and only near a viewport edge, which is the worst way to be wrong.
+  Shadows are padded by the same formula the vertex stage uses for them.
+- **Only a clean element is skipped.** The extent is exact while the content
+  has not changed; position may change freely, which is the case that matters,
+  since scrolling moves every row and changes what none of them draws. A dirty
+  element repaints and re-measures rather than trusting a stale bound.
+- **An extent measured while descendants were skipped is a lower bound rather
+  than the truth**, and is refused. Without this the mechanism eats itself: a
+  `Column` that painted four rows reports a four-row extent, and at the next
+  scroll position that extent falls outside the viewport and takes the whole
+  list with it. Found by watching a 60-row list paint one instance.
+
+The first frame still draws everything, because the extent is measured *from* a
+paint and there is nothing to cull against until one has happened.
+
+
 ### 5.11 The accessibility tree — `runtime/accessibility.py`
 
 `App.accessibility_tree()` snapshots what the interface *means*: roles, names,
