@@ -57,7 +57,10 @@ class UIPipeline:
         # 1x1 placeholders so the bind group is complete before M4 fills the
         # real atlases. The pipeline shape is final; only contents change.
         self.glyph_atlas = self._placeholder("r8unorm", b"\xff")
-        self.image_atlas = self._placeholder("rgba8unorm", b"\xff\xff\xff\xff")
+        # `-srgb`: see `render/atlas.py`'s `ImageAtlas._create_texture` for why
+        # an image texture must decode sRGB on sample, unlike the glyph atlas's
+        # plain `r8unorm` -- coverage has no colour to decode.
+        self.image_atlas = self._placeholder("rgba8unorm-srgb", b"\xff\xff\xff\xff")
         self.sampler = device.create_sampler(
             mag_filter=wgpu.FilterMode.linear,
             min_filter=wgpu.FilterMode.linear,
@@ -177,6 +180,18 @@ class UIPipeline:
         changes, but the texture object it lives in does not.
         """
         self.glyph_atlas = texture
+        self.bind_group = self._make_bind_group()
+
+    def bind_image_atlas(self, texture: Any) -> None:
+        """Swap in a real image atlas, replacing the 1x1 placeholder.
+
+        Mirrors `bind_glyph_atlas` exactly, for the same reason: WebGPU only
+        lets a bound texture change by rebuilding the bind group. Nothing
+        calls this yet -- no widget draws `Kind.IMAGE` -- but the seam is
+        ready for whichever one does, the way `bind_glyph_atlas` was ready a
+        milestone before real text existed.
+        """
+        self.image_atlas = texture
         self.bind_group = self._make_bind_group()
 
     def destroy(self) -> None:

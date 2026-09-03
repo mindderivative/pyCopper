@@ -330,3 +330,100 @@ def test_segment_respects_its_clip(render_scene) -> None:
     frame, _ = render_scene(paint)
     assert tuple(frame[64, 30, :3]) == (255, 0, 0), "inside the clip should be drawn"
     assert frame[64, 100, 0] < 50, "outside the clip should be removed"
+
+
+# ------------------------------------------------------------------- images
+
+
+def _bound_atlas(engine, rgba: np.ndarray):
+    """An ImageAtlas holding one swatch, bound to `engine`'s real pipeline in
+    place of the 1x1 placeholder.
+
+    Nothing in the running framework does this yet -- no widget draws
+    `Kind.IMAGE` -- so this is the seam `bind_image_atlas` exists for,
+    exercised directly the way M2 exercised `Kind.BOX` and `Kind.SHADOW`
+    before any widget existed to call them.
+    """
+    from pycopper.render.atlas import ImageAtlas
+
+    atlas = ImageAtlas(engine.device, size=64)
+    entry = atlas.add("swatch", rgba)
+    atlas.upload()
+    engine.pipeline.bind_image_atlas(atlas.texture)
+    return entry, atlas.size
+
+
+def test_an_opaque_image_paints_its_pixels(offscreen_engine) -> None:
+    """The whole path: decode (stood in for by a synthetic array, since the
+    atlas is decode-agnostic), pack, upload, bind, sample, blend."""
+    engine = offscreen_engine(width=128, height=128)
+    swatch = np.full((8, 8, 4), (0, 200, 0, 255), dtype=np.uint8)
+    entry, size = _bound_atlas(engine, swatch)
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_image(20, 20, 60, 60, uv=entry.uv(size))
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    frame = np.asarray(engine.canvas.draw())
+    assert tuple(frame[50, 50, :3]) == (0, 200, 0)
+
+
+def test_outside_the_image_is_untouched(offscreen_engine) -> None:
+    engine = offscreen_engine(width=128, height=128)
+    entry, size = _bound_atlas(engine, np.full((8, 8, 4), (0, 200, 0, 255), dtype=np.uint8))
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_image(20, 20, 60, 60, uv=entry.uv(size))
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    frame = np.asarray(engine.canvas.draw())
+    assert frame[5, 5, 1] < 50, "image leaked outside its rect"
+
+
+def test_a_tint_multiplies_a_white_texel(offscreen_engine) -> None:
+    """`color = premultiply(texel * fill)` -- a white swatch tinted blue must
+    come out exactly blue. This is what lets one image be recoloured, the way
+    an icon's glyph coverage is tinted by its fill."""
+    engine = offscreen_engine(width=128, height=128)
+    entry, size = _bound_atlas(engine, np.full((8, 8, 4), 255, dtype=np.uint8))
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_image(20, 20, 60, 60, uv=entry.uv(size), tint=BLUE)
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    frame = np.asarray(engine.canvas.draw())
+    assert tuple(frame[50, 50, :3]) == (0, 0, 255)
+
+
+def test_a_fully_transparent_texel_leaves_the_background(offscreen_engine) -> None:
+    """Straight, non-premultiplied alpha is the documented contract: a texel
+    with alpha 0 must vanish entirely regardless of its RGB, which is only
+    true if the atlas was never asked to premultiply on the way in."""
+    engine = offscreen_engine(width=128, height=128, theme=Theme(dark=True))
+    entry, size = _bound_atlas(engine, np.full((8, 8, 4), (255, 0, 0, 0), dtype=np.uint8))
+    surface = tuple(round(linear_to_srgb8(c)) for c in engine.palette.linear("surface")[:3])
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_image(20, 20, 60, 60, uv=entry.uv(size))
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    frame = np.asarray(engine.canvas.draw())
+    assert tuple(frame[50, 50, :3]) == pytest.approx(surface, abs=2)
+
+
+def test_an_image_respects_its_clip(offscreen_engine) -> None:
+    engine = offscreen_engine(width=128, height=128)
+    entry, size = _bound_atlas(engine, np.full((8, 8, 4), (0, 200, 0, 255), dtype=np.uint8))
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_image(0, 0, 128, 128, uv=entry.uv(size), clip=(0, 0, 64, 128))
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    frame = np.asarray(engine.canvas.draw())
+    assert tuple(frame[64, 30, :3]) == (0, 200, 0), "inside the clip should be drawn"
+    assert frame[64, 100, 1] < 50, "outside the clip should be removed"

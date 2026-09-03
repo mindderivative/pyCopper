@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pycopper.render.atlas import PADDING, AtlasFullError, GlyphAtlas, SkylinePacker
+from pycopper.render.atlas import PADDING, AtlasFullError, GlyphAtlas, ImageAtlas, SkylinePacker
 from pycopper.text import FontDB, FontRequest
 
 
@@ -142,3 +142,114 @@ def test_reset_clears_the_image(face) -> None:
 
 def test_upload_is_a_noop_without_a_device() -> None:
     assert GlyphAtlas(size=64).upload() is False
+
+
+# ------------------------------------------------------------ image atlas
+
+
+def rgba(w: int, h: int, colour: tuple[int, int, int, int] = (255, 0, 0, 255)) -> np.ndarray:
+    out = np.zeros((h, w, 4), dtype=np.uint8)
+    out[:, :] = colour
+    return out
+
+
+def test_packing_an_image_writes_its_pixels() -> None:
+    atlas = ImageAtlas(size=256)
+    entry = atlas.add("swatch", rgba(20, 10))
+    assert entry.width == 20 and entry.height == 10
+    assert tuple(atlas.pixels[entry.y, entry.x]) == (255, 0, 0, 255)
+
+
+def test_get_or_add_repeat_lookups_hit_the_cache() -> None:
+    """get_or_add must not call the loader again once cached -- the whole
+    point, since a loader may be an expensive disk read."""
+    atlas = ImageAtlas(size=256)
+    calls = []
+
+    def loader() -> np.ndarray:
+        calls.append(1)
+        return rgba(8, 8)
+
+    first = atlas.get_or_add("a", loader)
+    second = atlas.get_or_add("a", loader)
+    assert first == second
+    assert len(calls) == 1
+
+
+def test_different_keys_are_different_entries() -> None:
+    atlas = ImageAtlas(size=256)
+    a = atlas.add("a", rgba(8, 8))
+    b = atlas.add("b", rgba(8, 8))
+    assert (a.x, a.y) != (b.x, b.y)
+
+
+def test_re_adding_a_key_replaces_it() -> None:
+    atlas = ImageAtlas(size=256)
+    atlas.add("k", rgba(8, 8, (255, 0, 0, 255)))
+    atlas.add("k", rgba(8, 8, (0, 255, 0, 255)))
+    entry = atlas.get_or_add("k", lambda: rgba(8, 8, (0, 0, 255, 255)))
+    assert tuple(atlas.pixels[entry.y, entry.x]) == (0, 255, 0, 255)
+
+
+def test_images_are_padded_apart() -> None:
+    atlas = ImageAtlas(size=256)
+    a = atlas.add("a", rgba(20, 20))
+    b = atlas.add("b", rgba(20, 20))
+    assert b.x >= a.x + a.width + PADDING or b.y >= a.y + a.height + PADDING
+
+
+def test_image_uv_is_normalised_and_ordered() -> None:
+    atlas = ImageAtlas(size=256)
+    entry = atlas.add("a", rgba(30, 40))
+    u0, v0, u1, v1 = entry.uv(256)
+    assert 0.0 <= u0 < u1 <= 1.0
+    assert 0.0 <= v0 < v1 <= 1.0
+
+
+def test_image_overflow_resets_and_keeps_working() -> None:
+    """Eviction is wholesale, exactly as for glyphs -- the skyline cannot
+    free individual rectangles."""
+    atlas = ImageAtlas(size=64)
+    entries = [atlas.add(i, rgba(20, 20)) for i in range(20)]
+    assert atlas.resets >= 1
+    assert atlas.generation >= 1
+    assert entries[-1].generation == atlas.generation
+
+
+def test_an_image_larger_than_the_atlas_raises() -> None:
+    from pycopper.render.atlas import AtlasFullError
+
+    with pytest.raises(AtlasFullError):
+        ImageAtlas(size=64).add("too-big", rgba(200, 200))
+
+
+def test_image_reset_clears_the_atlas() -> None:
+    atlas = ImageAtlas(size=64)
+    atlas.add("a", rgba(8, 8))
+    atlas.reset()
+    assert np.all(atlas.pixels == 0)
+    assert len(atlas) == 0
+
+
+def test_contains_reflects_generation_not_just_presence() -> None:
+    atlas = ImageAtlas(size=64)
+    atlas.add("a", rgba(8, 8))
+    assert "a" in atlas
+    atlas.reset()
+    assert "a" not in atlas, "the key is still in the dict but its generation is stale"
+
+
+def test_image_upload_is_a_noop_without_a_device() -> None:
+    assert ImageAtlas(size=64).upload() is False
+
+
+def test_a_non_rgba_array_is_rejected() -> None:
+    atlas = ImageAtlas(size=64)
+    with pytest.raises(ValueError, match="RGBA"):
+        atlas.add("bad", np.zeros((8, 8, 3), dtype=np.uint8))
+
+
+def test_a_non_uint8_array_is_rejected() -> None:
+    atlas = ImageAtlas(size=64)
+    with pytest.raises(ValueError, match="uint8"):
+        atlas.add("bad", np.zeros((8, 8, 4), dtype=np.float32))

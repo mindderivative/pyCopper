@@ -901,6 +901,44 @@ Three things make it safe, and one of them was a bug first:
 The first frame still draws everything, because the extent is measured *from* a
 paint and there is nothing to cull against until one has happened.
 
+#### 5.8.4 Image atlas packing
+
+`ImageAtlas` (`render/atlas.py`) is `GlyphAtlas`'s counterpart for `Kind.IMAGE`
+— built on the same `SkylinePacker`, with the same wholesale-eviction
+contract, but **decode-agnostic**: it never opens a file or touches Pillow. A
+caller decodes (`Image.open(...).convert("RGBA")` and `np.asarray`, already a
+hard dependency) and hands over an `(h, w, 4)` uint8 array; the atlas only
+packs, caches, and uploads. Deliberately not a shared base class with
+`GlyphAtlas` — a glyph atlas rasterises through FreeType and keys on shaping
+parameters, an image atlas keys on whatever identifies the source, and forcing
+a common parent over that difference buys an abstraction for its own sake.
+
+**RGBA costs four bytes a pixel against the glyph atlas's one**, so the same
+default 1024² size costs 4× the VRAM: 4 MiB against 1 MiB. Stated rather than
+left to be found by a memory profiler.
+
+**Not wired into `Engine` or `App`.** No widget yet calls `add` — `Image`,
+`Video` and `Canvas` are still backlog — and allocating a real texture
+unconditionally would cost every application 4 MiB for a feature it cannot
+reach. `UIPipeline.bind_image_atlas` exists and is tested end-to-end
+(`tests/golden/test_primitives.py`), the same seam `bind_glyph_atlas` was
+before real text existed at M4, but nothing calls it yet outside the test that
+proves it works.
+
+**The atlas texture must declare `rgba8unorm-srgb`, and that is not a style
+choice.** An image from a decoder is sRGB-encoded bytes, the same as
+`materialyoucolor`'s output (§5.6.1). The render target is `rgba8unorm-srgb`,
+which treats what it is given as linear and re-encodes on write. A plain
+`rgba8unorm` atlas texture does no decode when sampled, so an sRGB byte would
+be read as linear and then re-encoded — the identical double-encoding failure
+§5.6.1 records for the palette, reappearing here for images and caught the
+same way: measured, not theorised. A swatch written as `(0, 200, 0)` came back
+as `(0, 229, 0)` with the plain format and `(0, 200, 0)` once the atlas texture
+was declared `-srgb`, which makes `textureSample` decode it back to linear
+before the fragment shader's `premultiply(texel * fill)` ever sees it. The
+glyph atlas is correctly `r8unorm` with no `-srgb` variant: coverage has no
+colour to decode.
+
 
 ### 5.11 The accessibility tree — `runtime/accessibility.py`
 
