@@ -39,3 +39,7 @@ M3-References/
 
 # Superseded skills, kept locally for reference
 .claude/old_skills.bck/
+
+# Full development chat transcript: kept locally for reference, deliberately
+# out of git history.
+CHAT_HISTORY.md
