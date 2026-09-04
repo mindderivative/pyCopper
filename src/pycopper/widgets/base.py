@@ -776,6 +776,7 @@ class SpacerElement(_StyledMixin, Padding):
 def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
     from . import carousel as ca
+    from . import dock as dk
     from . import material as m
     from . import navigation as n
     from . import overlays as o
@@ -801,6 +802,9 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.NAV_ITEM: n.NavItemElement,
         WidgetKind.TOP_APP_BAR: n.TopAppBarElement,
         WidgetKind.STATUS_BAR: n.StatusBarElement,
+        WidgetKind.DOCK_SPLIT: dk.DockSplitElement,
+        WidgetKind.DOCK_GROUP: dk.DockGroupElement,
+        WidgetKind.DOCK_PANEL: dk.DockPanelElement,
         WidgetKind.TABS: n.TabsElement,
         WidgetKind.TAB: n.TabElement,
         WidgetKind.SEGMENTED_BUTTON: n.SegmentedButtonElement,

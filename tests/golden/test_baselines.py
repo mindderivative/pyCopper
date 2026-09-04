@@ -2453,3 +2453,137 @@ def test_status_bar_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("status_bar", np.asarray(engine.canvas.draw()))
+
+
+def test_dock_baseline(render_scene, assert_golden) -> None:
+    """An IDE-shaped layout: a narrower sidebar group beside a wider main
+    group with two tabs, one of them active.
+
+    Proves the whole feature at once: the split ratio, the tab strip's
+    selected indicator and colour, and that the inactive tab's content
+    (Output) contributes nothing to what's visible.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "DockSplit",
+            "value": "0.3",
+            "children": [
+                {
+                    "name": "sidebar",
+                    "widget": "DockGroup",
+                    "children": [
+                        {
+                            "name": "files",
+                            "widget": "DockPanel",
+                            "text": "Files",
+                            "children": [
+                                {
+                                    "widget": "Container",
+                                    "style": {
+                                        "width": "expand",
+                                        "height": "expand",
+                                        "background": "surface",
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "name": "main",
+                    "widget": "DockGroup",
+                    "value": "editor",
+                    "children": [
+                        {
+                            "name": "editor",
+                            "widget": "DockPanel",
+                            "text": "main.py",
+                            "children": [
+                                {
+                                    "widget": "Container",
+                                    "style": {
+                                        "width": "expand",
+                                        "height": "expand",
+                                        "background": "surface_container_low",
+                                    },
+                                }
+                            ],
+                        },
+                        {
+                            "name": "output",
+                            "widget": "DockPanel",
+                            "text": "Output",
+                            "children": [{"widget": "Text", "text": "log output"}],
+                        },
+                    ],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=480, height=280, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("dock", np.asarray(engine.canvas.draw()))
+
+
+def test_tree_view_deep_collapse_baseline(render_scene, assert_golden) -> None:
+    """A collapsed branch two levels deep, with a genuinely expanded and
+    visibly-labelled grandchild inside it.
+
+    This is the specific shape `test_collapsing_an_ancestor_clips_every_
+    descendant` (test_navigation.py) checks at the display-list level --
+    but that test only verifies the *clip rect's own math*, not that the
+    renderer actually honours it. It doesn't: `ui.wgsl` only applies a clip
+    when both its width AND height are strictly greater than zero, so a
+    mathematically-correct zero-height intersection was silently read as
+    "unclipped" and the grandchild's label rendered anyway. Confirmed by
+    rendering this exact frame before the fix and finding the label really
+    was on screen. Fixed by flooring the intersected clip's dimensions to
+    a real, sub-pixel `HIDDEN_EXTENT` instead of the literal zero
+    `Rect.intersect` produces for a no-overlap case.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24},
+            "children": [
+                {
+                    "name": "a",
+                    "widget": "TreeItem",
+                    "text": "a",
+                    "value": "false",
+                    "children": [
+                        {
+                            "name": "b",
+                            "widget": "TreeItem",
+                            "text": "b",
+                            "value": "true",
+                            "children": [
+                                {
+                                    "name": "c",
+                                    "widget": "TreeItem",
+                                    "text": "must not be visible",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=280, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("tree_view_deep_collapse", np.asarray(engine.canvas.draw()))

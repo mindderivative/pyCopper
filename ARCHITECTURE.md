@@ -1049,6 +1049,43 @@ Revisit a general vector engine once the project is stable enough to justify
 designing a pluggable rendering backend around one — not as a drop-in swap for
 this section's own pipeline, which none of the above showed a need to replace.
 
+#### 5.8.6 A zero-size clip means *unclipped*, not *hidden*
+
+`ui.wgsl` applies a clip only when **both** dimensions are strictly positive:
+`if (clip.z > 0.0 && clip.w > 0.0)`. Either one being zero — not both, just
+one — reads as "no clip at all", the same as the display list's own
+`(0, 0, 0, 0)` sentinel for an element with no ancestor clip. This is fine for
+every clip a widget computes directly from its own size, since a real
+control's own rect never has a zero dimension. It stops being fine the moment
+a clip is computed by **intersecting** two rects, because `Rect.intersect`
+correctly floors a no-overlap result to an exact zero in the degenerate
+dimension — mathematically right, and silently read by the shader as "draw
+this anyway."
+
+Found twice from the same root cause, in both cases by rendering a real frame
+rather than trusting the clip math: `TreeItemElement.child_paint_context`
+intersects a collapsed ancestor's clip with each descendant's own rect
+(§5.12's `TreeView` entry), and `DockPanelElement.child_paint_context` needs
+to hide an inactive tab's content outright (§5.20). Both produced a
+mathematically correct zero-height clip for "this must not be visible", and
+both leaked the hidden content onto the actual rendered frame because that
+zero satisfied the shader's own definition of "unclipped". The existing unit
+test for the `TreeView` case (`test_collapsing_an_ancestor_clips_every_
+descendant`) had the identical bug in its own `visible()` helper — it only
+special-cased the exact `(0, 0)` sentinel, not "either dimension zero" — so
+it reported the broken behaviour as passing. A golden render at a taller
+canvas than the original (`tree_view_deep_collapse`) is what actually caught
+it: the earlier canvas happened to crop the leaking content by coincidence,
+which is why this survived one full "verified" ship cycle.
+
+**The fix in both places is the same shape**: never emit a clip whose width
+or height is exactly zero when the intent is "hide this". Each hiding path
+floors the degenerate dimension to `HIDDEN_EXTENT` (`0.01`, in already-scaled
+physical px) — real enough to satisfy the shader's `> 0.0` gate, small enough
+that no rasterised fragment can land inside it. This is not a new primitive
+or a new clip *format*; it is the one extra `max(value, HIDDEN_EXTENT)` an
+intersection-based clip needs that a size-based one never does.
+
 ### 5.11 The accessibility tree — `runtime/accessibility.py`
 
 `App.accessibility_tree()` snapshots what the interface *means*: roles, names,
@@ -1567,7 +1604,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
 | `Accordion` | 56 / 72dp header, `ListItem`'s anatomy | M3 has no component for this — only Lists' "expand and collapse" behaviour statement; disclosure state is `value:`, animated height reveal clipped like `ScrollView`, chevron **swaps** `expand_more`/`expand_less` rather than rotating (a glyph instance has no rotation parameter) |
-| `TreeView` + `TreeItem` | Accordion's mechanism, recursive | same M3 gap, same reveal/clip/chevron-swap machinery, applied to a `TreeItem` that nests further `TreeItem`s; a leaf has no chevron. Two things a single level of nesting never needed: per-level **indentation** (one chevron-width per depth, not M3-sourced — no tree page exists to source it from) and a **clip that intersects its ancestor's** rather than replacing it, since — unlike Accordion or `ScrollView` — a tree item is routinely nested inside its own kind, so collapsing a node must hide every descendant regardless of which of them are individually expanded. `TreeView` generalises `_SelectionContainer`'s `value:`-names-the-selected-child shape to select at any depth |
+| `TreeView` + `TreeItem` | Accordion's mechanism, recursive | same M3 gap, same reveal/clip/chevron-swap machinery, applied to a `TreeItem` that nests further `TreeItem`s; a leaf has no chevron. Two things a single level of nesting never needed: per-level **indentation** (one chevron-width per depth, not M3-sourced — no tree page exists to source it from) and a **clip that intersects its ancestor's** rather than replacing it, since — unlike Accordion or `ScrollView` — a tree item is routinely nested inside its own kind, so collapsing a node must hide every descendant regardless of which of them are individually expanded. The intersection's own degenerate case needed a further fix, covered in §5.8.6. `TreeView` generalises `_SelectionContainer`'s `value:`-names-the-selected-child shape to select at any depth |
 | `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
 | `CircularProgress` | 4dp ring, clockwise from 12 o'clock | determinate only; needs the arc primitive (§5.15). The 48dp default diameter is **not** sourced — that page's size table is an image |
 | `Carousel` + `CarouselItem` | 28dp items, 16dp leading/trailing, 8dp gaps | three layouts; items resize and snap (§5.16) |
@@ -2442,6 +2479,76 @@ background. `paired_content_token` now follows M3's container/`on_` pairing —
 `primary_container` implies `on_primary_container`. It is applied only where
 the whole surface belongs to the widget; a component whose background is one
 part of a larger anatomy keeps its variant's content token.
+
+---
+
+### 5.20 Dock layout — `widgets/dock.py`
+
+Three widgets, no M3 component behind any of them: checked directly, the same
+way `Pagination` and `StatusBar` were, rather than assumed absent. `DockSplit`
+divides exactly two children with a draggable divider; `DockGroup` is a
+tabbed stack of `DockPanel`s, exactly one visible at a time; `DockPanel` is
+one pane, its `text:` the tab label. This is **the static half only** — the
+tree is arranged once in the view file, the way a `Row`/`Column`/`Stack` tree
+already is. Runtime drag-and-drop, dragging a tab onto an edge to split or
+rearrange the layout while the app runs, is a separate and substantially
+larger feature (drop-zone hit-testing, tree mutation, tab reordering, drag
+previews) that was scoped out deliberately rather than half-built.
+
+**`DockGroup` owns content-switching that `Tabs` does not.** `Tabs` is only
+ever the strip — an application swaps content elsewhere based on its
+`value:`. A dock layout has nowhere else for that swap to live, so
+`DockGroup` reuses `Tabs`' own anatomy (48dp, 3dp bottom indicator, `primary`
+selected / `on_surface_variant` unselected — there being no M3 page for a
+dock tab either) but also lays out only the active `DockPanel` at its full
+share of the space each frame, giving every other one `Size(0, 0)`. Hover is
+tracked and **animated** per tab (`state.data["tab_hover"]` plus one
+`animated()` key per panel name) — safe here, unlike `Pagination`'s
+deliberate choice not to animate its own per-slot hover, because a dock
+group's set of tabs is small and fixed for the widget's lifetime rather than
+unbounded.
+
+**`Size(0, 0)` alone does not hide an inactive panel's content** — painting
+always emits full geometry regardless of the parent's clip, so an inactive
+`DockPanel`'s own children can still paint at whatever size *they* want,
+positioned right on top of the active one's. `DockPanelElement` clips itself
+to nothing when not selected — which surfaced the zero-size-clip-means-
+unclipped gap covered in full in §5.8.6, found here and in `TreeView`'s
+existing clip-intersection code from the same underlying cause.
+
+**`DockSplit`'s `axis` default needed a real fix, not a guess.** `axis` is
+shared with `ScrollView`, whose own sensible default is `vertical` — so the
+bare Pydantic field default cannot also mean "horizontal, side by side" for
+this widget, which is the more common reading of "split." Checking
+`"axis" in style.model_fields_set` (the same idiom `resolved_placement`
+already uses to tell an explicit `center` apart from the field's own
+default) lets `DockSplit` default to horizontal while an explicit
+`axis: vertical` still wins — confirmed by actually laying out a split
+before and after the fix: without it, two panes meant to sit side by side
+were stacked top to bottom instead, silently, since a wrong-but-valid
+layout raises nothing.
+
+Dragging the divider reuses the exact shape `BottomSheet`'s own drag handle
+already established (§5.17.2): `on_pointer_down` claims the drag with
+`event.capture()` only when the press lands on the divider (its own rect
+plus 3dp of slop, the same "unhittable with a mouse otherwise" reasoning the
+scrollbar thumb's slop already has), `on_pointer_move` tracks the pointer
+exactly and writes the new ratio straight to `value:`, firing `on_change`
+with it already computed — the same split `SpinBox` and `Pagination` make
+between updating a widget's own state and telling the application what
+changed. Because a `DockSplit`'s two children fill it entirely except for
+the divider's own few pixels, hovering or pressing it is naturally isolated
+by the framework's existing hit-testing with no extra state of its own —
+unlike `SpinBox` or `Pagination`, each of which needed to track *which*
+internal region was hovered, `DockSplit` has only the one, so it reuses the
+ordinary whole-element hover every other component already does.
+
+ARIA gave this one no approximating to do: `DockGroup` is `tablist`,
+`DockPanel` is `tabpanel`, and `DockSplit` is `separator` — precisely
+WAI-ARIA's own Window Splitter pattern, which is also where the divider's
+arrow-key step (2% per press, along the split's own axis) comes from; not
+sourced from M3, but a real convention for the exact role this widget
+already reports.
 
 ---
 

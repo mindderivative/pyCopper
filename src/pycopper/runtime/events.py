@@ -209,6 +209,8 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "TextField",
         "SpinBox",
         "Pagination",
+        "DockGroup",
+        "DockSplit",
     }
 )
 

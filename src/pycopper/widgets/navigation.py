@@ -998,6 +998,17 @@ class TreeItemElement(_StyledMixin, LayoutNode):
         revealed = body_h * self._progress()
         return outer.constrain(Size(width, header_h + revealed))
 
+    #: Real, but far below one physical pixel -- passes the shader's own
+    #: `clip.z/w > 0.0` gate (`ui.wgsl`: "a zero-size clip rect means
+    #: unclipped") without leaving any rasterisable area. `Rect.intersect`
+    #: clamps a no-overlap result to an exact zero in the degenerate
+    #: dimension, which that same shader gate reads as "no clip at all" --
+    #: the opposite of what a collapsed ancestor needs. Confirmed by
+    #: rendering a real frame: a grandchild's label was still on screen
+    #: with the un-floored intersection, despite the clip rect looking
+    #: correct from the Python side.
+    HIDDEN_EXTENT: Final = 0.01
+
     def child_paint_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
         """Clip to this node's own (animated) size, INTERSECTED with whatever
         clip already reached it -- see the class docstring for why this
@@ -1007,12 +1018,14 @@ class TreeItemElement(_StyledMixin, LayoutNode):
             absolute.x * dpr, absolute.y * dpr, self.size.width * dpr, self.size.height * dpr
         )
         clip = own if ctx.clip[2] == 0.0 and ctx.clip[3] == 0.0 else Rect(*ctx.clip).intersect(own)
+        width = clip.width if clip.width > 0.0 else self.HIDDEN_EXTENT
+        height = clip.height if clip.height > 0.0 else self.HIDDEN_EXTENT
         return PaintContext(
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
             pixel_ratio=dpr,
-            clip=(clip.x, clip.y, clip.width, clip.height),
+            clip=(clip.x, clip.y, width, height),
             clip_radii=ctx.clip_radii,
         )
 

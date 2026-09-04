@@ -954,8 +954,50 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `NavigationDrawer` | 240–360dp, 56dp items. |
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. |
+| `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |
 
 A selection container carries `value:` naming the selected child by `name`.
+
+### Dock layout
+
+Three widgets compose a resizable, tabbed panel layout the way an IDE's own
+is arranged — but only the *static* half: the tree is declared once in the
+view file, not dragged into shape at runtime.
+
+```yaml
+- name: workspace
+  widget: DockSplit
+  value: "0.25"                 # the left pane's share, 0..1
+  handlers: {on_change: setSplit}
+  children:
+    - name: sidebar
+      widget: DockGroup
+      children:
+        - {name: files, widget: DockPanel, text: Files, children: [...]}
+    - name: main
+      widget: DockGroup
+      value: "{{ active_tab.get() }}"
+      handlers: {on_change: setActiveTab}
+      children:
+        - {name: editor, widget: DockPanel, text: main.py, children: [...]}
+        - {name: output, widget: DockPanel, text: Output, children: [...]}
+```
+
+| Widget | Role |
+|---|---|
+| `DockSplit` | Exactly two children, divided by a draggable divider. `style.axis` (shared with `ScrollView`) is `horizontal` (default, side by side) or `vertical` (stacked). `value:` is the first child's share, 0..1. Nest another `DockSplit` as a child for a third pane. |
+| `DockGroup` | A tabbed stack of `DockPanel`s — exactly one visible at a time. `value:` names the active one by `name`; unset or unmatched falls back to the first. |
+| `DockPanel` | One pane. `text:` is its tab label, its single child is its content. |
+
+Both `DockSplit` and `DockGroup` fire `on_change` with the new value already
+computed — dragging the divider or clicking a tab updates the widget's own
+state and tells the application, the same as `SpinBox` and `Pagination`.
+
+**Runtime drag-and-drop — dragging a tab onto an edge to split or rearrange
+the tree while the app is running — is not implemented.** That is a
+substantially larger feature (drop-zone detection, tree mutation, tab
+reordering) than the static layout above, and is deliberately a separate,
+later piece of work rather than a half-built version bundled in here.
 
 ### Collapsing app bars
 

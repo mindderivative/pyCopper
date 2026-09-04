@@ -92,6 +92,12 @@ ROLES: Final[dict[str, str]] = {
     # this is "contentinfo" rather than Snackbar/Badge's "status".
     "StatusBar": "contentinfo",
     "Tabs": "tablist",
+    # No M3 component for any of the three; see DockSplitElement's own
+    # docstring. ARIA has precise roles for both shapes, so no approximation
+    # is needed the way Accordion/TreeView had to borrow "button"/"tree".
+    "DockGroup": "tablist",
+    "DockPanel": "tabpanel",
+    "DockSplit": "separator",  # WAI-ARIA's own Window Splitter pattern
     "SegmentedButton": "radiogroup",  # M3 calls the equivalent a "Radio group"
     "Carousel": "group",
     "CarouselItem": "group",
@@ -131,7 +137,7 @@ CHECKABLE: Final[frozenset[str]] = frozenset({"Checkbox", "Radio", "Switch"})
 
 #: Kinds whose `selected` is meaningful.
 SELECTABLE: Final[frozenset[str]] = frozenset(
-    {"Tab", "NavItem", "Segment", "ListItem", "MenuItem", "TreeItem"}
+    {"Tab", "NavItem", "Segment", "ListItem", "MenuItem", "TreeItem", "DockPanel"}
 )
 
 
@@ -252,11 +258,9 @@ def _node_for(element: Any) -> AccessibleNode | None:
         node.name = (element.spec.text or "").strip()
         node.description = (getattr(element, "supporting", "") or "").strip()
         node.value = getattr(element, "content", "") or ""
-    elif role in ("progressbar", "spinbutton"):
+    elif role in ("progressbar", "spinbutton") or kind in ("Pagination", "DockSplit"):
         # aria-valuemin/-valuemax have no field on AccessibleNode to carry
         # them -- not modelled, same honesty as the rest of this module.
-        node.value = str(element.number)
-    elif kind == "Pagination":
         node.value = str(element.number)
     elif role in ("dialog", "menu", "tooltip", "status"):
         node.expanded = bool(element.is_open)

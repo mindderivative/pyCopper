@@ -39,6 +39,7 @@ EMPTY_IS_HONEST = {
     "BottomSheet": "as tall as its content, and its drag handle is opt-in",
     "Text": "no text is no ink -- it keeps a line's height and no width",
     "Link": "no label is nothing to underline either -- there is nothing to draw",
+    "DockPanel": "a box around nothing, same as Container -- it has no content",
 }
 
 

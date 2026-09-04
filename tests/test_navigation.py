@@ -541,14 +541,20 @@ def test_collapsing_an_ancestor_clips_every_descendant() -> None:
     def visible(clip, rect) -> bool:
         """Would the shader's per-pixel clip test let any of `rect` through.
 
-        A clip rect can have real area and still hide its own content -- b's
-        header clip is a's own restrictive (0, 0, w, 56) rect, which has
-        plenty of area but sits nowhere near where b is actually positioned
-        (b starts at y=56, entirely below it). So this checks overlap with
-        the glyph's own rect, not just whether the clip rect is degenerate.
+        Mirrors `ui.wgsl` exactly: `if (clip.z > 0.0 && clip.w > 0.0)` is the
+        real gate -- EITHER dimension being zero (not just both) means "no
+        clip at all", which is why a naive `Rect.intersect` result cannot be
+        used to hide content directly (see `TreeItemElement.HIDDEN_EXTENT`).
+
+        A clip rect can also have real area and still hide its own content
+        -- b's header clip is a's own restrictive (0, 0, w, 56) rect, which
+        has plenty of area but sits nowhere near where b is actually
+        positioned (b starts at y=56, entirely below it). So this checks
+        overlap with the glyph's own rect too, not just whether the clip
+        rect itself is degenerate.
         """
         cx, cy, cw, ch = (float(v) for v in clip)
-        if cw == 0.0 and ch == 0.0:  # the dtype's own "unclipped" sentinel
+        if cw <= 0.0 or ch <= 0.0:  # ui.wgsl's own "unclipped" gate
             return True
         rx, ry, rw, rh = (float(v) for v in rect)
         return rx < cx + cw and rx + rw > cx and ry < cy + ch and ry + rh > cy

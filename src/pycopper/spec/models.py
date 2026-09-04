@@ -89,6 +89,9 @@ class WidgetKind(StrEnum):
     SPIN_BOX = "SpinBox"
     PAGINATION = "Pagination"
     STATUS_BAR = "StatusBar"
+    DOCK_SPLIT = "DockSplit"
+    DOCK_GROUP = "DockGroup"
+    DOCK_PANEL = "DockPanel"
 
 
 class SizeSpec:
