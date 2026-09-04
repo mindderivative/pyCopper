@@ -38,6 +38,7 @@ __all__ = [
     "DividerElement",
     "FabElement",
     "IconButtonElement",
+    "PaginationElement",
     "RadioElement",
     "SpinBoxElement",
     "SwitchElement",
@@ -1250,6 +1251,236 @@ class SpinBoxElement(_StyledMixin, Padding):
             style.font_size,
             value_token,
         )
+
+
+# -------------------------------------------------------------- pagination
+
+
+class PaginationElement(_StyledMixin, Padding):
+    """Page-number navigation: prev/next arrows around a row of page numbers.
+
+    M3 has no Pagination component -- checked directly, not assumed to be
+    missing: "pagination" appears in the whole reference library exactly
+    once, and only as a prohibition ("Cards shouldn't contain content that
+    can be swiped, such as an image carousel or pagination"). Nothing here
+    is therefore quoted from a spec. The anatomy borrows `IconButton`'s own
+    (40dp, no container, `on_surface_variant`) for the prev/next arrows and
+    unselected page numbers, and the same selected pairing `Chip`/`Segment`
+    already use (`secondary_container` / `on_secondary_container`) for the
+    current page.
+
+    `value:` is the current page, 1-indexed -- matching how a person reads
+    "page 3 of 10", not a 0-indexed offset -- and `style.count` is the
+    total. Clicking a page number or an arrow (or the Left/Right keys)
+    computes the new page and fires `on_change` with it already settled,
+    the same division every other value-bearing control here makes.
+
+    **Windowing**, since nothing sources one either: always show the first
+    and last page and the current page's immediate neighbours, collapsing
+    any larger gap into a non-interactive "…". Below eight pages nothing is
+    ever collapsed -- an ellipsis saves no room when it would replace only
+    one or two numbers. A consequence worth stating rather than hiding: the
+    control's own width changes slightly as the current page moves between
+    the edges (fewer numbers shown) and the middle (an ellipsis on each
+    side) -- the same minor variance most page-number widgets have.
+
+    **Hover is intentionally not animated, unlike every other state layer in
+    this file.** Those all use a fixed, small set of keys (SpinBox has
+    exactly two). A page count is unbounded, and an `animated()` call
+    creates a persistent entry in `self._animations` that nothing ever
+    evicts -- keying one per page number would leak one entry per page a
+    user ever hovered over a long session. Hover here is therefore a single
+    tracked slot (`state.data["page_hover"]`, overwritten in place) painted
+    at a flat opacity: real feedback, without state that grows without
+    bound.
+    """
+
+    BUTTON: Final = 40.0
+    GAP: Final = 4.0
+    ICON: Final = 24.0
+    #: Reuses M3's disabled-content opacity for a boundary arrow that can't
+    #: move further -- the same visual language `SpinBox` reuses, not the
+    #: same mechanism as `effective_disabled`.
+    AT_BOUND_OPACITY: Final = 0.38
+    CURSOR = "pointer"
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, EdgeInsets())
+        self.init_element(spec)
+
+    def _current(self) -> int:
+        return max(1, min(int(self.number) or 1, max(1, self.style.count)))
+
+    def _pages(self) -> list[int | None]:
+        """The page numbers to show, `None` marking a collapsed run."""
+        count = max(1, self.style.count)
+        if count <= 7:
+            return list(range(1, count + 1))
+        current = self._current()
+        shown = {1, count, current}
+        for delta in (-1, 1):
+            candidate = current + delta
+            if 1 <= candidate <= count:
+                shown.add(candidate)
+        ordered = sorted(shown)
+        result: list[int | None] = []
+        previous: int | None = None
+        for page in ordered:
+            if previous is not None and page - previous > 1:
+                result.append(None)
+            result.append(page)
+            previous = page
+        return result
+
+    def _slots(self) -> list[tuple[str, int | None]]:
+        slots: list[tuple[str, int | None]] = [("prev", None)]
+        for page in self._pages():
+            slots.append(("page", page) if page is not None else ("ellipsis", None))
+        slots.append(("next", None))
+        return slots
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        n = len(self._slots())
+        width = n * self.BUTTON + max(0, n - 1) * self.GAP
+        return outer.constrain(Size(width, self.BUTTON))
+
+    # ------------------------------------------------------------- pointer
+
+    def _slot_at(self, x: float) -> tuple[str, int | None] | None:
+        local = x - self.absolute_rect().x
+        cursor = 0.0
+        for kind, page in self._slots():
+            if cursor <= local < cursor + self.BUTTON:
+                return (kind, page)
+            cursor += self.BUTTON + self.GAP
+        return None
+
+    def _goto(self, page: int) -> None:
+        self._value = str(page)
+        handler = self.handlers.get("on_change")
+        if handler is not None:
+            handler(ChangeEvent(EventType.CHANGE, target=self, value=self._value))
+        self.mark_needs_layout()
+
+    def on_click(self, event: Any) -> None:
+        if self.effective_disabled:
+            return
+        hit = self._slot_at(event.x)
+        if hit is None:
+            return
+        kind, page = hit
+        current = self._current()
+        count = max(1, self.style.count)
+        if kind == "prev" and current > 1:
+            self._goto(current - 1)
+        elif kind == "next" and current < count:
+            self._goto(current + 1)
+        elif kind == "page" and page is not None and page != current:
+            self._goto(page)
+
+    def on_pointer_move(self, event: Any) -> None:
+        hit = self._slot_at(event.x)
+        if self.state.data.get("page_hover") != hit:
+            self.state.data["page_hover"] = hit
+            self.mark_needs_paint()
+
+    def on_pointer_leave(self, event: Any) -> None:
+        if self.state.data.get("page_hover") is not None:
+            self.state.data["page_hover"] = None
+            self.mark_needs_paint()
+
+    # ---------------------------------------------------------------- keys
+
+    def on_key_down(self, event: Any) -> None:
+        key = str(getattr(event, "key", "")).lower()
+        current = self._current()
+        count = max(1, self.style.count)
+        if key == "right" and current < count:
+            self._goto(current + 1)
+        elif key == "left" and current > 1:
+            self._goto(current - 1)
+
+    # --------------------------------------------------------------- paint
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        style = self.style
+        content = content_token(ctx, style, "on_surface_variant")
+        selected_bg = ctx.palette.index("secondary_container")
+        selected_content = ctx.palette.index("on_secondary_container")
+        dpr = ctx.pixel_ratio
+        current = self._current()
+        count = max(1, style.count)
+        hovered = self.state.data.get("page_hover")
+
+        cursor = 0.0
+        for kind, page in self._slots():
+            x = absolute.x + cursor
+            if kind == "ellipsis":
+                label = measure_text("...", style.font_size, engine=self.text_engine)
+                paint_text(
+                    ctx,
+                    x + (self.BUTTON - label.width) / 2,
+                    absolute.y + (self.BUTTON - label.height) / 2,
+                    "...",
+                    style.font_size,
+                    content,
+                )
+                cursor += self.BUTTON + self.GAP
+                continue
+
+            at_bound = (kind == "prev" and current <= 1) or (kind == "next" and current >= count)
+            selected = kind == "page" and page == current
+            if selected:
+                ctx.display_list.add_box(
+                    x * dpr,
+                    absolute.y * dpr,
+                    self.BUTTON * dpr,
+                    self.BUTTON * dpr,
+                    token=selected_bg,
+                    radii=(self.BUTTON / 2 * dpr,) * 4,
+                    clip=ctx.clip,
+                    clip_radii=ctx.clip_radii,
+                )
+            elif hovered == (kind, page) and not at_bound:
+                ctx.display_list.add_box(
+                    x * dpr,
+                    absolute.y * dpr,
+                    self.BUTTON * dpr,
+                    self.BUTTON * dpr,
+                    token=content,
+                    color=(1.0, 1.0, 1.0, HOVER),
+                    radii=(self.BUTTON / 2 * dpr,) * 4,
+                    clip=ctx.clip,
+                    clip_radii=ctx.clip_radii,
+                )
+
+            token = selected_content if selected else content
+            if kind == "page":
+                label = measure_text(str(page), style.font_size, engine=self.text_engine)
+                paint_text(
+                    ctx,
+                    x + (self.BUTTON - label.width) / 2,
+                    absolute.y + (self.BUTTON - label.height) / 2,
+                    str(page),
+                    style.font_size,
+                    token,
+                )
+            else:
+                icon = "chevron_left" if kind == "prev" else "chevron_right"
+                ctx.text.emit_icon(
+                    ctx.display_list,
+                    icon,
+                    x=x + (self.BUTTON - self.ICON) / 2,
+                    y=absolute.y + (self.BUTTON - self.ICON) / 2,
+                    size=self.ICON,
+                    pixel_ratio=dpr,
+                    token=token,
+                    color=(1.0, 1.0, 1.0, self.AT_BOUND_OPACITY if at_bound else 1.0),
+                    clip=ctx.clip,
+                    clip_radii=ctx.clip_radii,
+                )
+            cursor += self.BUTTON + self.GAP
 
 
 # ------------------------------------------------------------------ badges

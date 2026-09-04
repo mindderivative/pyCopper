@@ -39,6 +39,11 @@ ROLES: Final[dict[str, str]] = {
     "NavItem": "tab",  # "The role is 'tab'"
     "Tab": "tab",  # "The role is 'tab'"
     "ListItem": "option",  # a list is a "List box", so its items are options
+    # ARIA convention: no single role exists for "a strip of page numbers",
+    # since M3 has no Pagination component to name one for either. The
+    # individual page buttons are not separately exposed -- this is one
+    # opaque control, the same shape as SpinBox's two internal buttons.
+    "Pagination": "navigation",
     # --- ARIA convention
     "Button": "button",
     "Chip": "button",  # ...except a filter chip, which toggles -- see `_node_for`
@@ -246,6 +251,8 @@ def _node_for(element: Any) -> AccessibleNode | None:
     elif role in ("progressbar", "spinbutton"):
         # aria-valuemin/-valuemax have no field on AccessibleNode to carry
         # them -- not modelled, same honesty as the rest of this module.
+        node.value = str(element.number)
+    elif kind == "Pagination":
         node.value = str(element.number)
     elif role in ("dialog", "menu", "tooltip", "status"):
         node.expanded = bool(element.is_open)

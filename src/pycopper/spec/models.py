@@ -87,6 +87,7 @@ class WidgetKind(StrEnum):
     TREE_ITEM = "TreeItem"
     LINK = "Link"
     SPIN_BOX = "SpinBox"
+    PAGINATION = "Pagination"
 
 
 class SizeSpec:
@@ -372,6 +373,8 @@ class StyleSpec(_Frozen):
     max: float | None = None
     #: How much one click or arrow-key press changes a SpinBox's value by.
     step: float = Field(default=1.0, gt=0)
+    #: A Pagination's total number of pages.
+    count: int = Field(default=1, ge=1)
 
     # text
     font_size: float = Field(default=14.0, gt=0)

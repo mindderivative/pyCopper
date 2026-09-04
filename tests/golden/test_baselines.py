@@ -2381,3 +2381,32 @@ def test_spin_box_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("spin_box", np.asarray(engine.canvas.draw()))
+
+
+def test_pagination_baseline(render_scene, assert_golden) -> None:
+    """One at the first page, one in the middle of a large range.
+
+    Proves the whole feature at once: the collapsed "..." runs, the current
+    page's secondary_container fill, and the dimmed prev arrow with nothing
+    behind it to go back to.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24, "spacing": 20},
+            "children": [
+                {"name": "first", "widget": "Pagination", "value": "1", "style": {"count": 10}},
+                {"name": "mid", "widget": "Pagination", "value": "5", "style": {"count": 10}},
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=420, height=120, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("pagination", np.asarray(engine.canvas.draw()))

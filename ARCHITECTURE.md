@@ -1553,6 +1553,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3 |
 | `Badge` | 6dp dot, or 16dp-high pill | `value:` carries the count |
 | `SpinBox` | Two 40dp `IconButton`-anatomy regions (`remove`/`add`) flanking a number | No M3 component; named to dodge M3's own "Stepper" (a multi-step flow indicator). Grounded in the Sliders page's "icon buttons placed outside the slider" convention instead. `on_change` carries the new value already clamped to `style.min`/`max` and stepped by `style.step` |
+| `Pagination` | 40dp prev/next arrows around 40dp page-number buttons | No M3 component — "pagination" appears once in the whole reference library, as a prohibition on Cards. Windows around the current page, collapsing runs into `...`; below 8 total pages nothing is ever collapsed. The current page uses `Chip`/`Segment`'s own selected pairing (`secondary_container`/`on_secondary_container`) |
 
 **Wave 2** added navigation and structure in `widgets/navigation.py`:
 
@@ -1655,6 +1656,21 @@ nothing else in the framework needs sub-element hover), but press and focus
 are not, to avoid building that machinery for one widget. Typing a value
 directly is deliberately unsupported — that needs `TextField`'s full editing
 stack, and a half-built version of it would be worse than not having one.
+
+**`Pagination` (`widgets/material.py`) has no M3 page either**, checked
+directly rather than assumed: "pagination" appears in the whole reference
+library exactly once, as a prohibition on Cards. Its anatomy borrows
+`IconButton`'s (prev/next arrows) and `Chip`/`Segment`'s own selected pairing
+(`secondary_container`/`on_secondary_container`, for the current page) rather
+than inventing new tokens. The windowing rule — always show the first, last,
+and the current page's neighbours, collapsing anything larger into a
+non-interactive `...`, never collapsing below eight pages — is not sourced
+either, since nothing here is. **Hover deliberately breaks from `SpinBox`'s
+own pattern**: `SpinBox` animates a fixed two keys, but a page count is
+unbounded, and `animated()` leaves a permanent entry in `self._animations`
+that nothing evicts — keying one per page number a session ever hovered would
+leak. Hover here is one tracked slot, painted at a flat opacity instead of
+cross-fading, which is real feedback without state that grows without bound.
 
 **Selection is a binding, not style.** `Checkbox`, `Radio`, `Switch`, and the
 filter `Chip` read a new `value:` field on the spec, templated exactly like

@@ -582,6 +582,149 @@ def painted_app(app) -> DisplayList:
     return dl
 
 
+# ----------------------------------------------------------- pagination
+
+
+def _pagination_app(*, value="1", count=10, on_change=None):
+    style = {"count": count}
+    child = {"name": "pg", "widget": "Pagination", "value": value, "style": style}
+    if on_change is not None:
+        child["handlers"] = {"on_change": "change"}
+    view = {"name": "root", "widget": "Column", "children": [child]}
+    app = App(view, theme=Theme(dark=True))
+    if on_change is not None:
+        app._handlers["change"] = on_change
+    app.mount()
+    app.update()
+    return app
+
+
+def _slot_center(element, index: int) -> float:
+    """The x of a slot's centre, re-derived from the element's CURRENT
+    layout -- Pagination's own width changes as the current page moves, so a
+    coordinate computed before a click can be stale after it."""
+    rect = element.absolute_rect()
+    return rect.x + index * (element.BUTTON + element.GAP) + element.BUTTON / 2
+
+
+def _click_slot(app, element, index: int) -> None:
+    from pycopper.runtime.events import EventType, PointerEvent
+
+    rect = element.absolute_rect()
+    x = _slot_center(element, index)
+    y = rect.y + element.BUTTON / 2
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=x, y=y))
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=x, y=y))
+    app.dispatcher.drain()
+
+
+def test_pagination_is_forty_high() -> None:
+    e = laid_out(widget="Pagination", value="1", style={"count": 5})
+    assert e.size.height == 40.0
+
+
+def test_small_counts_show_every_page_with_no_ellipsis() -> None:
+    e = laid_out(widget="Pagination", value="1", style={"count": 7})
+    assert e._slots() == [("prev", None)] + [("page", n) for n in range(1, 8)] + [("next", None)]
+
+
+def test_large_counts_collapse_around_the_current_page() -> None:
+    e = laid_out(widget="Pagination", value="5", style={"count": 10})
+    kinds = [k for k, _ in e._slots()]
+    assert kinds.count("ellipsis") == 2
+    assert ("page", 1) in e._slots()
+    assert ("page", 10) in e._slots()
+    assert ("page", 5) in e._slots()
+
+
+def test_the_edges_never_need_two_ellipses() -> None:
+    first = laid_out(widget="Pagination", value="1", style={"count": 10})
+    assert [k for k, _ in first._slots()].count("ellipsis") == 1
+    last = laid_out(widget="Pagination", value="10", style={"count": 10})
+    assert [k for k, _ in last._slots()].count("ellipsis") == 1
+
+
+def test_clicking_a_page_number_jumps_to_it() -> None:
+    app = _pagination_app(value="5", count=10)
+    pg = app.root.find("pg")
+    index = pg._slots().index(("page", 10))
+    _click_slot(app, pg, index)
+    assert pg.number == 10.0
+
+
+def test_clicking_next_advances_by_one() -> None:
+    app = _pagination_app(value="5", count=10)
+    pg = app.root.find("pg")
+    _click_slot(app, pg, len(pg._slots()) - 1)
+    assert pg.number == 6.0
+
+
+def test_clicking_prev_goes_back_one() -> None:
+    app = _pagination_app(value="5", count=10)
+    pg = app.root.find("pg")
+    _click_slot(app, pg, 0)
+    assert pg.number == 4.0
+
+
+def test_next_stops_at_the_last_page() -> None:
+    app = _pagination_app(value="10", count=10)
+    pg = app.root.find("pg")
+    _click_slot(app, pg, len(pg._slots()) - 1)
+    assert pg.number == 10.0
+
+
+def test_prev_stops_at_the_first_page() -> None:
+    app = _pagination_app(value="1", count=10)
+    pg = app.root.find("pg")
+    _click_slot(app, pg, 0)
+    assert pg.number == 1.0
+
+
+def test_clicking_an_ellipsis_does_nothing() -> None:
+    app = _pagination_app(value="5", count=10)
+    pg = app.root.find("pg")
+    index = pg._slots().index(("ellipsis", None))
+    _click_slot(app, pg, index)
+    assert pg.number == 5.0
+
+
+def test_on_change_carries_the_new_page() -> None:
+    calls = []
+    app = _pagination_app(value="5", count=10, on_change=lambda e: calls.append(e.value))
+    pg = app.root.find("pg")
+    _click_slot(app, pg, len(pg._slots()) - 1)
+    assert calls == ["6"]
+
+
+def test_arrow_keys_change_the_page() -> None:
+    from pycopper.runtime.events import EventType, KeyEvent
+
+    app = _pagination_app(value="5", count=10)
+    pg = app.root.find("pg")
+    app.dispatcher.focus(pg)
+    app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Right"))
+    app.dispatcher.drain()
+    assert pg.number == 6.0
+    app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Left"))
+    app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Left"))
+    app.dispatcher.drain()
+    assert pg.number == 4.0
+
+
+def test_the_current_page_and_a_boundary_arrow_are_visually_distinct() -> None:
+    """The selected page gets a secondary_container fill; a spent arrow (at
+    page 1, nothing to go back to) dims instead -- two different signals,
+    not the same one reused."""
+    from pycopper.theme import Palette
+
+    pal = Palette(Theme(dark=True))
+    dl = painted(widget="Pagination", value="1", style={"count": 10})
+    tokens = tokens_in(dl)
+    assert pal.index("secondary_container") in tokens
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    assert any(float(g["fill"][3]) < 1.0 for g in glyphs), "expected the spent prev arrow to dim"
+
+
 # --------------------------------------------------------------- accordion
 
 
