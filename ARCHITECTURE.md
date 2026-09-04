@@ -618,6 +618,56 @@ The `Icon` widget takes its name from `text:`, so binding expressions work on
 it: `text: "{{ 'star' if saved.get() else 'star_border' }}"` switches the icon
 with state exactly the way a label does.
 
+#### 5.7.9 SVG icons — `text/svgicons.py`
+
+Arbitrary SVG artwork gets the same property Material Symbols has for free —
+no rendering path of its own — by *becoming* a font rather than by adding a
+second one next to the pipeline above. **The pipeline:** SVG path commands
+(`svgelements`, an optional extra — `pip install 'pycopper[svg]'`) → cubic
+curves refit to quadratic (`fontTools.pens.cu2quPen`, since `glyf` is
+quadratic and SVG's curves are cubic) → a real glyph (`TTGlyphPen`) → a real
+font file on disk (`fontTools.fontBuilder`) → `Face`, identical to loading
+Roboto. `Face` only ever opens a path — HarfBuzz, FreeType, and fontTools all
+read the same file — which is the seam that makes this reuse everything
+above with no change to it at all: `emit_icon` needed zero modification.
+
+**Why compile to a glyph rather than render the path directly**, stated
+plainly because the more obvious-looking design was tried first and rejected
+for `Shape` (§5.8.5's neighbour in spirit): a glyph's cache key includes its
+rasterised size, and the atlas has no per-entry eviction, so anything that
+changes size or content every frame thrashes it. Static artwork — an icon
+that does not morph — has no such problem; it rasterises once and the cache
+does the rest. Content that *does* need to animate stays off the atlas
+entirely (`Shape`'s parametric SDF, §5.8), which this module does not
+attempt to replace.
+
+**A real limitation, found by testing a ring with a hole, not by reading the
+spec.** `glyf` has no per-contour fill-rule flag; FreeType always fills by
+the nonzero winding rule. An SVG using the default `fill-rule="nonzero"`,
+with a hole wound opposite to the shape it cuts from — what every common
+export tool produces — compiles and rasterises correctly. An SVG that
+instead sets `fill-rule="evenodd"` and winds every contour the *same*
+direction is equally valid SVG and loses the hole: confirmed by compiling
+both windings of the same ring and rasterising each. There is no fix inside
+this module for `evenodd` source; it would need rewinding first.
+
+**Every icon is scaled from its own viewBox**, independently, so a tiny
+`viewBox="0 0 2 2"` icon and a `viewBox="0 0 2000 2000"` one land at the same
+visual size — checked, not assumed, since a shared scale would make one
+icon's units leak into another's proportions.
+
+**The regression this module actually produced while being built:**
+`IconSet(face)` with no `names` argument silently falls back to the *bundled*
+218-name Material Symbols table, so `load_svg_icons` — which constructs an
+`IconSet` from a freshly compiled `Face` — must pass its own names
+explicitly, or every real lookup on a custom set raises "unknown icon" while
+the font itself compiled without error. Caught by testing the constructed set
+against a real name before assuming it worked. `tests/golden/
+test_baselines.py::test_svg_icons_baseline` renders a compiled triangle and a
+compiled ring — with its hole — through a real `App`, tinted by a real
+palette token, so a shader-level regression here fails on pixels rather than
+on a property that can pass while the picture is wrong.
+
 #### 5.7.7 Scope tiers
 
 Revised upward from the previous revision, which deferred all shaping past v1. With the stack proven, the honest boundary is now much further out.

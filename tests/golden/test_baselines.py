@@ -2054,3 +2054,54 @@ def test_text_selection_baseline(render_scene, assert_golden) -> None:
 
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("text_selection", np.asarray(engine.canvas.draw()))
+
+
+def test_svg_icons_baseline(render_scene, assert_golden, tmp_path) -> None:
+    """Route A end to end: SVG -> a real glyph -> the existing pipeline.
+
+    Every property assertion in `test_svgicons.py` can pass while the shader
+    still draws the wrong thing -- this is the one check that renders a
+    compiled icon through the real `Icon` widget, in a real `App`, tinted by a
+    real palette token, and looks at the pixels. The ring proves the hole
+    survives to the screen, not just to `Face.rasterize`; the tint proves a
+    custom icon takes a palette token exactly like Material Symbols does.
+    """
+    pytest.importorskip("svgelements")
+    from pycopper.text.svgicons import load_svg_icons
+
+    triangle = (
+        '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
+        '<path d="M4 20 L20 20 L12 4 Z"/></svg>'
+    )
+    ring = (
+        '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
+        '<path d="M12 2 A10 10 0 1 0 12.01 2 Z M12 8 A6 6 0 1 1 11.99 8 Z"/></svg>'
+    )
+    icons = load_svg_icons({"triangle": triangle, "ring": ring}, tmp_path / "icons.ttf")
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Row",
+            "style": {"background": "surface", "padding": 20, "spacing": 20},
+            "children": [
+                {"name": "tri", "widget": "Icon", "text": "triangle", "style": {"icon_size": 48}},
+                {
+                    "name": "ring",
+                    "widget": "Icon",
+                    "text": "ring",
+                    "style": {"icon_size": 48, "color": "tertiary"},
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=140, height=88, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.text._icons = icons  # swap in the custom set before the first paint
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("svg_icons", np.asarray(engine.canvas.draw()))

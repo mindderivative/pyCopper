@@ -22,6 +22,7 @@ from .itemize import Direction, ItemRun, itemize
 from .layout import Alignment, GlyphPlacement, Paragraph, TextLine, layout_text
 from .segment import break_opportunities, cluster_boundaries, clusters
 from .shaping import ShapeCache, ShapedRun, shape_run
+from .svgicons import compile_svg_font, load_svg_icons
 
 __all__ = [
     "DEFAULT_ICON_SIZE",
@@ -44,8 +45,10 @@ __all__ = [
     "break_opportunities",
     "cluster_boundaries",
     "clusters",
+    "compile_svg_font",
     "itemize",
     "layout_text",
+    "load_svg_icons",
     "shape_run",
 ]
 
