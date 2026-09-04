@@ -187,10 +187,13 @@ class AccessKitBridge(Bridge):
 
         Called from the engine thread. AccessKit delivers on its own D-Bus
         task, and pyCopper's signals are thread affine, so a request cannot be
-        acted on where it arrives.
+        acted on where it arrives. Popped one at a time rather than snapshot-
+        then-clear: that pairing could drop a request the D-Bus thread appends
+        in the gap between the two.
         """
-        out = list(self._requests)
-        self._requests.clear()
+        out: list[Any] = []
+        while self._requests:
+            out.append(self._requests.popleft())
         return out
 
     def target_of(self, request: Any) -> AccessibleNode | None:
