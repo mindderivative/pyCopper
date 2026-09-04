@@ -37,6 +37,7 @@ __all__ = [
     "ColumnElement",
     "ContainerElement",
     "IconElement",
+    "LinkElement",
     "RowElement",
     "SpacerElement",
     "StackElement",
@@ -451,6 +452,74 @@ class ButtonElement(ContainerElement):
             )
 
 
+class LinkElement(_StyledMixin, Padding):
+    """M3's hyperlinked text -- underlined, `primary` or `tertiary`.
+
+    Not a component with its own page: the source is the typography
+    guidance's "Applying type" ("For hyperlinked text appearing on top of a
+    surface color, use primary. However, tertiary can be used to make links
+    less prominent" and, separately, "Hyperlinked text must also be
+    underlined") plus the Buttons page's explicit contrast with a text
+    button -- "Don't underline the text button. Use hyperlinked body text
+    instead to emphasize links." That contrast is the whole anatomy: a Link
+    carries **no container and no state layer**, which is what actually
+    tells it apart from a text button at rest, not just the underline.
+
+    Sized with `style.font_size` directly, not a fixed type-scale role the
+    way `Button`'s label is -- a link is meant to sit inline with whatever
+    body text surrounds it, not own a typography of its own. No hover/press
+    feedback is modelled: this is typography guidance, not a component with
+    a states table to translate.
+    """
+
+    #: 1dp, matching the framework's other hairline (`Divider`). Not
+    #: M3-sourced -- no measurement table exists for this "component".
+    UNDERLINE_THICKNESS: Final = 1.0
+    #: How far below the baseline the underline sits, as a fraction of the
+    #: font's descent. Also not sourced; a conventional typographic offset.
+    UNDERLINE_DEPTH: Final = 0.3
+    CURSOR = "pointer"
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, EdgeInsets())
+        self.init_element(spec)
+
+    def _color_role(self) -> str:
+        return "tertiary" if self.style.variant == "tertiary" else "primary"
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        label = (
+            measure_text(self._text, self.style.font_size, engine=self.text_engine)
+            if self._text.strip()
+            else Size(0.0, 0.0)
+        )
+        return outer.constrain(label)
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        if not self._text.strip():
+            return
+        style = self.style
+        token = content_token(ctx, style, self._color_role())
+        label = measure_text(self._text, style.font_size, engine=self.text_engine)
+        paint_text(ctx, absolute.x, absolute.y, self._text, style.font_size, token)
+
+        metrics = self.text_engine.db.face_for(FontRequest(weight=style.font_weight)).metrics(
+            style.font_size
+        )
+        dpr = ctx.pixel_ratio
+        underline_y = absolute.y + metrics.baseline + metrics.descent * self.UNDERLINE_DEPTH
+        ctx.display_list.add_box(
+            absolute.x * dpr,
+            underline_y * dpr,
+            label.width * dpr,
+            self.UNDERLINE_THICKNESS * dpr,
+            token=token,
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
+        )
+
+
 class TextElement(_StyledMixin, Padding):
     """A run of text, shaped and wrapped to the available width.
 
@@ -759,6 +828,7 @@ _REGISTRY: dict[WidgetKind, type] = {
     WidgetKind.COLUMN: ColumnElement,
     WidgetKind.STACK: StackElement,
     WidgetKind.BUTTON: ButtonElement,
+    WidgetKind.LINK: LinkElement,
     WidgetKind.TEXT: TextElement,
     WidgetKind.SPACER: SpacerElement,
     WidgetKind.ICON: IconElement,

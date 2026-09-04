@@ -85,6 +85,7 @@ class WidgetKind(StrEnum):
     ACCORDION = "Accordion"
     TREE_VIEW = "TreeView"
     TREE_ITEM = "TreeItem"
+    LINK = "Link"
 
 
 class SizeSpec:
@@ -263,6 +264,8 @@ Variant = Literal[
     "one_line",
     "two_line",
     "three_line",
+    # links ("primary" is shared with tabs)
+    "tertiary",
 ]
 
 

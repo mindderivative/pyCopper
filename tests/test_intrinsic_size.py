@@ -38,6 +38,7 @@ EMPTY_IS_HONEST = {
     "SegmentedButton": "as wide as its segments; it keeps its 40dp height",
     "BottomSheet": "as tall as its content, and its drag handle is opt-in",
     "Text": "no text is no ink -- it keeps a line's height and no width",
+    "Link": "no label is nothing to underline either -- there is nothing to draw",
 }
 
 
@@ -75,7 +76,7 @@ def test_a_label_is_what_makes_a_button_wide() -> None:
     assert narrow.width >= 64.0, "M3's minimum width still applies to a short label"
 
 
-@pytest.mark.parametrize("kind", ["Chip", "Segment", "Tab", "Tooltip"])
+@pytest.mark.parametrize("kind", ["Chip", "Segment", "Tab", "Tooltip", "Link"])
 def test_the_other_label_bearing_widgets_measure_theirs_too(kind: str) -> None:
     """Checked because Button's bug looked like it should have been shared --
     these paint a label the same way and were the obvious suspects. All four

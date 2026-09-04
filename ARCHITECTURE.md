@@ -1626,6 +1626,20 @@ Two sizing decisions worth recording:
 component in five configurations**, so they are one widget with a `variant`,
 not five widget kinds.
 
+**`Link` (`widgets/base.py`) has no page of its own** — the source is the
+typography guidance, not a component spec: "For hyperlinked text appearing on
+top of a surface color, use primary. However, tertiary can be used to make
+links less prominent" and "Hyperlinked text must also be underlined". Its
+anatomy is deliberately unlike `Button`'s: M3 states the two are not
+interchangeable ("Don't underline the text button. Use hyperlinked body text
+instead to emphasize links"), so `Link` carries **no container and no state
+layer** — only the label and its underline, sized with `font_size` directly
+rather than a fixed type-scale role, since it is meant to sit inline with
+whatever body text surrounds it. The underline itself is a 1dp box positioned
+from the resolved face's real ascent/descent (`Face.metrics`), not a rough
+fraction of the label's measured height — but exactly how far into the
+descent it sits is not sourced, since no measurement table exists for it.
+
 **Selection is a binding, not style.** `Checkbox`, `Radio`, `Switch`, and the
 filter `Chip` read a new `value:` field on the spec, templated exactly like
 `text:` — so `value: "{{ checked.get() }}"` tracks a signal. `Element.checked`

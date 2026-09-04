@@ -407,6 +407,50 @@ def test_text_button_draws_no_container() -> None:
     assert len(text_btn) < len(filled)
 
 
+# ------------------------------------------------------------------- link
+
+
+def test_link_underlines_its_label() -> None:
+    """M3: "Hyperlinked text must also be underlined" -- not optional."""
+    e = laid_out(widget="Link", text="Learn more")
+    dl = painted(widget="Link", text="Learn more")
+    underlines = [
+        s for s in dl.view if s["flags"][0] == Kind.BOX and abs(float(s["rect"][3]) - 1.0) < 0.01
+    ]
+    assert len(underlines) == 1
+    assert float(underlines[0]["rect"][2]) == pytest.approx(e.size.width)
+
+
+def test_link_defaults_to_primary() -> None:
+    from pycopper.theme import Palette
+
+    pal = Palette(Theme(dark=True))
+    assert pal.index("primary") in tokens_in(painted(widget="Link", text="Learn more"))
+
+
+def test_link_tertiary_variant_uses_tertiary() -> None:
+    from pycopper.theme import Palette
+
+    pal = Palette(Theme(dark=True))
+    dl = painted(widget="Link", text="Learn more", style={"variant": "tertiary"})
+    assert pal.index("tertiary") in tokens_in(dl)
+    assert pal.index("primary") not in tokens_in(dl)
+
+
+def test_link_draws_only_its_label_and_underline() -> None:
+    """No container, no state layer -- unlike a text Button, whose state
+    layer is merely invisible at rest, a Link never has one to begin with.
+    That contrast, not just the underline, is the whole anatomy M3 draws
+    between the two."""
+    dl = painted(widget="Link", text="Go")
+    glyphs = sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)
+    # Excludes the wrapping Column's own background box, which `painted()`
+    # always draws regardless of what widget is under test.
+    own_boxes = [s for s in dl.view if s["flags"][0] == Kind.BOX and float(s["rect"][3]) < 10.0]
+    assert glyphs == len("Go")
+    assert len(own_boxes) == 1
+
+
 # --------------------------------------------------------------- accordion
 
 

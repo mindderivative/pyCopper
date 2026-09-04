@@ -195,6 +195,7 @@ HANDLER_KEYS = {
 FOCUSABLE_KINDS: frozenset[str] = frozenset(
     {
         "Button",
+        "Link",
         "Checkbox",
         "Radio",
         "Switch",

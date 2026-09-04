@@ -933,6 +933,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | `Switch` | 52×32dp track. |
 | `Chip` | 32dp high. `assist`, `filter`, `input`, `suggestion`. |
 | `Badge` | 6dp dot, or a 16dp pill carrying `value:`. |
+| `Link` | Hyperlinked text: always underlined, `primary` (default) or `tertiary`. Sized with `font_size` like `Text`, not a fixed label role — it's meant to sit inline with body text. No container, no state layer. |
 
 Selection is a **binding, not style**: `value: "{{ checked.get() }}"`.
 

@@ -2311,3 +2311,44 @@ def test_submenu_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("submenu", np.asarray(engine.canvas.draw()))
+
+
+def test_link_baseline(render_scene, assert_golden) -> None:
+    """A link inline with body text, plus a standalone tertiary-variant link.
+
+    Proves the underline sits under the label at a real font-metric-derived
+    position (not a rough guess), and that `primary`/`tertiary` differ.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24, "spacing": 16},
+            "children": [
+                {
+                    "name": "row",
+                    "widget": "Row",
+                    "style": {"spacing": 4},
+                    "children": [
+                        {"name": "lead", "widget": "Text", "text": "Read our"},
+                        {"name": "terms", "widget": "Link", "text": "terms of service"},
+                    ],
+                },
+                {
+                    "name": "muted",
+                    "widget": "Link",
+                    "text": "Learn more",
+                    "style": {"variant": "tertiary"},
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=140, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("link", np.asarray(engine.canvas.draw()))
