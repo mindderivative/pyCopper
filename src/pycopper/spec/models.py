@@ -82,6 +82,7 @@ class WidgetKind(StrEnum):
     TEXT_FIELD = "TextField"
     SHAPE = "Shape"
     POPOVER = "Popover"
+    ACCORDION = "Accordion"
 
 
 class SizeSpec:

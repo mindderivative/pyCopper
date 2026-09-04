@@ -1532,6 +1532,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
+| `Accordion` | 56 / 72dp header, `ListItem`'s anatomy | M3 has no component for this — only Lists' "expand and collapse" behaviour statement; disclosure state is `value:`, animated height reveal clipped like `ScrollView`, chevron **swaps** `expand_more`/`expand_less` rather than rotating (a glyph instance has no rotation parameter) |
 | `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
 | `CircularProgress` | 4dp ring, clockwise from 12 o'clock | determinate only; needs the arc primitive (§5.15). The 48dp default diameter is **not** sourced — that page's size table is an image |
 | `Carousel` + `CarouselItem` | 28dp items, 16dp leading/trailing, 8dp gaps | three layouts; items resize and snap (§5.16) |

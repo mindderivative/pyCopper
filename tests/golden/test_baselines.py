@@ -2146,3 +2146,53 @@ def test_popover_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("popover", np.asarray(engine.canvas.draw()))
+
+
+def test_accordion_baseline(render_scene, assert_golden) -> None:
+    """One collapsed, one expanded, stacked in a Column.
+
+    Proves the header/chevron/reveal/clip together: the collapsed panel shows
+    only its 56dp header with `expand_more`, and the expanded one reveals its
+    body -- clipped in-shader exactly like `ScrollView`, not a second draw
+    call -- behind an `expand_less` chevron.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24},
+            "children": [
+                {
+                    "name": "collapsed",
+                    "widget": "Accordion",
+                    "text": "Shipping",
+                    "supporting_text": "Standard, 3-5 days",
+                    "value": "false",
+                    "children": [{"name": "c_body", "widget": "Text", "text": "Free over $50."}],
+                },
+                {"name": "gap", "widget": "Divider", "style": {"opacity": 0}},
+                {
+                    "name": "expanded",
+                    "widget": "Accordion",
+                    "text": "Returns",
+                    "value": "true",
+                    "children": [
+                        {
+                            "name": "e_body",
+                            "widget": "Text",
+                            "text": "Returns are accepted within 30 days of delivery.",
+                        }
+                    ],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=360, height=280, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("accordion", np.asarray(engine.canvas.draw()))

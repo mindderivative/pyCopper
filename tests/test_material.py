@@ -57,7 +57,18 @@ def test_every_kind_has_an_element() -> None:
 
 @pytest.mark.parametrize(
     "kind",
-    ["Card", "Divider", "Checkbox", "Radio", "Switch", "Chip", "IconButton", "Fab", "Badge"],
+    [
+        "Card",
+        "Divider",
+        "Checkbox",
+        "Radio",
+        "Switch",
+        "Chip",
+        "IconButton",
+        "Fab",
+        "Badge",
+        "Accordion",
+    ],
 )
 def test_kind_parses_and_builds(kind: str) -> None:
     assert laid_out(widget=kind) is not None
@@ -394,3 +405,119 @@ def test_text_button_draws_no_container() -> None:
     text_btn = painted(widget="Button", text="Go", style={"variant": "text"})
     filled = painted(widget="Button", text="Go", style={"variant": "filled"})
     assert len(text_btn) < len(filled)
+
+
+# --------------------------------------------------------------- accordion
+
+
+def _accordion_view(*, value: str):
+    return {
+        "name": "acc",
+        "widget": "Accordion",
+        "text": "Headline",
+        "value": value,
+        "children": [
+            {"name": "body", "widget": "Text", "text": "Body content", "style": {"height": 200}}
+        ],
+    }
+
+
+def test_collapsed_accordion_is_header_height_only() -> None:
+    e = laid_out(**_accordion_view(value="false"))
+    assert e.size.height == 56.0
+
+
+def test_expanded_accordion_reveals_the_body() -> None:
+    e = laid_out(**_accordion_view(value="true"))
+    assert e.size.height > 56.0
+
+
+def test_two_line_header_is_seventy_two_dp() -> None:
+    e = laid_out(widget="Accordion", text="Headline", supporting_text="Supporting", value="false")
+    assert e.size.height == 72.0
+
+
+def test_accordion_chevron_swaps_rather_than_stacking() -> None:
+    """`expand_more` swaps for `expand_less` -- the glyph does not rotate (no
+    rotation parameter on a glyph instance) and both are never drawn at once.
+    Same glyph *count* in both states is exactly what rules out stacking;
+    the display list always emits a fully laid-out subtree regardless of the
+    in-shader clip, so a body child would add the same glyphs either way and
+    is deliberately omitted here to isolate the chevron itself."""
+    collapsed = painted(widget="Accordion", text="Headline", value="false")
+    expanded = painted(widget="Accordion", text="Headline", value="true")
+    glyphs = lambda dl: sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)  # noqa: E731
+    assert glyphs(collapsed) == glyphs(expanded) >= 1
+
+
+def test_accordion_expand_state_is_bindable() -> None:
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "acc",
+                "widget": "Accordion",
+                "text": "Headline",
+                "value": "{{ open.get() }}",
+                "children": [{"name": "body", "widget": "Text", "text": "x"}],
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    open_ = Signal(False)
+    app.expose(open=open_)
+    app.mount()
+    app.update()
+    collapsed_height = app.root.find("acc").size.height
+
+    open_.set(True)
+    app.update()  # retargets the animation; does not jump (see test_motion.py)
+    assert app.root.find("acc").size.height == collapsed_height
+
+    app.motion.tick(1.0)  # past the expand transition
+    app.update()  # relayout picks up the now-advanced value
+    assert app.root.find("acc").size.height > collapsed_height
+
+
+def test_accordion_hover_state_layer_does_not_cover_the_body() -> None:
+    """The state layer is scoped to the header row -- `_emit_state_layer`
+    sizes from the whole (animated) element, which would wrongly tint the
+    revealed body too, so this widget emits its own header-sized box."""
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "acc",
+                "widget": "Accordion",
+                "text": "Headline",
+                "value": "true",
+                "children": [
+                    {"name": "body", "widget": "Text", "text": "x", "style": {"height": 200}}
+                ],
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    now = 0.0
+    app.clock = lambda: now
+    app.mount()
+    base = DisplayList()
+    app.paint(base)
+    assert not any(
+        s["flags"][0] == Kind.BOX and s["fill"][3] > 0 and s["rect"][3] <= 56.0 for s in base.view
+    )
+
+    w = app.root.find("acc")
+    w.state.hovered = True
+    w.mark_needs_paint()
+    app.paint(DisplayList())  # notices the hover and starts the fade
+    now = 0.2  # past the state-layer duration
+    hovered = DisplayList()
+    app.paint(hovered)
+    assert len(hovered) == len(base) + 1
+    assert any(
+        s["flags"][0] == Kind.BOX and s["fill"][3] > 0 and s["rect"][3] <= 56.0
+        for s in hovered.view
+    )

@@ -907,6 +907,7 @@ Selection is a **binding, not style**: `value: "{{ checked.get() }}"`.
 |---|---|
 | `Card` | 12dp radius, 16dp padding. `elevated`, `filled`, `outlined`. |
 | `ListItem` | 56 / 72 / 88dp by line count. |
+| `Accordion` | 56 / 72dp header (M3 gives this no component of its own, only Lists' "expand and collapse" behaviour). `text:` headline + `supporting_text:`, an optional child body, `value:` for open/closed. |
 | `TopAppBar` | 64dp small, 112dp `medium`, 152dp `large`. |
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator. |
 | `NavigationDrawer` | 240–360dp, 56dp items. |

@@ -58,6 +58,10 @@ ROLES: Final[dict[str, str]] = {
     # interactive content, and a Popover can hold buttons. A non-modal
     # dialog is the ARIA shape that actually fits.
     "Popover": "dialog",
+    # M3 has no Accordion component either -- see `AccordionElement`'s
+    # docstring. ARIA's disclosure-widget convention is a button that
+    # controls an adjacent region, which is exactly its shape here.
+    "Accordion": "button",
     "Menu": "menu",
     "Tooltip": "tooltip",
     "Snackbar": "status",  # "announced ... but don't trap focus"
@@ -228,6 +232,10 @@ def _node_for(element: Any) -> AccessibleNode | None:
         node.value = str(element.number)
     elif role in ("dialog", "menu", "tooltip", "status"):
         node.expanded = bool(element.is_open)
+    elif kind == "Accordion":
+        # Keyed on kind, not on role == "button" -- a plain Button shares that
+        # role and has no `is_open`/`checked` disclosure state to read.
+        node.expanded = bool(element.checked)
     return node
 
 

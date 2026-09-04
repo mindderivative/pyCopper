@@ -22,13 +22,14 @@ from __future__ import annotations
 import math
 from typing import Any, Final
 
-from ..layout import Constraints, EdgeInsets, Padding, Size
+from ..layout import INF, Constraints, EdgeInsets, Offset, Padding, Size
 from ..spec import StyleSpec, WidgetSpec
 from ..text.icons import DEFAULT_ICON_SIZE
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
 
 __all__ = [
+    "AccordionElement",
     "BadgeElement",
     "CardElement",
     "CheckboxElement",
@@ -303,6 +304,161 @@ class CardElement(_StyledMixin, Padding):
             radius=radius,
             border_width=1.0 if variant == "outlined" else 0.0,
             border_token=ctx.palette.index("outline_variant"),
+        )
+
+
+# --------------------------------------------------------------- accordion
+
+
+class AccordionElement(_StyledMixin, Padding):
+    """M3 has no Accordion component. What it has is Lists' documented
+    disclosure behaviour: "List items containing other list items can expand
+    and collapse in a folder-like manner, to reveal or hide content"
+    (`COMPONENT_LISTS.md`). Note the SAME section's worked example --
+    "Tapping a list item expands it vertically across the entire screen using
+    a container transform transition pattern" -- describes something else: a
+    full-screen master-detail transition, not the in-place disclosure this
+    widget is. This is the more universal pattern, common to nearly every UI
+    toolkit; M3 states the behaviour without naming or specifying a widget
+    for it, which is why the anatomy below borrows from elsewhere rather than
+    quoting a Popover-style measurement table that does not exist.
+
+    **Anatomy is `ListItem`'s** (56dp one-line / 72dp two-line header,
+    `on_surface`/`on_surface_variant` text) since M3 gives this component
+    none of its own to cite, plus a trailing `expand_more`/`expand_less`
+    chevron. **Expand state follows the `value:` convention** `Chip`'s filter
+    variant already uses -- `self.checked` reads it, and clicking fires
+    `on_click:` for the application to flip its own bound signal, the same
+    division of responsibility as every other selectable control.
+
+    **Expansion is a height animation, clipped exactly like `ScrollView`
+    clips its viewport** (`animated(..., invalidates="layout")`, the same
+    trade `Chip`'s filter checkmark and `Carousel` already make): the body is
+    laid out at its full natural height every frame, and the container's own
+    height -- which the clip uses -- is that height scaled by the animated
+    progress. There is no scroll offset, only a container that grows.
+
+    **The chevron swaps rather than rotates.** A glyph instance carries no
+    rotation parameter -- `Shape`'s polygon SDF does, an icon glyph does not
+    -- so continuously rotating `expand_more` into `expand_less` is not
+    something the current pipeline can express. It swaps on the *logical*
+    state (`checked`) rather than partway through the animated progress; a
+    mid-transition swap would read as a glitch, not a rotation.
+    """
+
+    HEADER_ONE_LINE: Final = 56.0
+    HEADER_TWO_LINE: Final = 72.0
+    PAD_X: Final = 16.0
+    HEADLINE: Final = 16.0
+    SUPPORTING: Final = 14.0
+    CHEVRON: Final = 24.0
+    CURSOR = "pointer"
+    CLIPS_CHILDREN = True
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, EdgeInsets())
+        self.init_element(spec)
+
+    def _header_height(self) -> float:
+        return self.HEADER_TWO_LINE if self._supporting.strip() else self.HEADER_ONE_LINE
+
+    def _progress(self) -> float:
+        """0 (collapsed) to 1 (fully expanded). Drives both the height and the
+        clip that reveals the body -- see the class docstring."""
+        return self.animated(
+            "expanded",
+            1.0 if self.checked else 0.0,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
+            invalidates="layout",
+        )
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        width = outer.max_width if outer.has_bounded_width else 320.0
+        header_h = self._header_height()
+
+        body_h = 0.0
+        child = self.child
+        if child is not None:
+            # Unbounded height: the body's NATURAL size, independent of how
+            # small the accordion's own current (animated) height is.
+            body_constraints = Constraints(
+                min_width=width, max_width=width, min_height=0.0, max_height=INF
+            )
+            child.layout(body_constraints)
+            body_h = child.size.height
+            child.offset = Offset(0.0, header_h)
+
+        revealed = body_h * self._progress()
+        return outer.constrain(Size(width, header_h + revealed))
+
+    def child_paint_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
+        """Clip to the accordion's own (animated) size -- see `ScrollView`,
+        which this mirrors exactly except that nothing scrolls."""
+        dpr = ctx.pixel_ratio
+        return PaintContext(
+            display_list=ctx.display_list,
+            palette=ctx.palette,
+            text=ctx.text,
+            pixel_ratio=dpr,
+            clip=(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                self.size.width * dpr,
+                self.size.height * dpr,
+            ),
+            clip_radii=ctx.clip_radii,
+        )
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        style = self.style
+        header_h = self._header_height()
+        headline_tok = content_token(ctx, style, "on_surface")
+        supporting_tok = ctx.palette.index("on_surface_variant")
+
+        # A state layer scoped to the header row alone -- `_emit_state_layer`
+        # sizes itself from `element.size`, which is the WHOLE (animated)
+        # accordion; reusing it as-is would tint the revealed body too.
+        alpha = _state_alpha(self)
+        if alpha > 0.001:
+            dpr = ctx.pixel_ratio
+            ctx.display_list.add_box(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                self.size.width * dpr,
+                header_h * dpr,
+                token=headline_tok,
+                color=(1.0, 1.0, 1.0, alpha),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+
+        second = self._supporting.strip()
+        x = absolute.x + self.PAD_X
+        if second:
+            top = measure_text(self._text, self.HEADLINE, engine=self.text_engine)
+            bottom = measure_text(second, self.SUPPORTING, engine=self.text_engine)
+            block = top.height + bottom.height
+            y = absolute.y + (header_h - block) / 2
+            paint_text(ctx, x, y, self._text, self.HEADLINE, headline_tok)
+            paint_text(ctx, x, y + top.height, second, self.SUPPORTING, supporting_tok)
+        elif self._text.strip():
+            label = measure_text(self._text, self.HEADLINE, engine=self.text_engine)
+            y = absolute.y + (header_h - label.height) / 2
+            paint_text(ctx, x, y, self._text, self.HEADLINE, headline_tok)
+
+        icon = "expand_less" if self.checked else "expand_more"
+        ctx.text.emit_icon(
+            ctx.display_list,
+            icon,
+            x=absolute.x + self.size.width - self.PAD_X - self.CHEVRON,
+            y=absolute.y + (header_h - self.CHEVRON) / 2,
+            size=self.CHEVRON,
+            pixel_ratio=ctx.pixel_ratio,
+            token=supporting_tok,
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
         )
 
 

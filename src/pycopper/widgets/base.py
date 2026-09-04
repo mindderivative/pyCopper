@@ -724,6 +724,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.ICON_BUTTON: m.IconButtonElement,
         WidgetKind.FAB: m.FabElement,
         WidgetKind.BADGE: m.BadgeElement,
+        WidgetKind.ACCORDION: m.AccordionElement,
         WidgetKind.NAVIGATION_RAIL: n.NavigationRailElement,
         WidgetKind.NAVIGATION_DRAWER: n.NavigationDrawerElement,
         WidgetKind.NAV_ITEM: n.NavItemElement,
