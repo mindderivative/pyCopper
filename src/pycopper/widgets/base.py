@@ -789,6 +789,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
     from . import canvas as cv
     from . import carousel as ca
+    from . import codeeditor as ce
     from . import dock as dk
     from . import image as im
     from . import material as m
@@ -847,6 +848,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.VIDEO: vd.VideoElement,
         WidgetKind.NODE_GRAPH: ng.NodeGraphElement,
         WidgetKind.NODE: ng.NodeElement,
+        WidgetKind.CODE_EDITOR: ce.CodeEditorElement,
     }
 
 

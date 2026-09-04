@@ -63,6 +63,10 @@ a11y = ["accesskit>=0.7,<0.8"]
 # calls compile_svg_font/load_svg_icons -- everything else in pyCopper,
 # including Material Symbols, needs no SVG parser at all.
 svg = ["svgelements>=1.9,<2"]
+# CodeEditor's syntax highlighting (widgets/codeeditor.py). Lazily imported --
+# a CodeEditor with no `style.language` set, or this extra not installed,
+# still works as a plain editable multi-line text control, just uncoloured.
+code = ["pygments>=2.18,<3"]
 dev = [
     "pytest>=8.0",
     "hypothesis>=6.100",
@@ -72,6 +76,7 @@ dev = [
     "types-PyYAML>=6.0",
     "accesskit>=0.7,<0.8",
     "svgelements>=1.9,<2",
+    "pygments>=2.18,<3",
 ]
 
 [project.urls]
@@ -126,6 +131,14 @@ ignore = ["N803", "N806"]  # graphics math uses conventional capitalised names
 # accesskit is a native wheel with no py.typed marker. Scoped to the one
 # module that imports it, so a missing stub elsewhere still fails.
 module = ["accesskit", "accesskit.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Pygments ships no inline types; a types-Pygments stub package exists on
+# PyPI, but adding it as a dev dependency for one lazily-imported, optional
+# module (widgets/codeeditor.py) is not worth it. Same reasoning as
+# accesskit above.
+module = ["pygments", "pygments.*"]
 ignore_missing_imports = true
 
 [tool.mypy]

@@ -97,6 +97,7 @@ class WidgetKind(StrEnum):
     VIDEO = "Video"
     NODE_GRAPH = "NodeGraph"
     NODE = "Node"
+    CODE_EDITOR = "CodeEditor"
 
 
 class SizeSpec:
@@ -498,6 +499,22 @@ class StyleSpec(_Frozen):
     #: reload does not reset a node an author has already moved.
     x: float = 0.0
     y: float = 0.0
+
+    # code editor
+    #: A Pygments lexer name or alias (`"python"`, `"yaml"`, ...) for
+    #: `CodeEditor` syntax highlighting. Unset or unrecognised means no
+    #: highlighting rather than an error -- Pygments is an optional
+    #: capability, not a hard dependency (`pycopper[code]`).
+    language: str | None = None
+    #: `CodeEditor`'s line-number gutter, shown by default.
+    line_numbers: bool = True
+    #: How many spaces a `CodeEditor`'s Tab key inserts.
+    tab_size: int = Field(default=4, ge=1)
+    #: A font family to request by name (`FontRequest.family`), resolved
+    #: through the same `FontDB` every widget already uses. Only `CodeEditor`
+    #: reads this today -- see its own docstring for why a code editor is
+    #: the first widget with a real reason to ask for one.
+    font_family: str | None = None
 
 
 class EdgeSpec(_Frozen):

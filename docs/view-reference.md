@@ -702,6 +702,71 @@ Home and End become line-relative, and End stops before the newline.
 
 Copy and paste use the system clipboard — see [The clipboard](#the-clipboard).
 
+## Code editor
+
+`CodeEditor` is a multi-line, syntax-highlighted, line-numbered text editor.
+No M3 component exists for it — it is built on the same underlying editing
+primitives `TextField` is, rather than on `TextField` itself, since a code
+editor has none of a text field's M3 chrome (a floating label, an indicator
+stroke).
+
+```yaml
+- name: source
+  widget: CodeEditor
+  value: "{{ file_contents.get() }}"
+  style: {language: python, height: 400, width: expand}
+  handlers: {on_change: set_source}
+```
+
+`value:` is the buffer, the same convention `TextField` uses. Unlike a
+`TextField`, **`CodeEditor` needs a bounded height** — it never grows to fit
+its content, and never wraps a long line (it scrolls sideways instead), so
+that its line numbers always correspond 1:1 with the buffer's own lines.
+
+**Syntax highlighting** comes from [Pygments](https://pygments.org/), an
+optional dependency (`pycopper[code]`) rather than a hard one. Set
+`style.language` to a Pygments lexer name or alias (`python`, `yaml`,
+`javascript`, ...); leaving it unset, or naming a language Pygments does not
+recognise, leaves the buffer uncoloured rather than raising. The colours
+themselves are fixed, not part of the M3 theme — there is no dark/light
+variant, and no way to override them from a view file today.
+
+**No monospace font ships with pyCopper** — only the proportional Roboto and
+Noto Sans. `style.font_family` names a face by family name; an application
+that wants true monospace alignment loads one itself before the view mounts:
+
+```python
+app.text.db.load("/path/to/JetBrainsMono-Regular.ttf")
+```
+
+Left unset, or naming a family nobody loaded, text still renders — with
+Roboto, proportionally — rather than failing.
+
+**What the keyboard does**, on top of everything [Text fields](#text-fields)
+already lists (arrows, word motion, selection, clipboard, undo/redo — all
+identical here):
+
+| Keys | Effect |
+|---|---|
+| Home / End | Start / end of the current source line, not the whole buffer |
+| Ctrl+Home / Ctrl+End | Start / end of the whole buffer |
+| Tab | Inserts `style.tab_size` spaces; indents every line a selection touches instead, so it never just replaces a multi-line selection with four spaces |
+| Shift+Tab | Dedents the current line, or every line a selection touches |
+| Enter | Auto-indents the new line to match the current one's leading whitespace |
+
+Tab does not move focus while a `CodeEditor` is focused — press **Escape**
+first (which always defocuses, for any widget) to reach the next control by
+keyboard.
+
+**Not implemented**: auto-closing or matching brackets, multiple cursors,
+code folding, a minimap, a draggable scrollbar thumb (the wheel and the
+keyboard both scroll; there is no visible, grabbable indicator yet), and
+incremental re-parsing for very large files (Pygments re-lexes the whole
+buffer on every edit). Language server integration is deliberately out of
+scope for the widget itself — that is an application concern, composed from
+whatever LSP client a project already uses, not something `CodeEditor`
+hard-depends on.
+
 ## Text selection
 
 A `Text` widget with `selectable: true` can be selected with the mouse:
@@ -910,6 +975,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | `Spacer` | Empty space. `width: expand` pushes siblings apart. |
 | `ScrollView` | A clipped viewport. **Must** have a bounded size on its scroll axis. |
 | `TextField` | The editable one. 56dp, `filled` or `outlined`. See [Text fields](#text-fields). |
+| `CodeEditor` | Multi-line, line-numbered, optionally syntax-highlighted. No M3 component. See [Code editor](#code-editor). |
 
 Inside a `Row` or `Column`, a child with `width: expand` (or `flex`) on the main
 axis shares the free space; anything else is measured first and takes what it
@@ -1340,6 +1406,10 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `count` | `Pagination` — total number of pages |
 | `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |
 | `x`, `y` | `Node` — initial world position in its `NodeGraph`; see [Node graph](#node-graph) |
+| `language` | `CodeEditor` — a Pygments lexer name/alias; unset or unrecognised means no highlighting |
+| `line_numbers` | `CodeEditor` — show the gutter (default on) |
+| `tab_size` | `CodeEditor` — spaces the Tab key inserts (default 4) |
+| `font_family` | `CodeEditor` — request a face by name; see [Code editor](#code-editor) |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |
 
 ---

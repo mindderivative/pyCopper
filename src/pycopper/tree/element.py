@@ -923,6 +923,17 @@ class ElementMixin:
     #: response to.
     CLIPS_CHILDREN: bool = False
 
+    #: Whether a focused instance wants Tab routed to its own `on_key_down`
+    #: instead of the dispatcher's default focus-traversal
+    #: (`EventDispatcher._dispatch_to_focused` checks this before treating
+    #: Tab as "move to the next control" -- Tab is intercepted before ANY
+    #: element's own handler runs, so there is no other way for one to see
+    #: the keypress at all). `Escape` still defocuses unconditionally, so
+    #: trapping Tab this way never traps the keyboard -- Escape, then Tab,
+    #: always reaches the next control. `CodeEditor` is the first, and so
+    #: far only, user (Tab inserts indentation there).
+    CAPTURES_TAB: bool = False
+
     def _read_hit_style(self) -> None:
         """Lift the two hit-rect properties off the spec, once.
 

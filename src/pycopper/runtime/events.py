@@ -212,6 +212,7 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "DockGroup",
         "DockSplit",
         "Node",
+        "CodeEditor",
     }
 )
 
@@ -441,7 +442,9 @@ class EventDispatcher:
         # Tab traversal is handled before delivery: it must work even when
         # nothing is focused yet, which is the state an app starts in.
         if isinstance(event, KeyEvent) and event.type is EventType.KEY_DOWN:
-            if event.key in ("Tab", "tab"):
+            if event.key in ("Tab", "tab") and not getattr(self._focused, "CAPTURES_TAB", False):
+                # getattr, not a direct attribute read: `self._focused` can be
+                # None (nothing focused yet), which has no CAPTURES_TAB at all.
                 self.focus_next(backwards="shift" in modifiers_of(event))
                 return
             if event.key in ("Escape", "escape"):

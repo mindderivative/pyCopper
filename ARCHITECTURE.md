@@ -2879,6 +2879,112 @@ container, `"graphics-object"` for one figure within it -- used directly
 rather than approximated, unlike `Canvas`/`Image`/`Video`'s shared `"img"`
 fallback where no closer role exists at all.
 
+### 5.25 Code editor — `widgets/codeeditor.py`
+
+No M3 component either. Built on the shared editing model
+(`text/editing.py`'s `Editor`/`EditState`, `text/selection.py`'s point/offset
+helpers) rather than on `TextField` (§5.9.1) itself -- that model's own
+docstring already anticipates more than one consumer ("`TextFieldElement`
+supplies keys and pixels; this supplies the answers"), and `TextField`'s
+layout and paint methods are saturated with M3-specific chrome (a floating
+label, an indicator stroke that thickens on focus) a code editor has none
+of. Subclassing `TextFieldElement` would have meant overriding nearly every
+method on it; building on the shared model instead reuses everything that
+actually is shared -- grapheme-aware caret motion, undo/redo, selection
+ranges, click-to-offset -- with none of the M3 baggage.
+
+**Never wraps, and therefore needs a genuinely bounded height.** Line
+numbers only mean something if they correspond 1:1 with the buffer's own
+source lines, so `max_width=None` is always passed to `text_engine.layout()`
+-- `layout_text`'s own contract already guarantees a hard break (`\n`)
+starts a new `TextLine` regardless of wrapping, so this alone is "one
+`TextLine` per source line," and a long line scrolls sideways instead of
+wrapping into a visual line the gutter could not label. Because nothing
+wraps, an unbounded height would try to grow to fit the entire buffer and
+never scroll -- the identical reasoning `ScrollView` (§5.14) raises for.
+
+**Syntax highlighting is optional Pygments (BSD-2), not a hard dependency
+-- asked of the user directly.** The real fork was Pygments against
+tree-sitter: tree-sitter's incremental re-parsing and real syntax tree are
+more capability than a v1 highlighter needs, at the cost of a new, heavier
+native dependency; Pygments is simpler, already commonly present, and its
+whole-buffer re-lex per edit is an accepted, real limitation for very large
+files edited live, the same shape of trade-off `NodeGraph` (§5.24) made by
+deferring zoom. `pygments` is imported lazily inside the one module that
+uses it (`pycopper[code]`, a new optional extra alongside `a11y`/`svg`); with
+it absent, or `style.language` unset or unrecognised by
+`pygments.lexers.get_lexer_by_name`, the widget still works as a plain
+editable multi-line control, just uncoloured -- `Image`'s (§5.22) "degrade
+rather than crash" choice for a bad path, applied here to a missing optional
+capability instead of bad data. Colours are literal RGBA, not palette
+tokens, for the identical reason `CanvasContext`'s (§5.21) own colour
+parameter accepts a literal tuple: there are only four true M3 colour roles
+(primary/secondary/tertiary/error) against the ten-odd categories a real
+syntax theme needs, and no semantic role exists to map the rest onto -- a
+stated departure from "emit tokens, not colours" (§5.6), not an oversight.
+Getting the source-offset accounting right needed one thing verified rather
+than assumed: Pygments strips input by default, which would desync a
+running offset count from the buffer's real length, so the lexer is
+constructed with `stripnl=False, stripall=False, ensurenl=False` and this
+was checked empirically (`"".join(v for _, v in lex(text, lexer)) == text`)
+before relying on it.
+
+**No monospace font ships with pyCopper.** Roboto and Noto Sans (§2.3.1) are
+both proportional. `style.font_family` requests a family by name through
+the same `FontRequest`/`FontDB` machinery every widget already resolves
+against; an application that wants true monospace alignment loads one
+itself with `app.text.db.load(path)` -- already a public method, no new API
+surface -- before this widget ever asks for it. Left unset, or naming a
+family nobody loaded, `FontDB.face_for` already falls back to the primary
+bundled face rather than raising, so an app that does nothing gets working,
+if proportional, text.
+
+**A new dispatcher capability was needed, not just a new widget.** Tab is
+intercepted and treated as focus traversal before any element's own
+`on_key_down` ever runs (`EventDispatcher._dispatch_to_focused`) -- there was
+no way for a widget to see the keypress at all, let alone insert indentation
+with it. `ElementMixin.CAPTURES_TAB` (default `False`, the same shape as the
+existing `CLIPS_CHILDREN` flag, §5.9) lets a focused element opt in;
+`CodeEditor` is the first, and so far only, one that does. `Escape` still
+defocuses unconditionally before per-element delivery too, so trapping Tab
+this way never traps the keyboard -- Escape, then Tab, always reaches the
+next control, the same escape hatch real code editors themselves rely on.
+
+**Tab/Shift+Tab operate on whole lines, not just the caret, whenever there
+is a selection.** `insert()`'s own semantics replace a selection outright,
+so a naive `insert(state, " " * tab_size)` on a multi-line selection would
+have destroyed the selected code and left four spaces in its place -- a
+real correctness bug caught by reasoning through the existing model's
+contract before shipping, not after. With no selection, Tab inserts spaces
+at the caret like ordinary typing instead, since re-indenting a whole line
+from a mid-line caret is not what a user pressing Tab there expects.
+
+ARIA has no dedicated role either. `"textbox"` -- the same role `TextField`
+(§5.9.1) already carries, with `aria-multiline` the only difference a
+multi-line `<textarea>` would add -- is the closest real anatomy, used
+directly rather than invented.
+
+**Deliberately out of scope for this pass**: auto-closing/matching
+brackets, multi-cursor editing, code folding, a minimap, a draggable
+scrollbar thumb (wheel and keyboard scrolling both work; only the visible,
+grabbable indicator is missing), incremental re-lexing for very large
+files, and any language server integration -- the package survey that
+grounded this widget's design was explicit that an LSP client is an
+application concern, not something a widget should hard-depend on.
+
+**A pre-existing `TextEngine.layout` cache-growth concern applies more
+sharply here than anywhere it was already true.** `TextEngine._layouts` is
+keyed by the full text string among other parameters and nothing ever
+evicts it (`text/__init__.py`), so a widget whose content changes on every
+keystroke accumulates one new full-`Paragraph` entry per keystroke for the
+life of the process -- already true of `TextField` today, not introduced by
+this widget, but worse here because a code buffer is typically much larger
+than a text field's value and a long editing session performs many more
+edits than a form field usually receives. Not fixed as part of this pass --
+a shared, already-tested cache used by every text-bearing widget deserves
+its own dedicated review (LRU eviction, or a cache key that does not embed
+the whole string), not a change bolted onto one consumer's widget.
+
 ---
 
 ## 6. Frame Lifecycle

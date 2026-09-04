@@ -34,6 +34,10 @@ __all__ = ["AccessibleNode", "Bridge", "accessibility_tree", "role_for"]
 ROLES: Final[dict[str, str]] = {
     # --- stated by M3
     "TextField": "textbox",  # "The role is 'textbox'"
+    # No M3 component -- see CodeEditorElement's own docstring. ARIA's
+    # "textbox" (with aria-multiline) is the same role a multi-line HTML
+    # <textarea> reports, which is the closest real anatomy this has.
+    "CodeEditor": "textbox",
     "LinearProgress": "progressbar",  # "role of 'progressbar'"
     "CircularProgress": "progressbar",  # "role of 'progressbar'"
     "NavItem": "tab",  # "The role is 'tab'"
@@ -278,6 +282,10 @@ def _node_for(element: Any) -> AccessibleNode | None:
         # so it is a description rather than being glued onto the name.
         node.name = (element.spec.text or "").strip()
         node.description = (getattr(element, "supporting", "") or "").strip()
+        node.value = getattr(element, "content", "") or ""
+    elif kind == "CodeEditor":
+        # No supporting-text/label anatomy to read -- see the widget's own
+        # docstring: `text:` is unused, the same as `Canvas`/`ScrollView`.
         node.value = getattr(element, "content", "") or ""
     elif role in ("progressbar", "spinbutton") or kind in ("Pagination", "DockSplit"):
         # aria-valuemin/-valuemax have no field on AccessibleNode to carry

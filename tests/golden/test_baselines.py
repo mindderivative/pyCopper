@@ -2617,6 +2617,31 @@ def test_nodegraph_baseline(render_scene, assert_golden) -> None:
     assert_golden("nodegraph", np.asarray(engine.canvas.draw()))
 
 
+def test_codeeditor_baseline(render_scene, assert_golden) -> None:
+    """A short Python snippet: proves the gutter, the divider, and Pygments
+    syntax highlighting all render together -- not just that the display
+    list contains the right instance kinds (`test_codeeditor.py` already
+    checks that at the CPU level with no GPU involved)."""
+    code = "def add(a, b):\n    return a + b\n"
+    view = {
+        "root": {
+            "name": "editor",
+            "widget": "CodeEditor",
+            "value": code,
+            "style": {"width": 280, "height": 140, "language": "python"},
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=280, height=140, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("codeeditor", np.asarray(engine.canvas.draw()))
+
+
 def test_image_baseline(render_scene, assert_golden, tmp_path) -> None:
     """A real decoded file sampled through the real texture pipeline --
     `Kind.IMAGE`'s first GPU render. Two placements of the same asymmetric
