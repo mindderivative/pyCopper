@@ -294,6 +294,24 @@ def test_engine_memoises_layouts() -> None:
     assert te.layout("Hello", px=16) is first
 
 
+def test_engine_layout_cache_does_not_grow_unbounded() -> None:
+    """A widget whose text changes every keystroke (TextField, CodeEditor)
+    must not leak one Paragraph per edit for the life of the process."""
+    te = TextEngine(layout_cache_size=64)
+    for i in range(1000):
+        te.layout(f"distinct string number {i}", px=16)
+    assert len(te._layouts) <= 64
+
+
+def test_engine_layout_cache_keeps_recently_used_entries() -> None:
+    te = TextEngine(layout_cache_size=8)
+    kept = te.layout("kept", px=16)
+    for i in range(20):
+        te.layout(f"filler {i}", px=16)
+        te.layout("kept", px=16)  # touched every iteration, so never LRU-oldest
+    assert te.layout("kept", px=16) is kept
+
+
 def test_engine_measure_matches_layout() -> None:
     te = TextEngine()
     assert te.measure("Hello", px=16) == te.layout("Hello", px=16).size

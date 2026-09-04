@@ -7,6 +7,7 @@ runs, paragraph layouts, and rasterised glyphs in the atlas.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Sequence
 from typing import Any
 
@@ -53,6 +54,15 @@ __all__ = [
 ]
 
 _NO_CLIP = (0.0, 0.0, 0.0, 0.0)
+
+# Bounds `TextEngine._layouts`. Every entry holds a fully shaped `Paragraph`,
+# and the key embeds the whole text string, so a widget whose content
+# changes on every keystroke (TextField, CodeEditor) would otherwise grow
+# this cache without limit for the life of the process (ARCHITECTURE.md
+# 5.25). Static UI text -- the common case this cache exists for -- rarely
+# has more than a few hundred distinct (text, style) combinations on screen
+# at once, so this ceiling doesn't touch that case in practice.
+_DEFAULT_LAYOUT_CACHE_SIZE = 512
 
 
 def _span_arrays(
@@ -109,13 +119,20 @@ def _span_arrays(
 class TextEngine:
     """Owns fonts, caches, and the glyph atlas for one application."""
 
-    __slots__ = ("_icons", "_layouts", "atlas", "db", "shaper")
+    __slots__ = ("_icons", "_layout_cache_size", "_layouts", "atlas", "db", "shaper")
 
-    def __init__(self, device: Any = None, *, atlas_size: int = 1024) -> None:
+    def __init__(
+        self,
+        device: Any = None,
+        *,
+        atlas_size: int = 1024,
+        layout_cache_size: int = _DEFAULT_LAYOUT_CACHE_SIZE,
+    ) -> None:
         self.db = FontDB()
         self.shaper = ShapeCache()
         self.atlas = GlyphAtlas(device, size=atlas_size)
-        self._layouts: dict[tuple[Any, ...], Paragraph] = {}
+        self._layouts: OrderedDict[tuple[Any, ...], Paragraph] = OrderedDict()
+        self._layout_cache_size = layout_cache_size
         self._icons: IconSet | None = None
 
     @property
@@ -183,11 +200,18 @@ class TextEngine:
         tracking: float = 0.0,
         line_height: float | None = None,
     ) -> Paragraph:
-        """Lay out *text*, memoised. Static labels cost nothing after frame one."""
+        """Lay out *text*, memoised. Static labels cost nothing after frame one.
+
+        The cache is bounded (LRU, ``layout_cache_size`` entries): a widget
+        whose text changes every keystroke -- `TextField`, `CodeEditor` --
+        keeps recently-seen paragraphs around for reuse but does not grow
+        `_layouts` without limit over a long editing session.
+        """
         req = request or FontRequest()
         key = (text, px, max_width, req.key(), alignment, tracking, line_height)
         hit = self._layouts.get(key)
         if hit is not None:
+            self._layouts.move_to_end(key)
             return hit
         para = layout_text(
             text,
@@ -201,6 +225,8 @@ class TextEngine:
             cache=self.shaper,
         )
         self._layouts[key] = para
+        if len(self._layouts) > self._layout_cache_size:
+            self._layouts.popitem(last=False)
         return para
 
     def measure(
