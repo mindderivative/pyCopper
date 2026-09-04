@@ -377,9 +377,10 @@ class StyleSpec(_Frozen):
     axis: Literal["vertical", "horizontal"] = "vertical"
     #: Draw a ScrollView's scrollbar when its content overflows.
     scrollbar: bool = True
-    #: Draw a bottom sheet's drag handle. Off by default: the handle is an
-    #: affordance for a drag gesture that is not wired to the pointer yet,
-    #: so showing one by default would promise behaviour that does not exist.
+    #: Draw a bottom sheet's drag handle. Off by default -- opt-in, the way a
+    #: view chooses to show any other affordance, not because the gesture
+    #: behind it is unwired (`BottomSheetElement.on_pointer_down/_move/_up`
+    #: already drag-and-dismiss with or without the handle drawn).
     handle: bool = False
     #: A SpinBox's bounds. None on either end means unbounded in that
     #: direction, not "clamp to zero" -- a generic increment control has no
