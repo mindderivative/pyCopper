@@ -45,6 +45,7 @@ __all__ = [
     "DialogElement",
     "MenuElement",
     "MenuItemElement",
+    "PopoverElement",
     "SideSheetElement",
     "SnackbarElement",
     "TooltipElement",
@@ -286,6 +287,185 @@ class DialogElement(_StyledMixin, Padding):
         if body:
             if head:
                 y += self.GAP_TITLE_BODY
+            paint_text(
+                ctx,
+                x,
+                y,
+                body,
+                self.BODY,
+                ctx.palette.index("on_surface_variant"),
+                max_width=inner_width,
+            )
+
+
+# ------------------------------------------------------------------ popover
+
+
+class PopoverElement(_StyledMixin, Padding):
+    """M3 has no Popover component -- what it has is the **persistent rich
+    tooltip**, which is a popover in every behavioural sense and differs from
+    the transient kind only in trigger: "Persistent rich tooltips appear when
+    ... the parent element is clicked" and "remain active even when leaving
+    the target region. They only disappear once a person interacts with
+    another UI element. Hovering doesn't trigger the tooltip." (`COMPONENT_
+    TOOLTIPS.md`). That maps onto pyCopper's existing overlay primitives with
+    nothing new to build there: `placement: anchor` (already what `Menu`
+    uses) plus the default `dismissable: true` gives click-outside-to-close
+    for free, and this widget adds only the anatomy -- container, shape, and
+    the gap between subhead, body, and an optional action row -- exactly the
+    division of labour `Dialog` and `Menu` already follow.
+
+    Anatomy and colours are the rich tooltip's: subhead (`text:`) and
+    supporting text (`supporting_text:`) both `on_surface_variant`, container
+    `surface_container_high`, `12dp` corners (`shape.corner.medium`), and
+    elevation level 2 -- the same level `Menu` sits at.
+
+    **Width is shrink-to-fit, not fill-to-minimum, and that is a real
+    difference from `Dialog` and `Menu` rather than an oversight.** Both of
+    those have an M3-stated *minimum* width and so take the width they are
+    offered, capped at their maximum (`_clamped_width`). The rich tooltip's
+    condensed spec states only a maximum -- `320dp` -- and nothing else,
+    which matches its tooltip heritage: a popover with one short line of text
+    should be exactly that wide, not stretched to look like a dialog.
+    """
+
+    RADIUS: Final = 12.0
+    MAX_WIDTH: Final = 320.0
+    RESTING_ELEVATION = 2
+    SUBHEAD: Final = 14.0
+    BODY: Final = 14.0
+    #: "Top padding: 12dp / Bottom padding: 8dp / Left and right padding: 16dp"
+    PAD_TOP: Final = 12.0
+    PAD_BOTTOM: Final = 8.0
+    PAD_X: Final = 16.0
+    #: Not separately stated for the rich tooltip; reused from Dialog's own
+    #: title-to-body and body-to-actions gaps rather than invented afresh,
+    #: since both separate a headline block from what follows it.
+    GAP_SUBHEAD_BODY: Final = 16.0
+    GAP_BODY_ACTIONS: Final = 24.0
+
+    DEFAULT_PLACEMENT = "anchor"
+
+    @property
+    def effective_radii(self) -> tuple[float, float, float, float]:
+        radii = self.style.corner_radius
+        return radii if any(radii) else (self.RADIUS,) * 4
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, self._insets(spec.style))
+        self.init_element(spec)
+
+    @staticmethod
+    def _insets(style: StyleSpec) -> EdgeInsets:
+        pad = style.padding
+        if pad != EdgeInsets():
+            return pad
+        return EdgeInsets(
+            PopoverElement.PAD_X,
+            PopoverElement.PAD_TOP,
+            PopoverElement.PAD_X,
+            PopoverElement.PAD_BOTTOM,
+        )
+
+    def configure(self) -> None:
+        self._padding = self._insets(self.style)
+
+    def _content_width(self, constraints: Constraints, inner_max: float) -> float:
+        """Shrink-to-fit: as wide as the widest line actually needs, never
+        wider than *inner_max*. A single short word must not claim the whole
+        320dp budget the way `Dialog`'s stated minimum would force it to."""
+        if self.style.width.kind == "fixed":
+            return max(0.0, float(self.style.width.value) - self._padding.horizontal)
+        engine = self.text_engine
+        head = self._text.strip()
+        body = self._supporting.strip()
+        natural = 0.0
+        if head:
+            natural = max(natural, measure_text(head, self.SUBHEAD, engine=engine).width)
+        if body:
+            natural = max(natural, measure_text(body, self.BODY, engine=engine).width)
+        return min(inner_max, natural) if natural else 0.0
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        pad = self._padding
+        outer_max = (
+            min(self.MAX_WIDTH, constraints.max_width)
+            if constraints.has_bounded_width
+            else self.MAX_WIDTH
+        )
+        inner_max = max(0.0, outer_max - pad.horizontal)
+        inner_width = self._content_width(constraints, inner_max)
+
+        engine = self.text_engine
+        head = self._text.strip()
+        body = self._supporting.strip()
+        head_h = (
+            measure_text(head, self.SUBHEAD, engine=engine, max_width=inner_width).height
+            if head
+            else 0.0
+        )
+        body_h = (
+            measure_text(body, self.BODY, engine=engine, max_width=inner_width).height
+            if body
+            else 0.0
+        )
+        if head_h and body_h:
+            body_h += self.GAP_SUBHEAD_BODY
+        text_h = head_h + body_h
+
+        actions_h = 0.0
+        child = self.child
+        if child is not None:
+            child.layout(
+                Constraints(
+                    min_width=0.0,
+                    max_width=inner_width,
+                    min_height=0.0,
+                    max_height=constraints.max_height,
+                )
+            )
+            inner_width = max(inner_width, child.size.width)
+            gap = self.GAP_BODY_ACTIONS if text_h else 0.0
+            child.offset = Offset(pad.left, pad.top + text_h + gap)
+            actions_h += gap + child.size.height
+
+        width = inner_width + pad.horizontal
+        height = pad.vertical + text_h + actions_h
+        return constraints.constrain(Size(width, height))
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        style = self.style
+        _surface(
+            ctx,
+            absolute,
+            self.size,
+            token=ctx.palette.index(style.background or "surface_container_high"),
+            radii=self.effective_radii,
+        )
+
+        pad = self._padding
+        inner_width = max(0.0, self.size.width - pad.horizontal)
+        x = absolute.x + pad.left
+        y = absolute.y + pad.top
+        head = self._text.strip()
+        body = self._supporting.strip()
+
+        if head:
+            paint_text(
+                ctx,
+                x,
+                y,
+                head,
+                self.SUBHEAD,
+                ctx.palette.index("on_surface_variant"),
+                max_width=inner_width,
+            )
+            y += measure_text(
+                head, self.SUBHEAD, engine=self.text_engine, max_width=inner_width
+            ).height
+        if body:
+            if head:
+                y += self.GAP_SUBHEAD_BODY
             paint_text(
                 ctx,
                 x,

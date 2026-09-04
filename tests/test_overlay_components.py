@@ -27,7 +27,16 @@ from pycopper.widgets.overlays import (
 
 WINDOW = Constraints.loose(Size(1000, 700))
 
-OVERLAY_KINDS = ["Dialog", "Menu", "MenuItem", "Tooltip", "Snackbar", "BottomSheet", "SideSheet"]
+OVERLAY_KINDS = [
+    "Dialog",
+    "Popover",
+    "Menu",
+    "MenuItem",
+    "Tooltip",
+    "Snackbar",
+    "BottomSheet",
+    "SideSheet",
+]
 
 
 def laid_out(spec: dict, constraints: Constraints = WINDOW):
@@ -429,3 +438,115 @@ def test_docked_sheets_sit_flush_while_floating_overlays_keep_a_margin() -> None
     assert side.origin.x + side.element.size.width == 440.0
     # The snackbar floats clear of the edge instead.
     assert bar.origin.y + bar.element.size.height < 300.0
+
+
+# ---------------------------------------------------------------- popover
+
+
+def test_popover_shrinks_to_fit_a_short_subhead() -> None:
+    """The claim the whole widget rests on: unlike Dialog and Menu, which have
+    an M3-stated MINIMUM and so fill the width they are offered, Popover has
+    only a stated MAXIMUM (320dp) and shrinks to its content. A one-word
+    subhead in a 1000px-wide window must come back far narrower than 320dp,
+    or this is silently behaving like Dialog instead."""
+    element = laid_out({"widget": "Popover", "text": "Hi"})
+    assert element.size.width < 100.0
+
+
+def test_popover_caps_at_the_m3_maximum() -> None:
+    long_body = "word " * 200
+    element = laid_out({"widget": "Popover", "supporting_text": long_body})
+    assert element.size.width == pytest.approx(320.0)
+
+
+def test_an_explicit_width_overrides_shrink_to_fit() -> None:
+    element = laid_out({"widget": "Popover", "text": "Hi", "style": {"width": 200}})
+    assert element.size.width == pytest.approx(200.0)
+
+
+def test_popover_has_a_12dp_corner_radius() -> None:
+    """`shape.corner.medium`, from the condensed spec's Rich Tooltip row --
+    distinct from Dialog's 28dp and Menu's 4dp."""
+    element = laid_out({"widget": "Popover", "text": "Hi"})
+    assert element.effective_radii == (12.0, 12.0, 12.0, 12.0)
+
+
+def test_popover_padding_is_asymmetric() -> None:
+    """'Top padding: 12dp / Bottom padding: 8dp / Left and right padding:
+    16dp' -- not the same value on every side, unlike Dialog's uniform 24dp.
+
+    Checked on the element directly, in element-local coordinates -- painting
+    through a hosted `App` would place the glyph at wherever the overlay host
+    positions the popover on screen, not at an offset from its own padding.
+    """
+    from pycopper.layout import OFFSET_ZERO
+    from pycopper.paint import DisplayList
+    from pycopper.tree.element import PaintContext
+
+    popover = laid_out({"widget": "Popover", "text": "Head"})
+    dl = DisplayList()
+    ctx = PaintContext(display_list=dl, palette=PALETTE, text=popover.text_engine, pixel_ratio=1.0)
+    popover.paint(ctx, OFFSET_ZERO)
+    glyphs = [s for s in dl.view if int(s["flags"][0]) == 1]
+    assert glyphs, "the subhead did not paint"
+    # A small tolerance for the glyph's own left/top bearing -- the pen sits
+    # exactly at the padding, but a glyph's ink does not start exactly there.
+    assert min(float(g["rect"][0]) for g in glyphs) == pytest.approx(16.0, abs=2.0)
+    assert min(float(g["rect"][1]) for g in glyphs) == pytest.approx(12.0, abs=2.0)
+
+
+def test_popover_subhead_and_body_use_on_surface_variant() -> None:
+    """Both text roles in the rich tooltip's colour table -- distinct from
+    Dialog, whose headline is `on_surface`, not the variant."""
+    tokens = tokens_in(painted({"widget": "Popover", "text": "Head", "supporting_text": "Body"}))
+    assert PALETTE.index("on_surface_variant") in tokens
+    assert PALETTE.index("on_surface") not in tokens
+
+
+def test_popover_container_is_surface_container_high() -> None:
+    dl = painted({"widget": "Popover", "text": "x"})
+    assert PALETTE.index("surface_container_high") in tokens_in(dl)
+
+
+def test_popover_places_its_action_row_below_the_text() -> None:
+    """Mirrors Dialog's own actions-below-body layout: an optional single
+    child is the action row, positioned after subhead + body + the gap."""
+    element = laid_out(
+        {
+            "widget": "Popover",
+            "text": "Head",
+            "children": [{"widget": "Button", "text": "Learn more", "style": {"height": 32}}],
+        }
+    )
+    button = element.child
+    assert button is not None
+    assert button.offset.y > 12.0  # below the top padding and the subhead
+
+
+def test_popover_defaults_to_anchor_placement_with_no_anchor_named() -> None:
+    """A Popover with nothing to attach to still resolves to `anchor` --
+    unlike Tooltip, which only implies it once an `anchor:` is actually named.
+    A popover with no anchor centres near the top, the same fallback
+    `_anchored` already gives any anchored overlay whose target is missing."""
+    assert hosted({"widget": "Popover", "text": "x"}).overlays.visible()[0].placement == "anchor"
+
+
+def test_an_anchored_popover_positions_against_its_anchor() -> None:
+    app = hosted(
+        {"widget": "Popover", "text": "Tip", "style": {"anchor": "trigger"}},
+        root_children=[
+            {"name": "trigger", "widget": "Button", "text": "Open", "style": {"height": 40}}
+        ],
+    )
+    trigger = app.root.find("trigger")
+    entry = app.overlays.visible()[0]
+    assert entry.origin.y == pytest.approx(trigger.absolute_rect().bottom + 4.0)
+
+
+def test_a_popover_is_not_modal_and_dismisses_like_a_menu() -> None:
+    """M3's persistent rich tooltip is never scrimmed and dismisses on
+    outside interaction -- the StyleSpec defaults (`modal: False`,
+    `dismissable: True`) are already exactly right and need no override."""
+    element = laid_out({"widget": "Popover", "text": "x"})
+    assert element.style.modal is False
+    assert element.style.dismissable is True

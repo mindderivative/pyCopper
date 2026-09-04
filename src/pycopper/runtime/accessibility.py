@@ -53,6 +53,11 @@ ROLES: Final[dict[str, str]] = {
     "Card": "group",
     "Divider": "separator",
     "Dialog": "dialog",
+    # M3 has no Popover component; its persistent rich tooltip is one in
+    # every behavioural sense but ARIA's own "tooltip" role forbids
+    # interactive content, and a Popover can hold buttons. A non-modal
+    # dialog is the ARIA shape that actually fits.
+    "Popover": "dialog",
     "Menu": "menu",
     "Tooltip": "tooltip",
     "Snackbar": "status",  # "announced ... but don't trap focus"

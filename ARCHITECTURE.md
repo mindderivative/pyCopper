@@ -1544,6 +1544,7 @@ placement, scrim, modality and dismissal. A Dialog does not know it is centred.
 | Widget | M3 spec | Notes |
 |---|---|---|
 | `Dialog` | 28dp radius, 24dp padding, 280–560dp wide, height **dynamic** | headline + `supporting_text` + actions as its child |
+| `Popover` | M3's persistent rich tooltip; 12dp radius, max 320dp, **shrink-to-fit** width | subhead + `supporting_text` + actions as its child; `surface_container_high`; defaults to `placement: anchor` |
 | `Menu` | 4dp radius, 112–280dp wide, 8dp vertical padding | `surface_container` |
 | `MenuItem` | 48dp high, 12dp side padding | denser than `ListItem`'s 56/72/88dp; `supporting_text` is the trailing shortcut |
 | `Tooltip` | 24dp high, 8dp side padding | `inverse_surface` / `inverse_on_surface` |

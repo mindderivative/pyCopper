@@ -81,6 +81,7 @@ class WidgetKind(StrEnum):
     SCROLL_VIEW = "ScrollView"
     TEXT_FIELD = "TextField"
     SHAPE = "Shape"
+    POPOVER = "Popover"
 
 
 class SizeSpec:

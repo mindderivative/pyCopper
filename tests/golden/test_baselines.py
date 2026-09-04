@@ -2105,3 +2105,44 @@ def test_svg_icons_baseline(render_scene, assert_golden, tmp_path) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("svg_icons", np.asarray(engine.canvas.draw()))
+
+
+def test_popover_baseline(render_scene, assert_golden) -> None:
+    """M3's persistent rich tooltip, anchored below a trigger button.
+
+    Proves the whole anatomy at once: shrink-to-fit width (this popover is
+    nowhere near its 320dp maximum), the subhead/body colour split, the
+    action row below the text, and anchor placement flipping the popover
+    below the real trigger rather than centring it -- none of which a
+    property assertion alone can confirm together.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24},
+            "children": [
+                {"name": "trigger", "widget": "Button", "text": "Info", "style": {"width": 80}}
+            ],
+        },
+        "overlays": [
+            {
+                "name": "pop",
+                "widget": "Popover",
+                "text": "New feature",
+                "supporting_text": "Filters now save automatically.",
+                "open": "true",
+                "style": {"anchor": "trigger"},
+                "children": [{"name": "learn", "widget": "Button", "text": "Learn more"}],
+            }
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=280, height=200, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("popover", np.asarray(engine.canvas.draw()))

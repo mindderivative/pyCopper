@@ -968,6 +968,7 @@ scrolls by pixels.
 | Widget | M3 spec |
 |---|---|
 | `Dialog` | 28dp radius, 24dp padding, 280–560dp, height dynamic. |
+| `Popover` | M3's persistent rich tooltip. `text:` (subhead) + `supporting_text:` + an optional child action row. 12dp radius, max 320dp, **shrink-to-fit width** (unlike `Dialog`/`Menu`, no minimum). Defaults to `placement: anchor`. |
 | `Menu` + `MenuItem` | 4dp radius, 112–280dp / 48dp rows. |
 | `Tooltip` | 24dp high, `inverse_surface`. |
 | `Snackbar` | 48dp growing to 64dp; `supporting_text` is the action label. |
