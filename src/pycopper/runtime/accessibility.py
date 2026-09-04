@@ -98,6 +98,12 @@ ROLES: Final[dict[str, str]] = {
     "DockGroup": "tablist",
     "DockPanel": "tabpanel",
     "DockSplit": "separator",  # WAI-ARIA's own Window Splitter pattern
+    # ARIA/HTML5 convention for a canvas element: opaque raster content with
+    # no structure of its own to expose. An application drawing something
+    # that DOES carry meaning names its own better role via `aria_label`-
+    # style metadata once that exists; not modelled today, same gap every
+    # other widget's alt-text story has.
+    "Canvas": "img",
     "SegmentedButton": "radiogroup",  # M3 calls the equivalent a "Radio group"
     "Carousel": "group",
     "CarouselItem": "group",

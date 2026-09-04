@@ -2532,6 +2532,41 @@ def test_dock_baseline(render_scene, assert_golden) -> None:
     assert_golden("dock", np.asarray(engine.canvas.draw()))
 
 
+def test_canvas_baseline(render_scene, assert_golden) -> None:
+    """One `on_paint` handler exercising every primitive at once: a filled
+    rect, a stroked line, a filled circle, a stroked arc, a hexagon, and a
+    label -- proving the whole vocabulary renders, not just that the display
+    list contains the right instance kinds (`test_canvas.py` already checks
+    that at the CPU level with no GPU involved)."""
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Canvas",
+            "style": {"width": 240, "height": 160, "background": "surface_container"},
+            "handlers": {"on_paint": "draw"},
+        }
+    }
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+
+    @app.handler
+    def draw(canvas):
+        canvas.rect(16, 16, 60, 32, color="primary", corner_radius=6)
+        canvas.line(16, 64, 220, 64, thickness=3, color="on_surface_variant")
+        canvas.circle(40, 110, 20, color="tertiary")
+        canvas.arc(100, 110, 20, thickness=4, start=0.0, sweep=4.5, color="secondary")
+        canvas.polygon(160, 90, 40, 40, sides=6, color=(0.9, 0.4, 0.2, 1.0))
+        canvas.text(16, 136, "Canvas", color="on_surface")
+
+    _, engine = render_scene(
+        lambda dl: None, width=240, height=160, theme=Theme(seed=SEED, dark=True)
+    )
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("canvas", np.asarray(engine.canvas.draw()))
+
+
 def test_tree_view_deep_collapse_baseline(render_scene, assert_golden) -> None:
     """A collapsed branch two levels deep, with a genuinely expanded and
     visibly-labelled grandchild inside it.

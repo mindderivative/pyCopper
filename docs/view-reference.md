@@ -955,6 +955,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. |
 | `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |
+| `Canvas` | No M3 component. A freeform drawing surface for an `on_paint` handler — see [Canvas](#canvas) below. |
 
 A selection container carries `value:` naming the selected child by `name`.
 
@@ -998,6 +999,61 @@ the tree while the app is running — is not implemented.** That is a
 substantially larger feature (drop-zone detection, tree mutation, tab
 reordering) than the static layout above, and is deliberately a separate,
 later piece of work rather than a half-built version bundled in here.
+
+### Canvas
+
+`Canvas` is a freeform drawing surface for content a view file can't express
+as data — a live chart, a custom gauge, anything whose shape depends on state
+that changes at runtime. No M3 component exists for it either.
+
+```yaml
+- name: chart
+  widget: Canvas
+  style: {width: expand, height: 200}
+  handlers: {on_paint: drawChart}
+```
+
+```python
+def drawChart(canvas):
+    for i, value in enumerate(readings):
+        x = i * (canvas.size.width / len(readings))
+        canvas.line(x, canvas.size.height, x, canvas.size.height - value, color="primary")
+    canvas.text(4, 4, f"{readings[-1]:.1f}", color="on_surface_variant")
+```
+
+The handler is an ordinary Python function, registered with `@app.handler`
+like any other, and named under `handlers:` the same way — `on_paint` rather
+than a bare `painter:` key, since every handler name is required to start
+with `on_`. It receives one argument, a drawing context, with these methods:
+
+| Method | Draws |
+|---|---|
+| `line(x1, y1, x2, y2, thickness=1, color=...)` | A capsule — a stroked line with round caps. |
+| `rect(x, y, w, h, color=..., corner_radius=0, border_width=0, border_color=None)` | A filled, optionally rounded and bordered rectangle. |
+| `circle(cx, cy, radius, color=...)` | A filled circle. |
+| `arc(cx, cy, radius, thickness=, start=, sweep=, color=...)` | A stroked ring segment — radians, clockwise from 12 o'clock, same as `CircularProgress`. |
+| `polygon(x, y, w, h, sides=, rotation=0, corner_radius=0, color=...)` | A regular polygon, same shape `Shape` draws. |
+| `text(x, y, text, font_size=14, color=..., alignment="start")` | Shaped text. |
+| `measure_text(text, font_size=14) -> Size` | For positioning text before drawing it. |
+
+`color` on every method takes a palette token name (`"primary"`, themed like
+everything else) or a literal `(r, g, b, a)` tuple for data-driven colour that
+has no semantic role to name. All coordinates are logical px relative to the
+canvas's own top-left; `canvas.size` is its current laid-out size. Drawing
+outside that size is clipped.
+
+**The application drives its own repaints.** The handler is an opaque Python
+closure, so the framework only calls it again when this element itself
+repaints — the same as every widget's own `paint_self`. If a chart's data
+changes outside the normal binding path, tell it directly:
+
+```python
+app.root.find("chart").mark_needs_paint()
+```
+
+`image()` is deliberately not offered yet — that waits for the `Image`
+widget itself, so the convention for loading and caching a source is
+designed once rather than invented twice.
 
 ### Collapsing app bars
 

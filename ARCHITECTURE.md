@@ -2550,6 +2550,83 @@ arrow-key step (2% per press, along the split's own axis) comes from; not
 sourced from M3, but a real convention for the exact role this widget
 already reports.
 
+### 5.21 Canvas — `widgets/canvas.py`
+
+No M3 component exists for this either, checked the same way as every other
+ungrounded widget. `Canvas` is the first consumer of two engine primitives
+that had none until now: `DisplayList.add_segment` (§5.15.1, built for
+oriented lines) and the palette-token colour convention every other widget
+already emits through. `add_image`/`ImageAtlas` still has no consumer —
+deliberately: `Canvas.image()` is left unbuilt until the `Image` widget
+itself exists, so the convention for loading, caching and keying a source
+gets designed once rather than reinvented here first and reconciled later.
+
+**Why an imperative callback and not a declarative shape list.** Every other
+widget's content is data a view file states once; `Canvas` exists precisely
+for the content that doesn't hold still long enough to be data — a live
+chart, a custom gauge, a scatter whose count changes every frame. `Shape`
+(§5.12) already covers the static case of one polygon declared once;
+reconciling N of those for something whose N changes at runtime would fight
+the reconciler rather than use it. Flutter's `CustomPainter` and HTML5's
+`<canvas>` both land on the same shape for the same reason: the view names a
+handler, the handler receives a drawing context, and it calls methods on it
+directly. `CanvasElement` follows them rather than inventing a third shape.
+
+**The handler is wired through the existing `handlers:` mechanism with no
+changes to it.** `WidgetSpec` validates every handler key with `on_` — a bare
+`painter:` key would fail that validator, so the handler is named `on_paint`
+instead, resolved by the unmodified `bind_handlers` path exactly like
+`on_click` or `on_change`. The difference is only in who calls it:
+`EventDispatcher._invoke` calls a real handler in response to a dispatched
+`Event`, but there is no event here, so `CanvasElement.paint_self` looks it
+up in `self.handlers` and calls it directly, with one argument — a
+`CanvasContext` — the same one-argument shape every other handler already
+has.
+
+**Only primitives the shader already has a branch for are exposed**: a
+stroked line (`add_segment`), a filled and optionally bordered/rounded box
+(`add_box`), a filled circle (`add_box` with its corner radius at half its
+own size — the same collapse `Shape`'s corner-radius-to-maximum morph
+already relies on), a stroked ring segment (`add_arc`), a regular polygon
+(`add_polygon`), and text (`paint_text`). §12's single-draw-call rule is what
+already ruled out rasterising arbitrary vector paths for `Shape`; the same
+limit applies to a handler-driven surface just as much as a declarative one.
+`CanvasContext`'s coordinates are logical px relative to the canvas's own
+top-left and its own physical-px conversion happens once, inside the
+context, so a handler never touches the pixel ratio — consistent with every
+other widget's `paint_self`. Colour is either a palette token name (themed,
+the vocabulary every other widget uses) or a literal RGBA tuple, for the
+real case of data-driven colour — a chart bar tinted by its value — that has
+no semantic role to name.
+
+**Clipping reuses §5.8.6's fix rather than repeating the bug it fixes.**
+`CanvasElement` computes its own clip by intersecting its rect with whatever
+an ancestor already set — the identical `TreeItemElement`/`DockPanelElement`
+formula, flooring a degenerate intersection to `HIDDEN_EXTENT` rather than
+the literal zero that reads as "unclipped" to `ui.wgsl`'s `clip.z/w > 0.0`
+gate — then hands that already-clipped context to `CanvasContext`, so every
+primitive it emits is clipped to the canvas's own bounds without the handler
+needing to know clipping exists.
+
+**Sizing needed its own concrete fallback, the same lesson `ButtonElement`'s
+`HEIGHT` exists to avoid relearning.** A `Canvas` has no content of its own
+to measure — no label, no children — so with no explicit `width`/`height`
+and no bound from its parent it would otherwise lay out `0×0` and silently
+draw nothing. It fills a bounded parent's available space; failing that, it
+falls back to a fixed `DEFAULT_SIZE` (200dp) rather than collapsing to zero.
+
+**Invalidation is the application's job, not a new API.** The handler is an
+opaque Python closure — the framework cannot know its drawing changed
+without calling it, so it is called exactly when this element itself
+repaints, same as every widget's `paint_self`, and skipped via the ordinary
+paint cache (§6) exactly as often as any other clean subtree is. An
+application whose drawing depends on state outside the normal binding path
+calls `app.root.find(name).mark_needs_paint()` — the same public method
+every element already has.
+
+ARIA has a role for exactly this shape: `Canvas` reports `img`, HTML5's own
+convention for opaque raster content with no structure of its own to expose.
+
 ---
 
 ## 6. Frame Lifecycle

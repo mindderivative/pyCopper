@@ -92,6 +92,7 @@ class WidgetKind(StrEnum):
     DOCK_SPLIT = "DockSplit"
     DOCK_GROUP = "DockGroup"
     DOCK_PANEL = "DockPanel"
+    CANVAS = "Canvas"
 
 
 class SizeSpec:

@@ -775,6 +775,7 @@ class SpacerElement(_StyledMixin, Padding):
 
 def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
+    from . import canvas as cv
     from . import carousel as ca
     from . import dock as dk
     from . import material as m
@@ -826,6 +827,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.CAROUSEL: ca.CarouselElement,
         WidgetKind.CAROUSEL_ITEM: ca.CarouselItemElement,
         WidgetKind.TEXT_FIELD: tf.TextFieldElement,
+        WidgetKind.CANVAS: cv.CanvasElement,
     }
 
 
