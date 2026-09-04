@@ -115,6 +115,12 @@ ROLES: Final[dict[str, str]] = {
     "Carousel": "group",
     "CarouselItem": "group",
     "ScrollView": "group",  # ARIA has no scroll-region role
+    # No M3 component either -- see NodeGraphElement's own docstring for the
+    # same gap. The W3C Graphics-ARIA module defines exactly this shape:
+    # "graphics-document" for a diagram's container, "graphics-object" for
+    # one figure within it -- used directly rather than approximated.
+    "NodeGraph": "graphics-document",
+    "Node": "graphics-object",
     "Container": "group",
     "Row": "group",
     "Column": "group",

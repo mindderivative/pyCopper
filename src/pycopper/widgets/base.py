@@ -793,6 +793,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import image as im
     from . import material as m
     from . import navigation as n
+    from . import nodegraph as ng
     from . import overlays as o
     from . import scroll as sc
     from . import textfield as tf
@@ -844,6 +845,8 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.CANVAS: cv.CanvasElement,
         WidgetKind.IMAGE: im.ImageElement,
         WidgetKind.VIDEO: vd.VideoElement,
+        WidgetKind.NODE_GRAPH: ng.NodeGraphElement,
+        WidgetKind.NODE: ng.NodeElement,
     }
 
 

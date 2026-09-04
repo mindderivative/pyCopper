@@ -95,6 +95,8 @@ class WidgetKind(StrEnum):
     CANVAS = "Canvas"
     IMAGE = "Image"
     VIDEO = "Video"
+    NODE_GRAPH = "NodeGraph"
+    NODE = "Node"
 
 
 class SizeSpec:
@@ -488,6 +490,28 @@ class StyleSpec(_Frozen):
     #: the box, centred within it.
     fit: Literal["contain", "cover", "fill", "none"] = "contain"
 
+    # node graph
+    #: A `Node`'s initial position in its `NodeGraph`'s own world space,
+    #: logical px. Only the starting point -- dragging moves the node from
+    #: here, tracked as runtime state (the same split `value:` and drag-
+    #: driven state already have on every other draggable widget), and a
+    #: reload does not reset a node an author has already moved.
+    x: float = 0.0
+    y: float = 0.0
+
+
+class EdgeSpec(_Frozen):
+    """A drawn connection between two `Node` ports in a `NodeGraph`.
+
+    `source`/`target` rather than `from`/`to` -- `from` is a keyword, and this
+    keeps the pair symmetric with `Identifier`'s existing dotted shape rather
+    than inventing a separate `"node:port"` syntax: each side is
+    `"node.port"`, the node's `name` and one of its `inputs`/`outputs` names.
+    """
+
+    source: Identifier
+    target: Identifier
+
 
 class WidgetSpec(_Frozen):
     #: Positional identity, assigned by the loader from the node's path. Never
@@ -544,6 +568,15 @@ class WidgetSpec(_Frozen):
     #: `Path(__file__).parent`.
     path: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
+    #: A `Node`'s named connection points, drawn on whichever edge a future
+    #: pass decides (left for inputs, right for outputs). Meaningless outside
+    #: `NodeGraph`. Parsed the same way as `classes:` -- a list or a
+    #: space-separated string.
+    inputs: Classes = ()
+    outputs: Classes = ()
+    #: A `NodeGraph`'s statically declared wires between ports, each
+    #: `"node.port"` on both ends. Meaningless outside `NodeGraph`.
+    edges: tuple[EdgeSpec, ...] = ()
     children: tuple[WidgetSpec, ...] = ()
 
     @field_validator("handlers")

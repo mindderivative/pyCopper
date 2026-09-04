@@ -51,6 +51,8 @@ Every node accepts these. Only `widget` is required.
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
 | `path` | string | An `Image`'s file to decode. Templated like `value`. See [Image](#image). |
+| `inputs`, `outputs` | string or list | A `Node`'s named ports. Meaningless outside `NodeGraph`. See [Node graph](#node-graph). |
+| `edges` | list | A `NodeGraph`'s declared wires, each `{source, target}` as `"node.port"`. See [Node graph](#node-graph). |
 | `handlers` | mapping | `on_*` keys to handler names registered in Python. |
 | `children` | list | Child nodes. |
 
@@ -959,6 +961,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. |
 | `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |
 | `Canvas` | No M3 component. A freeform drawing surface for an `on_paint` handler — see [Canvas](#canvas) below. |
+| `NodeGraph` + `Node` | No M3 component. A pannable surface of draggable, wired nodes — see [Node graph](#node-graph) below. |
 
 A selection container carries `value:` naming the selected child by `name`.
 
@@ -1155,6 +1158,57 @@ app.root.find("chart").mark_needs_paint()
 widget itself, so the convention for loading and caching a source is
 designed once rather than invented twice.
 
+### Node graph
+
+`NodeGraph` is a pannable surface of draggable `Node`s wired by declared
+edges — a real interactive editor, not a thin surface an application draws
+into itself the way `Canvas` is. No M3 component exists for either widget.
+
+```yaml
+- name: graph
+  widget: NodeGraph
+  style: {width: expand, height: expand}
+  edges:
+    - {source: source.out, target: sink.in}
+  children:
+    - name: source
+      widget: Node
+      text: Source
+      outputs: out
+      style: {x: 40, y: 40}
+      children: [ ... ]
+    - name: sink
+      widget: Node
+      text: Sink
+      inputs: in
+      style: {x: 280, y: 120}
+      handlers: {on_change: onNodeMoved}
+      children: [ ... ]
+```
+
+`style.x` / `y` is a `Node`'s **initial** world position only — dragging its
+title bar moves it from there, tracked as runtime state the same way a
+`ScrollView`'s scroll offset is, and a reload does not reset a node the user
+has already moved. `inputs` / `outputs` name a node's ports (a string or a
+list, parsed like `classes`), drawn evenly spaced down its left/right edge.
+`edges` on the `NodeGraph` itself declares the wires between them, each
+`source`/`target` a `"node.port"` pair — `source` and `target` rather than
+`from`/`to` because `from` is a Python keyword.
+
+Dragging a node's title bar moves it live and fires `on_change` with its new
+`"x,y"` position once the drag ends; the arrow keys nudge a focused node the
+same way and fire immediately, there being no separate release event for a
+key press. Dragging anywhere else on the surface — wherever no `Node` covers
+it — pans the whole graph, exactly like scrolling a `ScrollView`: a
+paint-time translation, not a relayout.
+
+**There is no zoom.** Scaling would either distort glyph rasterisation (the
+same per-frame-key trap `Icon`'s `icon_fill` axis quantisation exists to
+avoid) or require re-shaping text at a new pixel size on every step, and
+would also need every hit rect scaled to match — a real second feature, not
+a checkbox on this one. Panning and dragging are useful and correct without
+it.
+
 ### Collapsing app bars
 
 A `medium` or `large` app bar shrinks into a small one as its page scrolls,
@@ -1285,6 +1339,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `min`, `max`, `step` | `SpinBox` — bounds and increment; `min`/`max` default to unbounded |
 | `count` | `Pagination` — total number of pages |
 | `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |
+| `x`, `y` | `Node` — initial world position in its `NodeGraph`; see [Node graph](#node-graph) |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |
 
 ---

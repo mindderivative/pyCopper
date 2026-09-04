@@ -2573,6 +2573,50 @@ def test_canvas_baseline(render_scene, assert_golden) -> None:
     assert_golden("canvas", np.asarray(engine.canvas.draw()))
 
 
+def test_nodegraph_baseline(render_scene, assert_golden) -> None:
+    """Two nodes wired by one edge, panned part-way: proves the title bar,
+    port dots, and the edge segment between them all render together, and
+    that the pan offset (`state.scroll`) actually moves what's painted --
+    not just that the display list contains the right instance kinds
+    (`test_nodegraph.py` already checks that at the CPU level)."""
+    from pycopper.layout import Offset
+
+    view = {
+        "root": {
+            "name": "graph",
+            "widget": "NodeGraph",
+            "style": {"width": 320, "height": 200, "background": "surface_container_lowest"},
+            "edges": [{"source": "src.out", "target": "dst.in"}],
+            "children": [
+                {
+                    "name": "src",
+                    "widget": "Node",
+                    "text": "Source",
+                    "outputs": "out",
+                    "style": {"x": 20, "y": 20},
+                },
+                {
+                    "name": "dst",
+                    "widget": "Node",
+                    "text": "Sink",
+                    "inputs": "in",
+                    "style": {"x": 200, "y": 100},
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=200, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.root.state.scroll = Offset(10.0, 5.0)
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("nodegraph", np.asarray(engine.canvas.draw()))
+
+
 def test_image_baseline(render_scene, assert_golden, tmp_path) -> None:
     """A real decoded file sampled through the real texture pipeline --
     `Kind.IMAGE`'s first GPU render. Two placements of the same asymmetric

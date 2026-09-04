@@ -211,6 +211,7 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "Pagination",
         "DockGroup",
         "DockSplit",
+        "Node",
     }
 )
 

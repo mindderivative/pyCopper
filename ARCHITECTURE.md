@@ -1880,7 +1880,11 @@ No widget drew a segment at the time this primitive shipped — Canvas and
 node-graph were still unbuilt, so it shipped as a tested engine primitive
 alone, the way `KIND_BOX` and `KIND_SHADOW` were tested directly in
 `tests/golden/test_primitives.py` before any widget existed at M2. `Canvas`
-(§5.21) is now that consumer, via its `line()` method. `tests/test_segment.py` covers the instance
+(§5.21) was the first consumer, via its `line()` method; `NodeGraph` (§5.24)
+is the second, drawing each declared edge as one segment between two port
+points.
+
+`tests/test_segment.py` covers the instance
 encoding; `tests/golden/test_primitives.py` renders it, including a test that
 specifically distinguishes a round cap from a naively squared-off
 bounding-box cap — a point inside the capsule's true circular cap but outside
@@ -2798,6 +2802,82 @@ the abstract ARIA taxonomy itself defines, and this session could not
 verify the mapping against a live spec rather than recall it. Reports
 `img`, the same opaque-visual-content answer `Canvas`/`Image` already give,
 rather than asserting a name this session could not check.
+
+### 5.24 Node graph — `widgets/nodegraph.py`
+
+No M3 component either, checked directly the way every other ungrounded
+widget this session was. **A real interactive editor, not a thin surface
+an application draws into itself the way `Canvas` is** -- `Node` is a
+composed element with its own child content and its own drag handling,
+chosen over a Canvas-based alternative because panning, dragging, and
+hit-testing all have existing framework mechanisms to reuse rather than
+needing a bespoke region system built on top of one opaque paint handler.
+
+**Panning reuses `ScrollView`'s mechanism exactly (§5.14): `child_origin`
+returns `absolute - state.scroll`.** Panning is a paint-time translation,
+not a relayout, for the identical reason scrolling is -- Python is the
+bottleneck (§12), and a relayout per pan delta would be visible. There is
+no zoom. Scaling would either distort glyph rasterisation -- the same
+per-frame-key atlas-thrashing trap `Icon`'s `icon_fill` axis quantisation
+exists to avoid (§5.7) -- or force re-shaping text at a new pixel size on
+every step, and would also need every hit rect scaled to match. That is a
+real second feature, not a checkbox on this one, so v1 stops at pan and
+drag, both useful and correct without it.
+
+**A node's position is runtime state, not the spec.** `StyleSpec.x`/`y`
+give a `Node`'s starting point only; `NodeElement.position` reads them into
+`state.data` once and never again, the same split `ScrollView.state.scroll`
+already makes between an author's declared value and the runtime's own. A
+reload that reconciles the same `x`/`y` back in therefore does not reset a
+node the user has already dragged, because `configure()` never touches
+`state.data`.
+
+**No special-case region hit-testing for dragging.** A `Node`'s title bar
+is part of its own painted area, not a separate child element, so a press
+there is simply a press on the `Node` element itself; `on_pointer_down`
+checks the point against its own title-bar rect (`DockSplit._on_divider`'s
+own pattern, §5.20) before starting a drag, so a press on the node's
+content is left alone for whatever widget is actually there. The one place
+this needed a genuine fix rather than falling out for free: a native
+handler runs on the way up only, never during capture
+(`EventDispatcher._invoke`, §5.9), so a press anywhere inside a `Node` --
+content included -- bubbles through it to `NodeGraph` next. `NodeGraph.
+on_pointer_down` therefore checks `event.target is self` before starting a
+pan, rather than assuming "reached me" already means "missed every node" --
+reading the dispatcher's own already-computed hit-test result, not running
+a second one.
+
+**Edges are declared, not drawn.** `WidgetSpec.edges` is a tuple of
+`EdgeSpec(source, target)` -- `source`/`target` rather than `from`/`to`
+because `from` is a Python keyword -- each a `"node.port"` pair reusing
+`Identifier`'s existing dotted-name pattern verbatim rather than inventing
+a second syntax for the same shape. `NodeGraph.paint_self` resolves each
+edge to two points and draws one `add_segment` (§5.15.1) between them,
+after its own background and before its children paint, so every node sits
+visually on top of the wires touching it. A port's position along its
+node's edge is evenly spaced by its index among that side's `inputs`/
+`outputs` list -- not sourced from anywhere, since there is nothing to
+source it from, but the ordinary node-editor convention. An edge naming a
+node or port that does not exist is silently skipped rather than raising,
+consistent with a declarative view file describing what *should* connect
+without the loader needing to re-validate cross-references at parse time.
+
+`inputs`/`outputs` reuse the existing `Classes` annotated type verbatim --
+the same `BeforeValidator(_parse_classes)` a view's `classes:` field
+already uses to accept either a list or a space-separated string -- since
+a port-name list is the identical shape with no reason to parse it twice.
+
+`FOCUSABLE_KINDS` gains `Node`, and its arrow keys nudge the focused node
+by a fixed step and fire `on_change` immediately, mirroring `DockSplit`'s
+own keyboard-driven affordance (§5.20) -- there being no separate release
+event for a key press the way there is for a pointer drag, `on_change`
+there fires only once the drag actually ends.
+
+ARIA has no node-graph role either. The W3C Graphics-ARIA module defines
+exactly this shape, though: `"graphics-document"` for a diagram's own
+container, `"graphics-object"` for one figure within it -- used directly
+rather than approximated, unlike `Canvas`/`Image`/`Video`'s shared `"img"`
+fallback where no closer role exists at all.
 
 ---
 
