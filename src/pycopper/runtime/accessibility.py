@@ -104,6 +104,7 @@ ROLES: Final[dict[str, str]] = {
     # style metadata once that exists; not modelled today, same gap every
     # other widget's alt-text story has.
     "Canvas": "img",
+    "Image": "img",
     "SegmentedButton": "radiogroup",  # M3 calls the equivalent a "Radio group"
     "Carousel": "group",
     "CarouselItem": "group",

@@ -50,6 +50,7 @@ Every node accepts these. Only `widget` is required.
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
+| `path` | string | An `Image`'s file to decode. Templated like `value`. See [Image](#image). |
 | `handlers` | mapping | `on_*` keys to handler names registered in Python. |
 | `children` | list | Child nodes. |
 
@@ -77,7 +78,7 @@ meaningless; for anything holding focus, scroll, or text, give it a name.
 
 ## Bindings
 
-`text`, `value`, `open`, and `supporting_text` accept `{{ expression }}`
+`text`, `value`, `open`, `supporting_text`, and `path` accept `{{ expression }}`
 templates evaluated against signals exposed from Python:
 
 ```yaml
@@ -920,6 +921,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | `Icon` | Material Symbols. Name goes in `text:`; `icon_size`, `icon_fill`, `icon_weight`. |
 | `Divider` | 1dp `outline_variant`. `full_bleed` / `inset`. |
 | `Shape` | A regular polygon: `sides`, `rotation`, `corner_radius`, `background`, `border`. 48dp unless sized. Drawn as a distance field, not a rasterised path, so every one of those is **free to animate**. |
+| `Image` | A decoded raster image. `path:` names the file; `style: {fit}` controls how it fills a differently-shaped box. No M3 component — see [Image](#image) below. |
 
 ### Buttons and controls
 
@@ -999,6 +1001,55 @@ the tree while the app is running — is not implemented.** That is a
 substantially larger feature (drop-zone detection, tree mutation, tab
 reordering) than the static layout above, and is deliberately a separate,
 later piece of work rather than a half-built version bundled in here.
+
+### Image
+
+`Image` decodes a raster file and draws it as one instance. No M3 component
+exists for this either — images only ever appear as content *inside* other
+components (Carousel, Cards), never with an anatomy of their own.
+
+```yaml
+- name: avatar
+  widget: Image
+  path: "{{ avatar_path.get() }}"
+  style: {width: 48, height: 48, corner_radius: 24, fit: cover}
+```
+
+`path:` is templated like `value:`, so a signal can swap the picture at
+runtime. It is **not** `source:` — that key already means "splice in a view
+fragment from another file" (`spec/include.py` acts on it before Pydantic
+ever sees the node), so a widget field reusing it would be silently
+swallowed as an include rather than reaching `Image` at all. `path:` is
+resolved exactly the way a running process resolves any other filesystem
+path: absolute as given, relative to the working directory otherwise — **not**
+relative to the view file the way a `source:` include is confined. An
+application wanting a view-relative path resolves it itself, e.g. from
+`Path(__file__).parent`.
+
+With no `width`/`height`, `Image` reports the decoded picture's own pixel
+size as its logical size (one image pixel, one logical pixel) — it has real
+intrinsic content, unlike `Canvas`. An axis the view does size always wins.
+
+`style: {fit}` controls how the picture fills a box whose aspect ratio
+differs from its own, the same vocabulary CSS's `object-fit` uses since M3
+states none:
+
+| `fit` | Behaviour |
+|---|---|
+| `contain` (default) | Scales to fit entirely inside the box, preserving aspect ratio. Never crops, may letterbox. |
+| `cover` | Scales to fill the box entirely, preserving aspect ratio. Never letterboxes, crops the overflow. |
+| `fill` | Stretches to the box exactly. Distorts if the ratios differ. |
+| `none` | Draws at its own natural size, centred in the box, regardless of the box's size. |
+
+`corner_radius` rounds the picture's own visible corners, not just a
+container around it. **There is no `color:` tint** — `Kind.IMAGE` has no
+palette-token slot in the shader, the way `Shape`/`Icon`/text glyphs do, so
+baking a literal tint would silently stop re-theming on a live palette
+swap. An application wanting a tinted picture composites it before decoding.
+
+A missing file or a decode failure is logged to stderr and treated as
+"nothing to draw" rather than raised, so one bad asset reference does not
+crash the whole frame.
 
 ### Canvas
 
@@ -1184,6 +1235,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
 | `min`, `max`, `step` | `SpinBox` — bounds and increment; `min`/`max` default to unbounded |
 | `count` | `Pagination` — total number of pages |
+| `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |
 
 ---

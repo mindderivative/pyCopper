@@ -19,6 +19,7 @@ import wgpu
 from ..config import Settings
 from ..paint import DisplayList
 from ..render import UIPipeline
+from ..render.atlas import ImageAtlas
 from ..text import TextEngine
 from ..theme import Palette, Theme
 from .clipboard import GlfwClipboard, clipboard
@@ -79,6 +80,9 @@ class Engine:
 
         self.text = TextEngine(self.device)
         self.pipeline.bind_glyph_atlas(self.text.atlas.texture)
+
+        self.images = ImageAtlas(self.device)
+        self.pipeline.bind_image_atlas(self.images.texture)
 
         #: Fills the display list each frame. M3 replaces this with a walk of
         #: the element tree; until then it is the way to draw anything.
@@ -233,6 +237,7 @@ class Engine:
         # New glyphs may have been packed during paint; push them before the
         # draw that samples them.
         self.text.atlas.upload()
+        self.images.upload()
 
         width, height = self.canvas.get_physical_size()
         self.pipeline.upload_globals(width, height, self.pixel_ratio)
@@ -274,6 +279,8 @@ class Engine:
             del self.context
         if getattr(self, "text", None) is not None:
             self.text.atlas.destroy()
+        if getattr(self, "images", None) is not None:
+            self.images.destroy()
         pipeline = getattr(self, "pipeline", None)
         if pipeline is not None:
             pipeline.destroy()

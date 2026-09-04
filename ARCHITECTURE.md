@@ -2627,6 +2627,110 @@ every element already has.
 ARIA has a role for exactly this shape: `Canvas` reports `img`, HTML5's own
 convention for opaque raster content with no structure of its own to expose.
 
+### 5.22 Image — `widgets/image.py`
+
+No M3 component either — images only ever appear as content *inside* other
+components (Carousel, Cards), never with an anatomy of their own. The second
+consumer of an engine prerequisite left dormant since it was built:
+`DisplayList.add_image` (`Kind.IMAGE`) and `ImageAtlas` (skyline-packed,
+decode-agnostic, built alongside `bind_image_atlas`) both had zero callers
+before this widget.
+
+**Wiring the atlas into the engine took more than adding a widget class.**
+`ImageAtlas`'s own docstring was explicit that nothing had done this yet:
+"a widget that draws images should own an `ImageAtlas` the way `TextEngine`
+owns a `GlyphAtlas`." That meant mirroring the text pipeline's plumbing
+exactly, at every layer `GlyphAtlas` already touches:
+
+- `Engine.__init__` owns a device-bound `ImageAtlas` and binds it to the
+  pipeline's already-existing placeholder slot (`bind_image_atlas`, dormant
+  since the atlas-packing milestone); `Engine._upload` uploads it every
+  frame alongside the glyph atlas; `Engine.close` destroys it.
+- `App` owns a CPU-only `ImageAtlas`, promotes it to the device in `attach`
+  the same way it promotes `TextEngine`, and re-propagates it in `reload`
+  (hot reload rebuilds `self.root`, so a stale reference would silently
+  fall back to the process-wide default atlas otherwise).
+- `PaintContext` gained an `images: ImageAtlas` field (`default_image_atlas`
+  mirrors `default_text_engine`'s process-wide CPU-only singleton, for
+  measuring an `Image` in a unit test with no App standing behind it).
+- `ElementMixin` gained `image_atlas`/`set_image_atlas`, mirroring
+  `text_engine`/`set_text_engine` exactly — and for the identical reason:
+  `perform_layout` receives only `Constraints`, no `PaintContext`, so
+  `Image` needs an atlas reachable *without* one to learn a decoded image's
+  natural size during layout, not only to sample it during paint.
+
+**Fixed a real, if latent, circular import while wiring this in.**
+`render/atlas.py` imported `Face`/`GlyphBitmap` from `text.font` for type
+annotations only; `text/__init__.py` imports `GlyphAtlas` back from
+`render.atlas`. This was already a cycle, silently surviving only because
+nothing had imported `render.atlas` before `text` finished loading first.
+Adding `from ..render.atlas import ImageAtlas` to `runtime/engine.py`
+changed which side loaded first and made it a real `ImportError`. Fixed at
+the source rather than by reordering imports to keep tripping the same
+latent wire: `Face`/`GlyphBitmap` moved under `TYPE_CHECKING` in
+`render/atlas.py`, which costs nothing since `from __future__ import
+annotations` already makes every annotation a string there.
+
+**`path:`, not `source:`.** `source:` is already view-*composition* syntax —
+`spec/include.py` walks the raw YAML and splices in a fragment wherever it
+finds that key, before Pydantic ever validates a node. A widget field
+reusing the name would be silently swallowed as an include attempt rather
+than reaching `WidgetSpec` at all. `path:` is a new templated field on
+`WidgetSpec`, added to `ElementMixin`'s existing `_text`/`_value`/`_open`/
+`_disabled`/`_error` binding list (`init_element`, `update_spec`, `bind`'s
+`bound` list) the same way `disabled:` was added after the fact — so
+`path: "{{ avatar.get() }}"` swaps the decoded picture when a signal
+changes. It resolves the way a running process resolves any filesystem
+path (absolute as given, relative to the working directory otherwise) —
+deliberately **not** relative to the view file the way a `source:` include
+is confined, since threading the view root through to arbitrary widget
+paint time would be a substantially larger plumbing change than one widget
+justifies; an application wanting that resolves the path itself.
+
+**Sizing has real intrinsic content, unlike `Canvas`.** With no explicit
+`width`/`height`, `perform_layout` reports the decoded image's own pixel
+dimensions (one image px, one logical px) as its preferred size and lets
+`outer.constrain(natural)` do the rest — the same one-line shape every
+widget with an intrinsic size already uses, `Shape` included. An axis the
+view did size wins outright, because `sized()` already made that axis tight
+before `constrain` ever sees it; no cross-axis aspect coupling was added for
+the case of only one axis being explicit — every other axis in this layout
+system is decided independently, and inventing a coupling for one widget
+would be a wrinkle nothing else has.
+
+**`fit` is CSS's `object-fit` vocabulary, not an M3 one.** `contain`
+(default), `cover`, `fill`, `none` — the standard four, chosen because M3
+states nothing here at all and this is a widely understood convention to
+reach for instead. `contain`/`none` can leave part of the box uncovered,
+which is why `ImageElement.paint_self` calls the inherited background/
+border/shadow painter first: a letterboxed image over an explicit
+`background:` shows that colour in the gap, the same layering `Canvas` uses
+for the same reason. Only `cover` crops, and it crops the *source* — the UV
+rect narrows symmetrically rather than the destination rect shrinking,
+so no extra geometry is needed for the cropped part to simply not be
+sampled. The math (`_fit_image`) is a pure function taking a box, a natural
+size, and a UV rect, independently unit-testable with no GPU and no App.
+
+**No tint.** `Kind.IMAGE`'s shader branch has no palette-token slot — only
+`Shape`/`Icon`/glyphs do, because each of those clears its own atlas key on
+every colour-affecting parameter change, which an already-decoded image has
+no equivalent hook for. Baking a literal tint from `ctx.palette.linear(...)`
+would silently stop re-theming on a live palette swap, which is exactly what
+§2's "emit tokens, not colours" rule exists to prevent — so `color:` is not
+read at all; `opacity:` still reaches the instance's tint alpha, since that
+is not a colour choice.
+
+**A bad `path:` degrades to nothing rather than crashing a frame.** Decoding
+happens lazily, inside `_entry()`, cached per resolved `Path` on the element
+itself (comparing against the last-resolved key, not re-decoding every
+layout). A missing file or a decode failure raises inside that cache
+boundary, is logged to stderr once, and is remembered as "nothing to draw"
+until `path:` changes to something that decodes — the same reasoning
+`reload_errors` already applies to a broken hot reload: a bad asset
+reference should degrade visibly, not take the whole frame down with it.
+
+ARIA reports `img` here too, HTML5's own convention, same as `Canvas`.
+
 ---
 
 ## 6. Frame Lifecycle

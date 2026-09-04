@@ -778,6 +778,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import canvas as cv
     from . import carousel as ca
     from . import dock as dk
+    from . import image as im
     from . import material as m
     from . import navigation as n
     from . import overlays as o
@@ -828,6 +829,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.CAROUSEL_ITEM: ca.CarouselItemElement,
         WidgetKind.TEXT_FIELD: tf.TextFieldElement,
         WidgetKind.CANVAS: cv.CanvasElement,
+        WidgetKind.IMAGE: im.ImageElement,
     }
 
 

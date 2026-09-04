@@ -15,6 +15,7 @@ from .config import Settings
 from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
 from .motion import Ticker
 from .paint import DisplayList
+from .render.atlas import ImageAtlas
 from .runtime.accessibility import AccessibleNode, Bridge, accessibility_tree
 from .runtime.engine import Engine
 from .runtime.events import Event, EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
@@ -63,6 +64,9 @@ class App:
 
         self.text = TextEngine()
         self.root.set_text_engine(self.text)
+
+        self.images = ImageAtlas()
+        self.root.set_image_atlas(self.images)
 
         self.motion = Ticker(reduce_motion=self.settings.reduce_motion)
         self.root.set_ticker(self.motion)
@@ -217,6 +221,7 @@ class App:
         self.view = new_view
         self.root.attach(self.layout_owner)
         self.root.set_text_engine(self.text)
+        self.root.set_image_atlas(self.images)
         self.dispatcher.root = self.root
         if self._mounted:
             self.mount()
@@ -267,6 +272,7 @@ class App:
             display_list=display_list,
             palette=self.palette,
             text=self.text,
+            images=self.images,
             pixel_ratio=self.engine.pixel_ratio if self.engine else 1.0,
         )
         self.root.paint(ctx, OFFSET_ZERO)
@@ -351,6 +357,9 @@ class App:
         self.text.attach_device(engine.device)
         engine.text = self.text
         engine.pipeline.bind_glyph_atlas(self.text.atlas.texture)
+        self.images.attach_device(engine.device)
+        engine.images = self.images
+        engine.pipeline.bind_image_atlas(self.images.texture)
         engine.palette = self.palette
         engine.painter = self.paint
         engine.canvas.add_event_handler(self._on_canvas_event, "*")

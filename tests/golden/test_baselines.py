@@ -2567,6 +2567,53 @@ def test_canvas_baseline(render_scene, assert_golden) -> None:
     assert_golden("canvas", np.asarray(engine.canvas.draw()))
 
 
+def test_image_baseline(render_scene, assert_golden, tmp_path) -> None:
+    """A real decoded file sampled through the real texture pipeline --
+    `Kind.IMAGE`'s first GPU render. Two placements of the same asymmetric
+    source (left half red, right half blue) at each `fit` that can crop or
+    letterbox, so a wrong UV crop or a wrong destination rect both show up
+    as visibly wrong colour placement, not just an instance count."""
+    import numpy as np
+    from PIL import Image as PILImage
+
+    source = np.zeros((40, 80, 4), dtype=np.uint8)
+    source[:, :40] = (200, 60, 60, 255)
+    source[:, 40:] = (60, 90, 200, 255)
+    png = tmp_path / "split.png"
+    PILImage.fromarray(source, "RGBA").save(png)
+
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Row",
+            "style": {"spacing": 16, "padding": 16, "background": "surface"},
+            "children": [
+                {
+                    "name": "contain",
+                    "widget": "Image",
+                    "path": str(png),
+                    "style": {"width": 100, "height": 100, "fit": "contain"},
+                },
+                {
+                    "name": "cover",
+                    "widget": "Image",
+                    "path": str(png),
+                    "style": {"width": 100, "height": 100, "fit": "cover", "corner_radius": 12},
+                },
+            ],
+        }
+    }
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    _, engine = render_scene(
+        lambda dl: None, width=232, height=132, theme=Theme(seed=SEED, dark=True)
+    )
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("image", np.asarray(engine.canvas.draw()))
+
+
 def test_tree_view_deep_collapse_baseline(render_scene, assert_golden) -> None:
     """A collapsed branch two levels deep, with a genuinely expanded and
     visibly-labelled grandchild inside it.

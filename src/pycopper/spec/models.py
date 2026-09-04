@@ -93,6 +93,7 @@ class WidgetKind(StrEnum):
     DOCK_GROUP = "DockGroup"
     DOCK_PANEL = "DockPanel"
     CANVAS = "Canvas"
+    IMAGE = "Image"
 
 
 class SizeSpec:
@@ -467,6 +468,16 @@ class StyleSpec(_Frozen):
     #: easier to reason about than 0.5236.
     rotation: float = 0.0
 
+    # images
+    #: How an `Image` fills a box whose aspect ratio differs from its own,
+    #: CSS's `object-fit` vocabulary since M3 states none. `contain` (the
+    #: default) never crops and never distorts -- the least surprising choice
+    #: for a widget with no M3 anatomy to say otherwise. `cover` crops to
+    #: fill; `fill` stretches to the box exactly, distorting if the ratios
+    #: differ; `none` draws at the image's own natural size regardless of
+    #: the box, centred within it.
+    fit: Literal["contain", "cover", "fill", "none"] = "contain"
+
 
 class WidgetSpec(_Frozen):
     #: Positional identity, assigned by the loader from the node's path. Never
@@ -510,6 +521,18 @@ class WidgetSpec(_Frozen):
     #: colours and a view should be able to drive it from validation rather
     #: than restyle it. Only `TextField` reads it.
     error: str | None = None
+    #: An `Image`'s file to decode and display. Templated like `value:`, so
+    #: `path: "{{ avatar.get() }}"` swaps the picture when a signal changes.
+    #: **Not** `source:` -- that key is already view-*composition* syntax
+    #: (`spec/include.py` splices in a fragment wherever it sees one, before
+    #: Pydantic ever runs), so a widget field reusing it would be silently
+    #: swallowed as an include rather than reaching this model at all.
+    #: Resolved exactly as a running process resolves any other path --
+    #: absolute as given, relative to the working directory otherwise --
+    #: **not** relative to the view file the way `source:` includes are; an
+    #: application wanting that computes the path itself, e.g. from
+    #: `Path(__file__).parent`.
+    path: str | None = None
     handlers: dict[str, str] = Field(default_factory=dict)
     children: tuple[WidgetSpec, ...] = ()
 
@@ -539,6 +562,9 @@ class WidgetSpec(_Frozen):
 
     def supporting_template(self) -> Template | None:
         return Template(self.supporting_text) if self.supporting_text is not None else None
+
+    def path_template(self) -> Template | None:
+        return Template(self.path) if self.path is not None else None
 
     def walk(self) -> Any:
         yield self

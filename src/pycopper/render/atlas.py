@@ -22,11 +22,18 @@ from __future__ import annotations
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import numpy as np
 
-from ..text.font import Face, GlyphBitmap
+if TYPE_CHECKING:
+    # Deferred: `text` imports `GlyphAtlas` from this module, so importing
+    # `text.font` back at module load time is a real cycle, not just a slow
+    # one -- whichever side loads first finds the other mid-initialization.
+    # `Face`/`GlyphBitmap` are used only as parameter annotations here, and
+    # `from __future__ import annotations` already makes every annotation a
+    # string, so deferring the import to type-checking time costs nothing.
+    from ..text.font import Face, GlyphBitmap
 
 __all__ = [
     "AtlasEntry",

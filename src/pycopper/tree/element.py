@@ -24,6 +24,7 @@ from ..layout import EDGE_ZERO, OFFSET_ZERO, EdgeInsets, Offset, Rect
 from ..motion import Animation, Ticker, default_ticker
 from ..paint import NO_TOKEN, DisplayList
 from ..paint.display_list import Kind
+from ..render.atlas import ImageAtlas
 from ..runtime.signals import Effect
 from ..spec import StyleSpec, Template, WidgetSpec
 from ..text import TextEngine
@@ -59,6 +60,22 @@ def default_text_engine() -> TextEngine:
     return _DEFAULT_TEXT
 
 
+_DEFAULT_IMAGES: ImageAtlas | None = None
+
+
+def default_image_atlas() -> ImageAtlas:
+    """Process-wide CPU-only atlas for elements built outside an App.
+
+    Mirrors `default_text_engine` exactly, for the same reason: `Image` can
+    be laid out and painted (into a CPU-only `DisplayList`) in a unit test
+    with no device and no App standing behind it.
+    """
+    global _DEFAULT_IMAGES
+    if _DEFAULT_IMAGES is None:
+        _DEFAULT_IMAGES = ImageAtlas()
+    return _DEFAULT_IMAGES
+
+
 @dataclass(slots=True)
 class WidgetState:
     """Runtime state. Survives hot reload; the Spec never holds any of this."""
@@ -81,6 +98,7 @@ class PaintContext:
     display_list: DisplayList
     palette: Palette
     text: TextEngine = field(default_factory=default_text_engine)
+    images: ImageAtlas = field(default_factory=default_image_atlas)
     pixel_ratio: float = 1.0
     clip: tuple[float, float, float, float] = _NO_CLIP
     clip_radii: tuple[float, float, float, float] = _NO_CLIP
@@ -196,6 +214,8 @@ class ElementMixin:
     _disabled: str
     _error_template: Template | None
     _error: str
+    _path_template: Template | None
+    _path: str
     _cached: np.ndarray | None
     #: Everything the cached slice was built from. Compared whole, because a
     #: cached slice holds *resolved physical geometry* -- if any of these
@@ -204,6 +224,7 @@ class ElementMixin:
     _cached_key: tuple[Any, ...] | None
     _needs_paint: bool
     _text_engine: TextEngine | None
+    _image_atlas: ImageAtlas | None
     _ticker: Ticker | None
     _animations: dict[str, Animation]
     _hit_overflow: float
@@ -229,6 +250,8 @@ class ElementMixin:
         self._disabled = spec.disabled or ""
         self._error_template = spec.error_template()
         self._error = spec.error or ""
+        self._path_template = spec.path_template()
+        self._path = spec.path or ""
         self._cached = None
         self._cached_key = None
         #: Bounding box of everything this subtree actually painted, in
@@ -247,6 +270,7 @@ class ElementMixin:
         self._extent_partial = False
         self._needs_paint = True
         self._text_engine = None
+        self._image_atlas = None
         self._ticker = None
         #: Named animations owned by this element. They survive `update_spec`
         #: with the rest of the runtime state, so a hot reload does not restart
@@ -282,6 +306,9 @@ class ElementMixin:
         self._error_template = spec.error_template()
         if self._error_template is None or self._error_template.is_static:
             self._error = spec.error or ""
+        self._path_template = spec.path_template()
+        if self._path_template is None or self._path_template.is_static:
+            self._path = spec.path or ""
         self.configure()
         self.mark_needs_layout()
 
@@ -299,6 +326,24 @@ class ElementMixin:
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.set_text_engine(engine)
+
+    @property
+    def image_atlas(self) -> ImageAtlas:
+        """The atlas used to decode and pack images during layout and paint.
+
+        Mirrors `text_engine` exactly, and for the same reason: `Image` needs
+        an atlas to learn a decoded image's natural size during layout, not
+        only to sample it during paint -- `perform_layout` has no
+        `PaintContext` to reach `ctx.images` through, the same gap
+        `text_engine` exists to close for `measure_text`.
+        """
+        return self._image_atlas if self._image_atlas is not None else default_image_atlas()
+
+    def set_image_atlas(self, atlas: ImageAtlas) -> None:
+        self._image_atlas = atlas
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.set_image_atlas(atlas)
 
     # -------------------------------------------------------------- motion
 
@@ -454,6 +499,11 @@ class ElementMixin:
         return self._supporting
 
     @property
+    def path(self) -> str:
+        """Rendered `path` binding -- the file an `Image` decodes and shows."""
+        return self._path
+
+    @property
     def selected(self) -> bool:
         """Whether a parent container has marked this item as the active one.
 
@@ -522,6 +572,7 @@ class ElementMixin:
                 ("_open", self._open_template),
                 ("_disabled", self._disabled_template),
                 ("_error", self._error_template),
+                ("_path", self._path_template),
             )
             if tpl is not None and not tpl.is_static
         ]

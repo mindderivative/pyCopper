@@ -40,6 +40,7 @@ EMPTY_IS_HONEST = {
     "Text": "no text is no ink -- it keeps a line's height and no width",
     "Link": "no label is nothing to underline either -- there is nothing to draw",
     "DockPanel": "a box around nothing, same as Container -- it has no content",
+    "Image": "no path is no picture -- there is nothing to decode or to size",
 }
 
 
