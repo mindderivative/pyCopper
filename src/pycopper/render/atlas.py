@@ -481,6 +481,37 @@ class ImageAtlas:
             return entry
         return self.add(key, loader())
 
+    def update(self, key: ImageKey, rgba: np.ndarray) -> ImageEntry:
+        """Overwrite *key*'s pixels in place when its shape hasn't changed;
+        pack it fresh via `add` otherwise.
+
+        `add` always allocates a new rectangle, which is right for "this
+        source decoded to a different image" but wrong for a live video
+        frame arriving 30-60 times a second at the same resolution: going
+        through the packer every call would churn allocations (and
+        eventually force a wholesale reset) for pixels that were only ever
+        going to land in the same slot. A same-shape overwrite is one numpy
+        slice write and touches neither the packer nor the cache dict.
+
+        Falls back to `add` on a genuine miss, a stale generation (the atlas
+        was reset since this key was packed), or a size change -- a decoder
+        renegotiating resolution mid-stream is exactly "a different image."
+        """
+        rgba = np.asarray(rgba)
+        if rgba.ndim != 3 or rgba.shape[2] != 4:
+            raise ValueError(f"expected an (h, w, 4) RGBA array, got shape {rgba.shape}")
+        if rgba.dtype != np.uint8:
+            raise ValueError(f"expected uint8, got {rgba.dtype}")
+
+        entry = self._cache.get(key)
+        h, w = rgba.shape[:2]
+        same_shape = entry is not None and (entry.width, entry.height) == (w, h)
+        if entry is not None and entry.generation == self._generation and same_shape:
+            self._pixels[entry.y : entry.y + h, entry.x : entry.x + w] = rgba
+            self._dirty = True
+            return entry
+        return self.add(key, rgba)
+
     # ------------------------------------------------------------ GPU side
 
     @property

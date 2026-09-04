@@ -967,13 +967,15 @@ a common parent over that difference buys an abstraction for its own sake.
 default 1024² size costs 4× the VRAM: 4 MiB against 1 MiB. Stated rather than
 left to be found by a memory profiler.
 
-**Not wired into `Engine` or `App`.** No widget yet calls `add` — `Image`,
-`Video` and `Canvas` are still backlog — and allocating a real texture
-unconditionally would cost every application 4 MiB for a feature it cannot
-reach. `UIPipeline.bind_image_atlas` exists and is tested end-to-end
-(`tests/golden/test_primitives.py`), the same seam `bind_glyph_atlas` was
-before real text existed at M4, but nothing calls it yet outside the test that
-proves it works.
+**Now wired into `Engine` and `App`, mirroring `TextEngine`/`GlyphAtlas`
+exactly** (§5.22): `Engine` owns a device-bound instance bound to
+`UIPipeline.bind_image_atlas` at construction and uploaded every frame;
+`App` owns a CPU-only one, promoted to the device in `attach`. `Image`
+(§5.22) calls `add`/`get_or_add` once per decoded file; `Video` (§5.23)
+calls the later-added `update` every pushed frame instead, to avoid
+thrashing the packer at frame rate; `Canvas` (§5.21) deliberately does
+**not** call any of them — `image()` was left unbuilt there so this
+convention got designed once, by `Image`, rather than twice.
 
 **The atlas texture must declare `rgba8unorm-srgb`, and that is not a style
 choice.** An image from a decoder is sRGB-encoded bytes, the same as
@@ -2730,6 +2732,69 @@ until `path:` changes to something that decodes — the same reasoning
 reference should degrade visibly, not take the whole frame down with it.
 
 ARIA reports `img` here too, HTML5's own convention, same as `Canvas`.
+
+### 5.23 Video — `widgets/video.py`
+
+No M3 component either. Unlike every other widget this session, this one
+is not a case of "no anatomy exists" alone -- pyCopper has no codec
+dependency at all (Pillow decodes still images; nothing decodes
+`.mp4`/`.webm`), and adding one, realistically PyAV wrapping FFmpeg, would
+mean taking on its install size and licensing considerations for every
+application, not just the ones that show video. Put to the user directly
+rather than assumed: **`Video` is a frame sink.** The application decodes
+however it likes and calls `push_frame(rgba)`; this widget owns only
+displaying whatever the latest one was.
+
+**The only addition below the widget layer was `ImageAtlas.update`.**
+`ImageAtlas.add` always allocates a fresh rectangle through the skyline
+packer -- correct for "this source decoded to a different picture," wrong
+for a stream arriving 30-60 times a second at the same resolution, which
+would churn the packer's own bookkeeping for pixels that were only ever
+going to land back in the same slot and eventually force a wholesale
+eviction for no reason. `update` overwrites an existing entry's pixels in
+place with one numpy slice write when the shape still matches, and falls
+back to `add` on a genuine miss, a stale generation (the atlas was reset
+since), or a size change -- a decoder renegotiating resolution mid-stream
+is exactly "a different image." Everything else was already in place: no
+new texture slot, no shader change, no exception to the single-draw-call
+model. A video frame is one `Kind.IMAGE` instance sampling the same
+`image_atlas` every `Image` on screen already does -- confirmed by a golden
+that pushes a stale grey frame, renders once, pushes a live green/yellow
+one at the same shape, and asserts the second frame's colours: if the
+in-place overwrite or the per-frame `Engine._upload` were wrong, the stale
+frame's grey would be what showed instead.
+
+**Each `VideoElement` gets its own atlas key, not a spec-derived one.**
+`id`/`name` identify a *position* in the tree, not the object; keying on
+`object()` created once in `__init__` ties the slot to this specific
+instance, which is exactly what reconciliation preserves across an
+ordinary update (the same instance keeps calling `push_frame` on the same
+key). A `Video` that is genuinely removed and replaced orphans its old
+region until the atlas next resets -- a real, minor cost, the same shape as
+any atlas key nobody explicitly evicts, not treated as a defect to solve
+now.
+
+**No decode-adjacent state lives on the widget.** No `value:` for
+play/pause, no scrub bar, no clock -- the application already owns the
+decode loop, so it is the natural owner of transport state too, composed
+from ordinary widgets (`IconButton` for play/pause, `LinearProgress` or a
+`Canvas`-drawn bar for position) around a `Video` the way a page composes
+around anything else. Sizing, `fit`, corner rounding, and the absence of a
+`color:` tint all reuse `Image`'s own reasoning verbatim (`_fit_image` is
+imported from `widgets/image.py` rather than duplicated) -- the only
+genuine difference is where the pixels come from.
+
+`push_frame` is not thread-safe, the same rule every mutation in this
+framework follows (§8): it must run on the engine thread. A decoder on its
+own thread hands a frame back with `loop.call_soon_threadsafe(element.
+push_frame, rgba)`, identical to what `Signal.set` already requires.
+
+ARIA has no dedicated role for video either -- HTML-AAM exposes `<video>`
+as `"video"` through platform accessibility APIs, but that is not a role
+the abstract ARIA taxonomy itself defines, and this session could not
+verify the mapping against a live spec rather than recall it. Reports
+`img`, the same opaque-visual-content answer `Canvas`/`Image` already give,
+rather than asserting a name this session could not check.
 
 ---
 

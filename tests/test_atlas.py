@@ -253,3 +253,57 @@ def test_a_non_uint8_array_is_rejected() -> None:
     atlas = ImageAtlas(size=64)
     with pytest.raises(ValueError, match="uint8"):
         atlas.add("bad", np.zeros((8, 8, 4), dtype=np.float32))
+
+
+# ------------------------------------------------------- image atlas: update
+
+
+def test_update_on_a_miss_packs_fresh() -> None:
+    atlas = ImageAtlas(size=256)
+    entry = atlas.update("frame", rgba(80, 40))
+    assert entry.width == 80 and entry.height == 40
+
+
+def test_update_with_the_same_shape_overwrites_in_place() -> None:
+    atlas = ImageAtlas(size=256)
+    first = atlas.update("frame", rgba(80, 40, (255, 0, 0, 255)))
+    second = atlas.update("frame", rgba(80, 40, (0, 255, 0, 255)))
+    assert (second.x, second.y) == (first.x, first.y), "same shape must not reallocate"
+    assert tuple(atlas.pixels[second.y, second.x]) == (0, 255, 0, 255)
+
+
+def test_update_does_not_touch_the_packer_on_a_hit() -> None:
+    """The whole point: a same-shape update is a pixel write, not an
+    allocation -- repeating it must not grow occupancy or generation."""
+    atlas = ImageAtlas(size=256)
+    atlas.update("frame", rgba(80, 40))
+    occupancy_after_first = atlas._packer.occupancy
+    for _ in range(50):
+        atlas.update("frame", rgba(80, 40))
+    assert atlas._packer.occupancy == occupancy_after_first
+    assert atlas.generation == 0
+
+
+def test_update_with_a_different_shape_reallocates() -> None:
+    atlas = ImageAtlas(size=256)
+    first = atlas.update("frame", rgba(80, 40))
+    second = atlas.update("frame", rgba(40, 20))
+    assert (second.width, second.height) == (40, 20)
+    assert (second.x, second.y) != (first.x, first.y)
+
+
+def test_update_after_a_reset_repacks_rather_than_reusing_stale_coordinates() -> None:
+    atlas = ImageAtlas(size=64)
+    atlas.update("frame", rgba(20, 20))
+    atlas.reset()
+    repacked = atlas.update("frame", rgba(20, 20, (0, 0, 255, 255)))
+    assert repacked.generation == atlas.generation
+    assert tuple(atlas.pixels[repacked.y, repacked.x]) == (0, 0, 255, 255)
+
+
+def test_update_rejects_the_same_shapes_add_does() -> None:
+    atlas = ImageAtlas(size=64)
+    with pytest.raises(ValueError, match="RGBA"):
+        atlas.update("bad", np.zeros((8, 8, 3), dtype=np.uint8))
+    with pytest.raises(ValueError, match="uint8"):
+        atlas.update("bad", np.zeros((8, 8, 4), dtype=np.float32))

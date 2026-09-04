@@ -784,6 +784,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import overlays as o
     from . import scroll as sc
     from . import textfield as tf
+    from . import video as vd
 
     return {
         WidgetKind.CARD: m.CardElement,
@@ -830,6 +831,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.TEXT_FIELD: tf.TextFieldElement,
         WidgetKind.CANVAS: cv.CanvasElement,
         WidgetKind.IMAGE: im.ImageElement,
+        WidgetKind.VIDEO: vd.VideoElement,
     }
 
 

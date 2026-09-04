@@ -922,6 +922,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | `Divider` | 1dp `outline_variant`. `full_bleed` / `inset`. |
 | `Shape` | A regular polygon: `sides`, `rotation`, `corner_radius`, `background`, `border`. 48dp unless sized. Drawn as a distance field, not a rasterised path, so every one of those is **free to animate**. |
 | `Image` | A decoded raster image. `path:` names the file; `style: {fit}` controls how it fills a differently-shaped box. No M3 component — see [Image](#image) below. |
+| `Video` | A live-updating video surface — the application decodes and pushes frames. No M3 component — see [Video](#video) below. |
 
 ### Buttons and controls
 
@@ -1050,6 +1051,54 @@ swap. An application wanting a tinted picture composites it before decoding.
 A missing file or a decode failure is logged to stderr and treated as
 "nothing to draw" rather than raised, so one bad asset reference does not
 crash the whole frame.
+
+### Video
+
+`Video` is a live-updating display surface — the application decodes,
+`Video` displays. No M3 component exists, and pyCopper does not decode
+video itself: nothing in the project depends on a codec library (Pillow
+decodes still images; nothing decodes `.mp4`/`.webm`), and adding one —
+realistically PyAV, which wraps FFmpeg — would mean taking on its install
+size and licensing considerations for every application, not just the ones
+that show video.
+
+```yaml
+- name: player
+  widget: Video
+  style: {width: 640, height: 360, fit: contain}
+```
+
+```python
+import numpy as np
+
+
+def on_new_frame(rgba: np.ndarray) -> None:
+    app.root.find("player").push_frame(rgba)
+```
+
+`push_frame(rgba)` takes an `(h, w, 4)` uint8, straight-alpha array — the
+same convention `Image` decodes into — and displays it in place of whatever
+was showing before. There is no `path:`, no decoding, no codec awareness at
+all: the application feeds frames from wherever it likes (PyAV, OpenCV, a
+camera driver, a procedurally generated stream), and this widget only owns
+showing the latest one. It sizes and fits exactly like `Image` — an unsized
+axis reports the current frame's own pixel dimensions, `style: {fit}` takes
+the same `contain`/`cover`/`fill`/`none` vocabulary, `corner_radius` rounds
+the frame's own visible corners, and there is no `color:` tint for the same
+reason `Image` has none.
+
+**There is no play/pause, no scrub bar, no `value:` for position.** The
+application already owns the decode loop — it is the thing deciding when a
+new frame exists — so it is also the natural owner of transport controls,
+composed from ordinary widgets (an `IconButton` for play/pause, a
+`LinearProgress` or a `Canvas`-drawn bar for position) around a `Video` the
+same way a page composes around anything else.
+
+**`push_frame` is not thread-safe**, by the same rule every mutation in this
+framework follows: it must run on the engine thread. A decoder on its own
+thread hands a frame back with
+`loop.call_soon_threadsafe(element.push_frame, rgba)`, the identical pattern
+`Signal.set` already requires from a background thread.
 
 ### Canvas
 

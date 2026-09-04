@@ -2614,6 +2614,48 @@ def test_image_baseline(render_scene, assert_golden, tmp_path) -> None:
     assert_golden("image", np.asarray(engine.canvas.draw()))
 
 
+def test_video_baseline(render_scene, assert_golden) -> None:
+    """A pushed frame sampled through the real texture pipeline, then
+    *replaced* by a second, differently-coloured same-shape frame before the
+    asserted render -- proving `push_frame` -> `ImageAtlas.update` ->
+    `Engine._upload` -> the shader's sample all actually connect. If the
+    in-place overwrite or the per-frame upload were broken, this would show
+    the first frame's colours instead of the second's."""
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Video",
+            "style": {
+                "width": 100,
+                "height": 100,
+                "fit": "cover",
+                "corner_radius": 12,
+                "background": "surface",
+            },
+        }
+    }
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    _, engine = render_scene(
+        lambda dl: None, width=100, height=100, theme=Theme(seed=SEED, dark=True)
+    )
+    app.attach(engine)
+    app.mount()
+    app.update()
+
+    stale = np.zeros((40, 80, 4), dtype=np.uint8)
+    stale[:] = (150, 150, 150, 255)
+    app.root.find("root").push_frame(stale)
+    engine.canvas.request_draw(engine.draw_frame)
+    engine.canvas.draw()  # render once so the "stale" frame is not what gets asserted
+
+    live = np.zeros((40, 80, 4), dtype=np.uint8)
+    live[:, :40] = (60, 160, 90, 255)
+    live[:, 40:] = (220, 190, 60, 255)
+    app.root.find("root").push_frame(live)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("video", np.asarray(engine.canvas.draw()))
+
+
 def test_tree_view_deep_collapse_baseline(render_scene, assert_golden) -> None:
     """A collapsed branch two levels deep, with a genuinely expanded and
     visibly-labelled grandchild inside it.

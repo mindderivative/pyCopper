@@ -41,6 +41,7 @@ EMPTY_IS_HONEST = {
     "Link": "no label is nothing to underline either -- there is nothing to draw",
     "DockPanel": "a box around nothing, same as Container -- it has no content",
     "Image": "no path is no picture -- there is nothing to decode or to size",
+    "Video": "no pushed frame is no picture either -- same reasoning as Image",
 }
 
 

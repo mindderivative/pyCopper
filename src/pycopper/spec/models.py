@@ -94,6 +94,7 @@ class WidgetKind(StrEnum):
     DOCK_PANEL = "DockPanel"
     CANVAS = "Canvas"
     IMAGE = "Image"
+    VIDEO = "Video"
 
 
 class SizeSpec:

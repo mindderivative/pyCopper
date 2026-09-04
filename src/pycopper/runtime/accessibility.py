@@ -105,6 +105,12 @@ ROLES: Final[dict[str, str]] = {
     # other widget's alt-text story has.
     "Canvas": "img",
     "Image": "img",
+    # No dedicated ARIA role exists for video either -- HTML-AAM exposes
+    # `<video>` as "video" through platform accessibility APIs, but that is
+    # not a role the abstract ARIA taxonomy itself defines. Treated the same
+    # opaque-visual-content way `Canvas`/`Image` are rather than asserting a
+    # role this session could not verify against the spec directly.
+    "Video": "img",
     "SegmentedButton": "radiogroup",  # M3 calls the equivalent a "Radio group"
     "Carousel": "group",
     "CarouselItem": "group",
