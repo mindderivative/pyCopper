@@ -240,6 +240,36 @@ def test_menu_item_paints_label_and_trailing_shortcut() -> None:
     assert PALETTE.index("on_surface_variant") in tokens
 
 
+def test_submenu_trigger_draws_a_chevron_instead_of_the_shortcut() -> None:
+    """`has_submenu` and `supporting_text` are mutually exclusive trailing
+    content -- a row that opens a submenu does not also show a shortcut."""
+    from pycopper.paint import Kind
+
+    with_shortcut = painted(
+        {
+            "widget": "Menu",
+            "children": [{"widget": "MenuItem", "text": "Cut", "supporting_text": "Ctrl+X"}],
+        }
+    )
+    with_submenu = painted(
+        {
+            "widget": "Menu",
+            "children": [
+                {
+                    "widget": "MenuItem",
+                    "text": "Cut",
+                    "supporting_text": "Ctrl+X",
+                    "style": {"has_submenu": True},
+                }
+            ],
+        }
+    )
+    glyphs = lambda dl: sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)  # noqa: E731
+    # "Ctrl+X" is six glyphs; the chevron is one -- different counts confirm
+    # one replaced the other rather than both being drawn.
+    assert glyphs(with_submenu) < glyphs(with_shortcut)
+
+
 # ----------------------------------------------------------------- tooltip
 
 

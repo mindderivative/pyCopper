@@ -2255,3 +2255,59 @@ def test_tree_view_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("tree_view", np.asarray(engine.canvas.draw()))
+
+
+def test_submenu_baseline(render_scene, assert_golden) -> None:
+    """A main menu with a submenu open beside its trigger item.
+
+    Proves the whole feature at once: the trigger's trailing chevron (not a
+    keyboard shortcut), the submenu positioned beside the item rather than
+    below the whole menu, and both menus rendering simultaneously without
+    overlapping.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24},
+            "children": [
+                {"name": "trigger", "widget": "Button", "text": "File", "style": {"width": 80}}
+            ],
+        },
+        "overlays": [
+            {
+                "name": "main",
+                "widget": "Menu",
+                "open": "true",
+                "style": {"anchor": "trigger"},
+                "children": [
+                    {"name": "new", "widget": "MenuItem", "text": "New", "supporting_text": "^N"},
+                    {
+                        "name": "recent",
+                        "widget": "MenuItem",
+                        "text": "Open Recent",
+                        "style": {"has_submenu": True},
+                    },
+                ],
+            },
+            {
+                "name": "sub",
+                "widget": "Menu",
+                "open": "true",
+                "style": {"anchor": "recent"},
+                "children": [
+                    {"name": "r1", "widget": "MenuItem", "text": "report.docx"},
+                    {"name": "r2", "widget": "MenuItem", "text": "notes.txt"},
+                ],
+            },
+        ],
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=640, height=260, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("submenu", np.asarray(engine.canvas.draw()))

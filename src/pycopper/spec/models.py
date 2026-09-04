@@ -344,6 +344,11 @@ class StyleSpec(_Frozen):
     dismissable: bool = True
     #: Gap between an anchored overlay and its anchor, in logical px.
     offset: float = Field(default=4.0, ge=0)
+    #: A `MenuItem` that opens a submenu. Purely the visual affordance (a
+    #: trailing `chevron_right`, replacing `supporting_text`) -- the submenu
+    #: itself is a separate `Menu` overlay entry anchored to this item by
+    #: `name`, the same way any anchored overlay is declared.
+    has_submenu: bool = False
     #: `name` of the ScrollView a TopAppBar collapses with. Without it a
     #: medium or large bar simply stays expanded.
     collapses_with: str | None = None

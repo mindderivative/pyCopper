@@ -206,6 +206,41 @@ overlays:
 | `scrim` | draws M3's 32% backdrop |
 | `dismissable` | closes on Escape or a click outside (default `true`) |
 | `offset` | gap from the anchor, in dp |
+| `has_submenu` | a `MenuItem` draws a trailing `chevron_right` instead of `supporting_text` — see below |
+
+### Submenus
+
+A `MenuItem` that opens a submenu carries `has_submenu: true`, which draws a
+trailing `chevron_right` in place of `supporting_text`. The submenu itself is
+a second `Menu` overlay, declared *after* the parent menu, anchored to the
+item's `name`:
+
+```yaml
+overlays:
+  - name: main
+    widget: Menu
+    open: "{{ menu_open.get() }}"
+    style: {anchor: menu_btn}
+    children:
+      - {name: new, widget: MenuItem, text: New}
+      - name: recent
+        widget: MenuItem
+        text: Open Recent
+        style: {has_submenu: true}
+        handlers: {on_pointer_enter: openRecent}
+  - name: recent_menu
+    widget: Menu
+    open: "{{ recent_open.get() }}"
+    style: {anchor: recent}       # a name inside the OTHER overlay above
+    children:
+      - {widget: MenuItem, text: report.docx}
+```
+
+An anchor that names something inside another overlay resolves there once the
+main tree has no match — this is the one case an anchor target is not a plain
+widget. Anchoring to a `MenuItem` specifically also changes *how* it
+positions: beside the item (flipping to the other side near an edge) rather
+than below it, matching M3's stated submenu placement.
 
 ### Two ways for a dialog to behave
 

@@ -44,6 +44,10 @@ ROLES: Final[dict[str, str]] = {
     "Chip": "button",  # ...except a filter chip, which toggles -- see `_node_for`
     "IconButton": "button",
     "Fab": "button",
+    # A submenu trigger (`style.has_submenu`) should additionally carry
+    # `aria-haspopup`/`aria-expanded`, per ARIA convention -- not modelled:
+    # `_node_for` sees one element at a time and has no visibility into
+    # whether some *other* overlay happens to be anchored to this one.
     "MenuItem": "menuitem",
     "Checkbox": "checkbox",
     "Radio": "radio",

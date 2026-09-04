@@ -1505,6 +1505,37 @@ And one surfaced by building the components on top of it:
   aspiration that yields to a narrower parent, not a floor — see
   `_clamped_width`.
 
+#### 5.13.3 Submenus: an anchor that lives inside another overlay
+
+A `MenuItem` opens a submenu by naming itself as the *anchor* of a second
+`Menu` overlay, declared after it — no new widget kind, since a submenu is
+just another `Menu` with an unusual anchor target. Two consequences of that
+target being a `MenuItem`, both handled in `_anchored`:
+
+- **The lookup falls back past `root`.** `root.find(name)` only ever finds
+  things in the main tree; a submenu's trigger lives inside its *parent*
+  overlay's own element tree. `_anchored` now tries `self.find(name)` — which
+  already searches every overlay, for handler resolution — when `root` comes
+  up empty. `style.has_submenu` is the item's own visual affordance (a
+  trailing `chevron_right` in place of `supporting_text`) and is unrelated to
+  this lookup; nothing stops any overlay from anchoring to any `MenuItem`.
+- **Positioning switches to beside rather than below.** M3: "Submenus should
+  open next to the parent menu item without overlapping it." `_anchored`
+  checks the resolved target's own kind and routes to `_anchored_beside` —
+  the same flip-on-overflow shape as the below/above case, on the other axis.
+
+**A real one-frame bug this surfaced, now fixed.** `entry.element.offset` used
+to be set only in `paint`, never in `layout`. `absolute_rect()` for anything
+inside an overlay bottoms out at that overlay's root offset (a root has no
+parent to compose a position from), so a submenu opening on the *same* frame
+its parent first appears anchored against the parent's stale — or, on a
+brand-new entry, zero — offset for exactly one frame, before snapping to the
+correct position once `paint` ran. `layout` now sets `element.offset` itself,
+immediately after `_place` resolves it, so a later entry in the same pass sees
+an up-to-date position from an earlier one. This is why a submenu must be
+declared **after** the menu it anchors into: entries are placed in declaration
+order, and `main` needs its own offset set before `sub`'s anchor lookup runs.
+
 ### 5.12 Material Design 3 components — `widgets/material.py`, `navigation.py`, `overlays.py`
 
 Components translated from their M3 specs. Dimensions are M3's own dp
@@ -1548,7 +1579,7 @@ placement, scrim, modality and dismissal. A Dialog does not know it is centred.
 | `Dialog` | 28dp radius, 24dp padding, 280–560dp wide, height **dynamic** | headline + `supporting_text` + actions as its child |
 | `Popover` | M3's persistent rich tooltip; 12dp radius, max 320dp, **shrink-to-fit** width | subhead + `supporting_text` + actions as its child; `surface_container_high`; defaults to `placement: anchor` |
 | `Menu` | 4dp radius, 112–280dp wide, 8dp vertical padding | `surface_container` |
-| `MenuItem` | 48dp high, 12dp side padding | denser than `ListItem`'s 56/72/88dp; `supporting_text` is the trailing shortcut |
+| `MenuItem` | 48dp high, 12dp side padding | denser than `ListItem`'s 56/72/88dp; `supporting_text` is the trailing shortcut. `style.has_submenu` swaps that trailing slot for a `chevron_right` instead (mutually exclusive with the shortcut) — the submenu is a second `Menu` overlay anchored to the item's `name`, positioned beside it rather than below it ("Submenus should open next to the parent menu item without overlapping it"). Anchoring to something inside *another* overlay is the one case `OverlayHost._anchored` falls back past `root` |
 | `Tooltip` | 24dp high, 8dp side padding | `inverse_surface` / `inverse_on_surface` |
 | `Snackbar` | 48dp growing to 64dp | `inverse_surface`; action label in `inverse_primary` |
 | `BottomSheet` | 28dp **top** corners, max 640dp wide | optional 32×4dp drag handle, 22dp above and below |

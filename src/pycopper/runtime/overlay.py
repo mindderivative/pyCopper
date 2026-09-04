@@ -289,13 +289,29 @@ class OverlayHost:
     # ------------------------------------------------------------------ layout
 
     def layout(self, window: Size, root: Any) -> None:
-        """Size and place every visible overlay against the window."""
+        """Size and place every visible overlay against the window.
+
+        `entry.element.offset` is set here, immediately after `_place`
+        resolves it -- not only in `paint`, which used to be the only place
+        that happened. A submenu's `_anchored` call reads `absolute_rect()`
+        on a `MenuItem` that lives inside an *earlier* entry's own overlay
+        tree, and that walk bottoms out at the earlier entry's root element,
+        whose absolute position **is** `element.offset` (a root has no
+        parent to compose it from). Left unset until `paint`, that offset
+        would still hold last frame's value -- or `OFFSET_ZERO` on an entry's
+        first frame -- so a submenu opening on the very same frame as its
+        parent would anchor against a stale position for one frame before
+        snapping to the right place. Declaration order matters here: a
+        submenu must be declared after the parent menu it anchors into, the
+        same way it would read naturally in a view file.
+        """
         self.sync_dismissals()
         self._collect_dismiss_requests()
         for entry in self.rendered():
             element = entry.element
             element.layout(Constraints.loose(window))
             entry.origin = self._place(entry, window, root)
+            element.offset = entry.origin
 
     def _place(self, entry: OverlayEntry, window: Size, root: Any) -> Offset:
         style = entry.element.style
@@ -346,14 +362,27 @@ class OverlayHost:
 
         A menu that runs off the bottom of the window is useless, so the flip
         is part of anchoring rather than something the caller must handle.
+
+        The anchor target is looked up in `root` first and, if that misses,
+        among the *other* overlays -- a submenu's trigger `MenuItem` lives
+        inside its parent `Menu`, which is itself an overlay entry, not part
+        of the main tree `root` walks. Anchoring to a `MenuItem` specifically
+        then positions beside it rather than below it: M3's stated submenu
+        placement ("Submenus should open next to the parent menu item
+        without overlapping it").
         """
         style = entry.element.style
         size = entry.element.size
         target = root.find(style.anchor) if root is not None else None
         if target is None:
+            target = self.find(style.anchor) if style.anchor else None
+        if target is None:
             return Offset((window.width - size.width) / 2, MARGIN)
 
         rect = target.absolute_rect()
+        if str(target.spec.widget) == "MenuItem":
+            return self._anchored_beside(rect, size, window, style.offset)
+
         x = min(max(MARGIN, rect.x), max(MARGIN, window.width - size.width - MARGIN))
         below = rect.bottom + style.offset
         if below + size.height <= window.height - MARGIN:
@@ -362,6 +391,22 @@ class OverlayHost:
         if above >= MARGIN:
             return Offset(x, above)
         return Offset(x, max(MARGIN, window.height - size.height - MARGIN))
+
+    def _anchored_beside(self, rect: Rect, size: Size, window: Size, offset: float) -> Offset:
+        """A submenu's placement: to the right of its trigger, flipping to the
+        left when it would overflow -- the same flip `_anchored` does, on the
+        other axis. Vertically kept level with the trigger's top edge, clamped
+        inside the window rather than flipped, since there is no "above"
+        equivalent for a menu that opens sideways.
+        """
+        y = min(max(MARGIN, rect.y), max(MARGIN, window.height - size.height - MARGIN))
+        right = rect.right + offset
+        if right + size.width <= window.width - MARGIN:
+            return Offset(right, y)
+        left = rect.x - offset - size.width
+        if left >= MARGIN:
+            return Offset(left, y)
+        return Offset(max(MARGIN, window.width - size.width - MARGIN), y)
 
     # ------------------------------------------------------------------- paint
 

@@ -531,11 +531,26 @@ class MenuItemElement(_StyledMixin, Padding):
     Distinct from `ListItem`, whose M3 heights are 56/72/88dp -- a menu row is
     denser. `supporting_text:` is the trailing text (a keyboard shortcut, in
     practice), drawn `on_surface_variant` at the far edge.
+
+    `style.has_submenu` swaps that trailing slot for a 24dp `chevron_right`
+    instead -- M3's anatomy lists a generic "Trailing icon (optional)", and a
+    right-facing chevron marking "this opens more choices" is the near-
+    universal convention for it (shown in the spec's own submenu screenshot,
+    though not stated in words to quote). The two trailing contents are
+    mutually exclusive: a row that opens a submenu does not also carry its
+    own keyboard shortcut.
+
+    The submenu itself is a plain `Menu` overlay declared separately and
+    anchored to this item's `name` -- this widget only draws the affordance.
+    See `OverlayHost._anchored` for how that anchor resolves (the trigger
+    lives inside another overlay, not the main tree) and positions beside the
+    item rather than below it.
     """
 
     HEIGHT: Final = 48.0
     PAD_X: Final = 12.0
     LABEL: Final = 14.0
+    CHEVRON: Final = 24.0
     CURSOR = "pointer"
 
     def __init__(self, spec: WidgetSpec) -> None:
@@ -574,6 +589,20 @@ class MenuItemElement(_StyledMixin, Padding):
                 self.LABEL,
                 label_token,
             )
+        if style.has_submenu:
+            ctx.text.emit_icon(
+                ctx.display_list,
+                "chevron_right",
+                x=absolute.x + self.size.width - self.PAD_X - self.CHEVRON,
+                y=absolute.y + (self.size.height - self.CHEVRON) / 2,
+                size=self.CHEVRON,
+                pixel_ratio=ctx.pixel_ratio,
+                token=ctx.palette.index("on_surface_variant"),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+            return
+
         trailing = self._supporting.strip()
         if trailing:
             metrics = measure_text(trailing, self.LABEL, engine=self.text_engine)

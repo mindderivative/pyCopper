@@ -124,6 +124,92 @@ def test_missing_anchor_falls_back_rather_than_crashing() -> None:
     assert app.overlays.visible()[0].rect().y >= 0
 
 
+# -------------------------------------------------------------- submenus
+
+
+def _menu_with_submenu(*, sub_open: str = "true", sub_style: dict | None = None) -> list:
+    """A main Menu with one plain item and one submenu trigger, plus the
+    submenu itself -- declared second, anchored to the trigger's name."""
+    return [
+        {
+            "name": "main",
+            "widget": "Menu",
+            "open": "true",
+            "style": {"anchor": "btn"},
+            "children": [
+                {"name": "cut", "widget": "MenuItem", "text": "Cut"},
+                {
+                    "name": "recent",
+                    "widget": "MenuItem",
+                    "text": "Open Recent",
+                    "style": {"has_submenu": True},
+                },
+            ],
+        },
+        {
+            "name": "sub",
+            "widget": "Menu",
+            "open": sub_open,
+            "style": {"anchor": "recent", **(sub_style or {})},
+            "children": [{"widget": "MenuItem", "text": "report.docx"}],
+        },
+    ]
+
+
+def test_a_submenu_anchors_to_an_item_inside_its_parent_overlay() -> None:
+    """`recent` lives inside the `main` Menu's own overlay tree, not the main
+    tree -- resolving it at all is the point (see `OverlayHost._anchored`)."""
+    app = make(_menu_with_submenu())
+    sub = next(e for e in app.overlays.visible() if e.element.name == "sub")
+    assert sub.rect().width > 0.0
+
+
+def test_a_submenu_opens_beside_its_trigger_not_below_the_whole_menu() -> None:
+    app = make(_menu_with_submenu())
+    trigger = app.overlays.find("recent")
+    sub = next(e for e in app.overlays.visible() if e.element.name == "sub")
+    trigger_rect = trigger.absolute_rect()
+    assert sub.rect().x >= trigger_rect.right
+    assert sub.rect().y == pytest.approx(trigger_rect.y)
+
+
+def test_a_submenu_flips_to_the_left_when_it_would_overflow() -> None:
+    """The trigger sits near the window's right edge, so a submenu with real
+    (but not window-exceeding) width has room to its left and not its right.
+    """
+    app = make(
+        _menu_with_submenu(sub_style={"width": 300}),
+        root_children=[
+            {
+                "widget": "Row",
+                "style": {"width": "expand"},
+                "children": [
+                    {"widget": "Spacer", "style": {"width": "expand"}},
+                    {"name": "btn", "widget": "Button", "text": "Open", "style": {"height": 40}},
+                ],
+            }
+        ],
+    )
+    trigger = app.overlays.find("recent")
+    sub = next(e for e in app.overlays.visible() if e.element.name == "sub")
+    assert sub.rect().x < trigger.absolute_rect().x
+    assert sub.rect().x >= 0.0
+
+
+def test_a_submenu_positions_correctly_on_the_very_first_paint() -> None:
+    """A submenu open on the same frame its parent first appears used to
+    anchor against the parent's stale (zero) offset for exactly one frame,
+    since only `paint` set it -- not `layout`, which runs first and is where
+    a submenu's own anchor is resolved. Fixed in `OverlayHost.layout`."""
+    app = make(_menu_with_submenu())
+    first = paint(app)
+    first_origin = next(e for e in app.overlays.entries if e.element.name == "sub").origin
+    second = paint(app)
+    second_origin = next(e for e in app.overlays.entries if e.element.name == "sub").origin
+    assert first_origin == second_origin
+    assert len(first) == len(second)
+
+
 # ------------------------------------------------------------------- paint
 
 
@@ -304,10 +390,12 @@ def test_handlers_inside_an_overlay_resolve() -> None:
     app.mount()
     app.update()
     ok = app.overlays.find("ok")
+    # `absolute_rect()` is already fully absolute after `update()` -- the
+    # overlay root's own offset is set during `layout()`, not only `paint()`
+    # (see `OverlayHost.layout`), so no manual `entry.origin` addition here.
     rect = ok.absolute_rect()
-    entry = app.overlays.visible()[0]
-    x = entry.origin.x + rect.x + 5
-    y = entry.origin.y + rect.y + 5
+    x = rect.x + 5
+    y = rect.y + 5
     app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=x, y=y))
     app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=x, y=y))
     app.dispatcher.drain()
