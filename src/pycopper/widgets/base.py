@@ -800,6 +800,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.NAVIGATION_DRAWER: n.NavigationDrawerElement,
         WidgetKind.NAV_ITEM: n.NavItemElement,
         WidgetKind.TOP_APP_BAR: n.TopAppBarElement,
+        WidgetKind.STATUS_BAR: n.StatusBarElement,
         WidgetKind.TABS: n.TabsElement,
         WidgetKind.TAB: n.TabElement,
         WidgetKind.SEGMENTED_BUTTON: n.SegmentedButtonElement,

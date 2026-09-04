@@ -87,6 +87,10 @@ ROLES: Final[dict[str, str]] = {
     "BottomSheet": "dialog",
     "SideSheet": "dialog",
     "TopAppBar": "banner",
+    # The footer counterpart to TopAppBar's "banner" landmark -- a status bar
+    # is a persistent informational region, not a transient announcement, so
+    # this is "contentinfo" rather than Snackbar/Badge's "status".
+    "StatusBar": "contentinfo",
     "Tabs": "tablist",
     "SegmentedButton": "radiogroup",  # M3 calls the equivalent a "Radio group"
     "Carousel": "group",

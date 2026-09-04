@@ -1562,6 +1562,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination |
 | `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem` |
 | `TopAppBar` | 64dp small, 112dp medium, 152dp large | medium and large collapse on scroll (§5.19) |
+| `StatusBar` | 24dp, `surface_container`, 16dp horizontal padding | no M3 component, and the phrase does not appear anywhere in M3's own vocabulary either; the docked *toolbar* is a different thing (action buttons, not information). Fixes a real gap `TopAppBar` shares: extending `Flex` directly, not `_FlexElement`, means a `Spacer` styled `width: expand` is invisible to the base `flex_of` and starves whatever comes after it — `StatusBar` overrides `flex_of` to recognise it, the same way `_FlexElement` already does for `Row`/`Column` |
 | `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |

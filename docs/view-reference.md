@@ -949,6 +949,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `Accordion` | 56 / 72dp header (M3 gives this no component of its own, only Lists' "expand and collapse" behaviour). `text:` headline + `supporting_text:`, an optional child body, `value:` for open/closed. |
 | `TreeView` + `TreeItem` | Same M3 gap as `Accordion`, applied recursively. A `TreeItem` with `children:` is a branch (chevron, `value:` for open/closed); with none it's a leaf. `TreeView`'s own `value:` names the selected item by `name` at any depth. |
 | `TopAppBar` | 64dp small, 112dp `medium`, 152dp `large`. |
+| `StatusBar` | 24dp, `surface_container`. No M3 component or even the phrase "status bar" anywhere in M3's own vocabulary — the docked *toolbar* it might sound like is a row of action buttons, a different thing. A plain `Row` a view populates freely; a `Spacer` splits it into leading/trailing groups. |
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator. |
 | `NavigationDrawer` | 240–360dp, 56dp items. |
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |

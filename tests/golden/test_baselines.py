@@ -2410,3 +2410,46 @@ def test_pagination_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("pagination", np.asarray(engine.canvas.draw()))
+
+
+def test_status_bar_baseline(render_scene, assert_golden) -> None:
+    """A status bar docked below some content, with a leading message and a
+    trailing group split by a Spacer.
+
+    Proves the anatomy (surface_container, thin 24dp height) and the fix
+    that makes the Spacer split actually work: without overriding flex_of,
+    the trailing text would be starved of width and vanish.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "width": "expand", "height": "expand"},
+            "children": [
+                {
+                    "name": "content",
+                    "widget": "Container",
+                    "style": {"width": "expand", "height": "expand"},
+                },
+                {
+                    "name": "bar",
+                    "widget": "StatusBar",
+                    "children": [
+                        {"name": "lead", "widget": "Text", "text": "Ready"},
+                        {"name": "gap", "widget": "Spacer", "style": {"width": "expand"}},
+                        {"name": "branch", "widget": "Text", "text": "main"},
+                        {"name": "encoding", "widget": "Text", "text": "UTF-8"},
+                    ],
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=360, height=120, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("status_bar", np.asarray(engine.canvas.draw()))

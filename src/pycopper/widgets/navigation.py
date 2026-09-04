@@ -34,7 +34,7 @@ from ..layout import (
 )
 from ..spec import WidgetSpec
 from ..spec.typescale import TYPE_SCALE
-from ..tree.element import PaintContext
+from ..tree.element import ElementMixin, PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
 from .material import SELECTION_CURVE, SELECTION_MOTION, _arc, _box, _emit_state_layer, _state_alpha
 
@@ -47,6 +47,7 @@ __all__ = [
     "NavigationRailElement",
     "SegmentElement",
     "SegmentedButtonElement",
+    "StatusBarElement",
     "TabElement",
     "TabsElement",
     "TopAppBarElement",
@@ -472,6 +473,82 @@ class TopAppBarElement(_StyledMixin, Flex):
             weight=TITLE_ROLE.weight,
             tracking=TITLE_ROLE.tracking,
             line_height=leading,
+        )
+
+
+# --------------------------------------------------------------- status bar
+
+
+class StatusBarElement(_StyledMixin, Flex):
+    """A thin, informational bar docked to a window edge -- word count,
+    encoding, a git branch, connection state.
+
+    M3 has neither this widget nor the phrase "status bar" anywhere in its
+    own vocabulary -- checked directly rather than assumed absent, the same
+    way `Pagination`'s grounding was checked. Its cousin from the same
+    docked-bar family that DOES exist, the docked toolbar (M3's replacement
+    for the deprecated bottom app bar), is a different thing: a row of
+    *action* buttons, not an informational strip, so this does not borrow
+    its anatomy despite sitting at the same edge of a window.
+
+    Built the way `TopAppBar` is: a plain `Flex` a view populates with
+    whatever `Text`/`Icon`/`Divider` children it wants. There is no special
+    "leading"/"trailing" slot to learn -- a `Spacer` does that split the same
+    way it would in any other `Row`.
+
+    `surface_container` background, no drawn border, follows this
+    framework's existing convention for a docked surface (`Card`, `Menu`,
+    `TopAppBar`, both sheets all read the same way): a tonal shift says "this
+    is a separate surface" without a hard line. The 24dp height and 16dp
+    horizontal padding are not sourced -- there is nothing to source them
+    from -- chosen to read as clearly thinner than every interactive
+    control's own 40dp+ density in this framework, which is the one thing a
+    purely informational bar should never be mistaken for.
+    """
+
+    HEIGHT: Final = 24.0
+    PAD_X: Final = 16.0
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Flex.__init__(self, axis=Axis.HORIZONTAL, spacing=spec.style.spacing or 8.0)
+        self.init_element(spec)
+
+    def configure(self) -> None:
+        self._spacing = self.style.spacing or 8.0
+
+    def flex_of(self, child: Any) -> int:
+        """A child styled `expand` or `flex:n` is flexible, matching Row and
+        Column's own `_FlexElement.flex_of`.
+
+        This widget extends `Flex` directly rather than `_FlexElement`, so
+        without this override a `Spacer` meant to push trailing items to the
+        far edge -- the documented way to split this bar into leading and
+        trailing groups -- is measured as an ordinary inflexible child. It
+        would then be sized against nearly all the remaining width and
+        starve whatever comes after it, rather than sharing the space.
+        """
+        explicit = super().flex_of(child)
+        if explicit:
+            return explicit
+        if not isinstance(child, ElementMixin):
+            return 0
+        size = child.style.width
+        if size.kind == "flex":
+            return max(1, int(size.value))
+        return 1 if size.kind == "expand" else 0
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = constraints.copy_with(min_height=self.HEIGHT, max_height=self.HEIGHT)
+        pad = EdgeInsets.symmetric(horizontal=self.PAD_X)
+        inner = super().perform_layout(outer.deflate(pad))
+        for child in self.children:
+            child.offset = child.offset + pad.top_left
+        return outer.constrain(inner.inflate(pad))
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        token = ctx.palette.index(self.style.background or "surface_container")
+        _box(
+            ctx, absolute.x, absolute.y, self.size.width, self.size.height, token=token, radius=0.0
         )
 
 

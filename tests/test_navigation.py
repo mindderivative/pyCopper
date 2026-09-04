@@ -79,6 +79,7 @@ RAIL = [
         "LinearProgress",
         "TreeView",
         "TreeItem",
+        "StatusBar",
     ],
 )
 def test_kind_builds(kind: str) -> None:
@@ -557,3 +558,75 @@ def test_collapsing_an_ancestor_clips_every_descendant() -> None:
     # b and c sit below a's collapsed 56px boundary -- both are hidden by
     # a's clip regardless of b's own (expanded) state.
     assert not any(visible(s["clip"], s["rect"]) for s in below_fold)
+
+
+# --------------------------------------------------------------- status bar
+
+
+def test_status_bar_is_twenty_four_high() -> None:
+    e = laid_out({"name": "w", "widget": "StatusBar"})
+    assert e.size.height == 24.0
+
+
+def test_status_bar_uses_surface_container() -> None:
+    app = app_with([{"name": "label", "widget": "Text", "text": "Ready"}], widget="StatusBar")
+    assert PAL.index("surface_container") in tokens(paint(app))
+
+
+def test_a_spacer_splits_leading_and_trailing_groups() -> None:
+    """A Spacer styled `width: expand` must actually claim the free space --
+    StatusBar extends Flex directly, not _FlexElement, so without its own
+    flex_of override a Spacer here would be measured as an ordinary
+    inflexible child and swallow the room meant to be shared, starving
+    whatever comes after it (the same gap TopAppBar has and does not need
+    to close, since it never puts a Spacer among its own children)."""
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "style": {"background": "surface", "width": "expand"},
+        "children": [
+            {
+                "name": "bar",
+                "widget": "StatusBar",
+                "children": [
+                    {"name": "lead", "widget": "Text", "text": "Ready"},
+                    {"name": "gap", "widget": "Spacer", "style": {"width": "expand"}},
+                    {"name": "trail", "widget": "Text", "text": "UTF-8"},
+                ],
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    a.mount()
+    a.update()
+    bar = a.root.find("bar")
+    lead = a.root.find("lead")
+    trail = a.root.find("trail")
+    assert trail.size.width > 0.0, "the trailing label was starved of space"
+    assert trail.offset.x + trail.size.width <= bar.size.width, "it overflowed the bar"
+    assert trail.offset.x > lead.offset.x + lead.size.width, "the spacer did nothing"
+
+
+def test_status_bar_pads_both_edges() -> None:
+    """The Flex layout happens against the deflated width, not the full one
+    with padding bolted on afterwards -- otherwise the last child's own
+    right edge would run PAD_X past the bar's right edge."""
+    from pycopper.widgets.navigation import StatusBarElement
+
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "style": {"background": "surface", "width": "expand"},
+        "children": [
+            {
+                "name": "bar",
+                "widget": "StatusBar",
+                "children": [{"name": "label", "widget": "Text", "text": "Ready"}],
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    a.mount()
+    a.update()
+    label = a.root.find("label")
+    assert label.offset.x == StatusBarElement.PAD_X

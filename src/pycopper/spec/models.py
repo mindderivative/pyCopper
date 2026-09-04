@@ -88,6 +88,7 @@ class WidgetKind(StrEnum):
     LINK = "Link"
     SPIN_BOX = "SpinBox"
     PAGINATION = "Pagination"
+    STATUS_BAR = "StatusBar"
 
 
 class SizeSpec:
