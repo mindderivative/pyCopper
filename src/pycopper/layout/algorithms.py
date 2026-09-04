@@ -240,7 +240,9 @@ class ConstrainedBox(SingleChildNode):
         child = self.child
         if child is None:
             return inner.constrain(inner.smallest)
-        return constraints.constrain(child.layout(inner))
+        # Tight in both axes means the child's size cannot influence ours.
+        size = child.layout(inner, parent_uses_size=not inner.is_tight)
+        return constraints.constrain(size if not inner.is_tight else inner.smallest)
 
 
 # -------------------------------------------------------------------- flex

@@ -43,6 +43,7 @@ majority of real-world icon SVGs) before it can become a glyph.
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -86,7 +87,7 @@ def _draw_into(pen: AbstractPen, svg_source: str, transform: Matrix) -> None:
     """
     import svgelements as se
 
-    doc = se.SVG.parse(__import__("io").StringIO(svg_source))
+    doc = se.SVG.parse(io.StringIO(svg_source))
     started = False
     for element in doc.elements():
         if not isinstance(element, se.Shape):
@@ -134,7 +135,7 @@ def _viewbox_transform(svg_source: str) -> Matrix:
     """
     import svgelements as se
 
-    doc = se.SVG.parse(__import__("io").StringIO(svg_source))
+    doc = se.SVG.parse(io.StringIO(svg_source))
     if doc.viewbox is None:
         raise ValueError("SVG has no viewBox -- cannot scale it to a glyph")
     vx, vy, vw, vh = doc.viewbox.x, doc.viewbox.y, doc.viewbox.width, doc.viewbox.height

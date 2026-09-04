@@ -135,9 +135,9 @@ def shape_run(
     glyphs = np.fromiter((i.codepoint for i in infos), dtype=np.uint32, count=count)
     clusters = np.fromiter((i.cluster for i in infos), dtype=np.uint32, count=count)
     advances = np.fromiter((p.x_advance for p in positions), dtype=np.float32, count=count)
-    offsets = np.empty((count, 2), dtype=np.float32)
-    for i, p in enumerate(positions):
-        offsets[i] = (p.x_offset, p.y_offset)
+    offset_x = np.fromiter((p.x_offset for p in positions), dtype=np.float32, count=count)
+    offset_y = np.fromiter((p.y_offset for p in positions), dtype=np.float32, count=count)
+    offsets = np.stack((offset_x, offset_y), axis=1)
 
     return ShapedRun(face, text, direction, glyphs, advances, offsets, clusters)
 

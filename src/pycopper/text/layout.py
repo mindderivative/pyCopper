@@ -256,8 +256,6 @@ def layout_text(
             start = op.offset
     if start < len(text):
         blocks.append((start, text[start:]))
-    if not blocks:
-        blocks = [(0, text)]
 
     lines: list[TextLine] = []
     for offset, block in blocks:
@@ -326,17 +324,26 @@ def _wrap_block(
     lines: list[TextLine] = []
     line_start = 0
     last_fit = 0
-    for op in [o.offset for o in break_opportunities(stripped)]:
+    ops = [o.offset for o in break_opportunities(stripped)]
+    i = 0
+    while i < len(ops):
+        op = ops[i]
         if measure(line_start, op) <= max_width + FIT_EPSILON:
             last_fit = op
+            i += 1
             continue
         # Overflowed. Emit up to the last opportunity that fitted; if none did,
         # this one unbreakable unit overflows on its own line rather than
-        # vanishing.
+        # vanishing. Only advance past `op` when it was consumed as that
+        # unbreakable unit -- cutting back to an earlier `last_fit` leaves `op`
+        # untested against the new line, and re-trying it (rather than moving
+        # on) is what stops the break right after a cut from being lost.
         cut = last_fit if last_fit > line_start else op
         lines.append(_emit(stripped, offset, line_start, cut, shape_segment))
         line_start = cut
         last_fit = cut
+        if cut == op:
+            i += 1
 
     if line_start < len(stripped):
         runs, w = shape_segment(stripped[line_start:].rstrip())

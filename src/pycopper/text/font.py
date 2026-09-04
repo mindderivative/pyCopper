@@ -184,11 +184,14 @@ class Face:
         if key == self._size_key:
             return
         self._ft.set_char_size(key[0])
-        if coords and self.axes:
+        if self.axes:
             # freetype-py takes PLAIN DESIGN VALUES here, not 16.16 fixed
             # point. Passing scaled values silently clamps every axis to its
             # maximum, which looks like "the axis does nothing".
-            self._ft.set_var_design_coords(list(coords))
+            # Falling through to the previous coords when none are given
+            # would leave a variable face stuck at whatever axis position it
+            # last rendered at, since freetype doesn't reset it on its own.
+            self._ft.set_var_design_coords(list(coords) if coords else list(self.clamp_coords()))
         offset = round(key[1] * 64 / SUBPIXEL_BUCKETS)
         self._ft.set_transform(freetype.Matrix(0x10000, 0, 0, 0x10000), freetype.Vector(offset, 0))
         self._size_key = key

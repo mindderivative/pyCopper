@@ -354,12 +354,24 @@ class App:
     def attach(self, engine: Engine) -> None:
         # One atlas per application: promote the App's CPU-only text engine to
         # the device rather than leaving the Engine's separate one bound.
+        # Engine's own atlases become unreachable the moment their attributes
+        # are overwritten below, but the GPU textures they own do not free
+        # themselves -- destroyed here, the one place that knows they are
+        # being orphaned rather than still in use (unlike `bind_glyph_atlas`/
+        # `bind_image_atlas` themselves, which a test can call directly on a
+        # texture nothing else has replaced yet, and must not destroy on its
+        # behalf).
+        old_text, old_images = engine.text, engine.images
         self.text.attach_device(engine.device)
         engine.text = self.text
         engine.pipeline.bind_glyph_atlas(self.text.atlas.texture)
+        if old_text is not self.text:
+            old_text.atlas.destroy()
         self.images.attach_device(engine.device)
         engine.images = self.images
         engine.pipeline.bind_image_atlas(self.images.texture)
+        if old_images is not self.images:
+            old_images.destroy()
         engine.palette = self.palette
         engine.painter = self.paint
         engine.canvas.add_event_handler(self._on_canvas_event, "*")

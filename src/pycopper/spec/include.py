@@ -126,7 +126,7 @@ def _namespace_names(node: Any, prefix: str, local: set[str]) -> Any:
     out: dict[str, Any] = {}
     for key, value in node.items():
         if key == "name" and isinstance(value, str):
-            out[key] = value if value == prefix else f"{prefix}.{value}"
+            out[key] = f"{prefix}.{value}"
         elif key == "anchor" and isinstance(value, str) and value in local:
             # An anchor naming a fragment-local id must follow it; one naming
             # an outer element is left alone.
@@ -328,7 +328,7 @@ def _expand(
         fragment["name"] = call_name
 
     # Anything else at the call site (open:, style:, ...) is not merged --
-    # parameters are the interface. Carrying `id` across is the one exception.
+    # parameters are the interface.
     for key in (SOURCE_KEY, WITH_KEY, "name"):
         node.pop(key, None)
     if node:

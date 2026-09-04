@@ -178,6 +178,14 @@ class UIPipeline:
         Rebuilding the bind group is the only way to change a bound texture in
         WebGPU. It happens once at start-up, not per frame -- the atlas image
         changes, but the texture object it lives in does not.
+
+        Deliberately does not destroy the outgoing texture: this is a low-
+        level primitive with no opinion on who else might still hold a live
+        reference to it (a test binding a texture directly, as
+        `tests/golden/test_primitives.py` does; `Engine`'s own `TextEngine`
+        before `App.attach()` replaces it). The caller that actually orphans
+        a texture -- `App.attach()`, swapping its own atlas in for `Engine`'s
+        -- is the one that knows that and destroys it there.
         """
         self.glyph_atlas = texture
         self.bind_group = self._make_bind_group()
@@ -185,11 +193,8 @@ class UIPipeline:
     def bind_image_atlas(self, texture: Any) -> None:
         """Swap in a real image atlas, replacing the 1x1 placeholder.
 
-        Mirrors `bind_glyph_atlas` exactly, for the same reason: WebGPU only
-        lets a bound texture change by rebuilding the bind group. Nothing
-        calls this yet -- no widget draws `Kind.IMAGE` -- but the seam is
-        ready for whichever one does, the way `bind_glyph_atlas` was ready a
-        milestone before real text existed.
+        Mirrors `bind_glyph_atlas` exactly, including not destroying the
+        outgoing texture -- see its docstring.
         """
         self.image_atlas = texture
         self.bind_group = self._make_bind_group()

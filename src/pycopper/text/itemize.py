@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bidi import get_display
 from fontTools import unicodedata as ftud
 
 from .font import Face
@@ -63,11 +62,6 @@ def resolve_base_direction(text: str) -> str:
             return Direction.RTL
         return Direction.LTR
     return Direction.LTR
-
-
-def reorder_for_display(text: str, base: str | None = None) -> str:
-    """Logical order -> visual order via the bidi algorithm."""
-    return str(get_display(text, base_dir="R" if base == Direction.RTL else "L"))
 
 
 def script_runs(text: str) -> list[tuple[int, int, str]]:

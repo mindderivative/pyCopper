@@ -190,6 +190,8 @@ def _validate(node: ast.AST, source: str) -> None:
             raise ExpressionError(f"private name {child.id!r} is not accessible")
         if isinstance(child, ast.Call):
             _validate_call(child, source)
+        if isinstance(child, ast.Dict) and None in child.keys:
+            raise ExpressionError(f"dict unpacking is not supported ({source!r})")
 
 
 def _validate_call(node: ast.Call, source: str) -> None:
@@ -226,6 +228,11 @@ def _eval(node: ast.AST, ctx: Mapping[str, Any], source: str) -> Any:
             return getattr(_eval(node.value, ctx, source), node.attr)
         case ast.Subscript():
             return _eval(node.value, ctx, source)[_eval(node.slice, ctx, source)]
+        case ast.Slice():
+            lower = _eval(node.lower, ctx, source) if node.lower is not None else None
+            upper = _eval(node.upper, ctx, source) if node.upper is not None else None
+            step = _eval(node.step, ctx, source) if node.step is not None else None
+            return slice(lower, upper, step)
         case ast.BinOp():
             return _BINARY[type(node.op)](
                 _eval(node.left, ctx, source), _eval(node.right, ctx, source)

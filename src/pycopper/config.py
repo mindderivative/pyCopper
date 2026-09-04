@@ -42,8 +42,6 @@ class Settings(BaseSettings):
 
     #: Wait for the display before showing a frame.
     #:
-    #: Wait for the display before showing a frame.
-    #:
     #: **False by default**, which is not the conventional choice and is worth
     #: justifying. Waiting is normally free, but rendercanvas presents once per
     #: compositor configure during a resize -- 250 a second, measured -- and

@@ -123,8 +123,11 @@ class SizeSpec:
             if text == "expand":
                 return cls("expand")
             if text.endswith("%"):
-                return cls("percent", float(text[:-1]) / 100.0)
-            if text.startswith("flex"):
+                pct = float(text[:-1]) / 100.0
+                if pct < 0:
+                    raise ValueError(f"size must be non-negative, got {raw!r}")
+                return cls("percent", pct)
+            if text == "flex" or text.startswith("flex:"):
                 _, _, weight = text.partition(":")
                 return cls("flex", float(weight) if weight else 1.0)
         raise ValueError(
@@ -151,6 +154,11 @@ def _parse_edges(raw: Any) -> EdgeInsets:
     if isinstance(raw, int | float):
         return EdgeInsets.all(float(raw))
     if isinstance(raw, dict):
+        unknown = set(raw) - {"left", "top", "right", "bottom"}
+        if unknown:
+            raise ValueError(
+                f"invalid edge insets key(s) {sorted(unknown)!r}; expected left/top/right/bottom"
+            )
         return EdgeInsets(
             float(raw.get("left", 0)),
             float(raw.get("top", 0)),

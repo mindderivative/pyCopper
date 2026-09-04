@@ -13,11 +13,11 @@
 // All colours here are LINEAR (ARCHITECTURE.md 5.6.1) and output is
 // PREMULTIPLIED, matching the One / OneMinusSrcAlpha blend state.
 
-const KIND_BOX:    u32 = 0u;
-const KIND_GLYPH:  u32 = 1u;
-const KIND_IMAGE:  u32 = 2u;
-const KIND_SHADOW: u32 = 3u;
-const KIND_ARC:    u32 = 4u;
+const KIND_BOX:     u32 = 0u;
+const KIND_GLYPH:   u32 = 1u;
+const KIND_IMAGE:   u32 = 2u;
+const KIND_SHADOW:  u32 = 3u;
+const KIND_ARC:     u32 = 4u;
 const KIND_POLYGON: u32 = 5u;
 const KIND_SEGMENT: u32 = 6u;
 

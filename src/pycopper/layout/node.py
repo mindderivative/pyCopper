@@ -152,8 +152,19 @@ class LayoutNode(ABC):
         self.mark_needs_layout()
 
     def clear_children(self) -> None:
-        for child in list(self._children):
-            self.remove_child(child)
+        """Detach every child in one pass.
+
+        Not a loop over :meth:`remove_child` -- that does an O(n) list search
+        per call, making a naive clear O(n^2) in the child count.
+        """
+        children, self._children = self._children, []
+        for child in children:
+            child._parent = None
+            child._relayout_boundary = None
+            if child._owner is not None:
+                child._detach()
+        if children:
+            self.mark_needs_layout()
 
     def walk(self) -> Iterator[LayoutNode]:
         """Depth-first pre-order traversal including self."""
@@ -261,6 +272,12 @@ class LayoutNode(ABC):
         assert self._relayout_boundary is self
         self._size = self.perform_layout(self._constraints)
         self._needs_layout = False
+
+        if __debug__ and not self._constraints.is_satisfied_by(self._size):
+            raise AssertionError(
+                f"{type(self).__name__}.perform_layout returned {self._size} "
+                f"which violates {self._constraints}"
+            )
 
     @abstractmethod
     def perform_layout(self, constraints: Constraints) -> Size:
