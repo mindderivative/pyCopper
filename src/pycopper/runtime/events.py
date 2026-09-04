@@ -340,8 +340,10 @@ class EventDispatcher:
     def _dispatch_pointer(self, event: PointerEvent) -> None:
         # A captured pointer keeps receiving events outside its own bounds,
         # which is what makes dragging work.
-        path = [self._captured] if self._captured is not None else self.hit_path(event.x, event.y)
-        path = self._enabled_path(path)
+        raw_path = (
+            [self._captured] if self._captured is not None else self.hit_path(event.x, event.y)
+        )
+        path = self._enabled_path(raw_path)
 
         # A press outside a modal dismisses it and goes no further.
         if (
@@ -356,15 +358,13 @@ class EventDispatcher:
         match event.type:
             case EventType.POINTER_MOVE:
                 self._pointer = (event.x, event.y)
-                # The cursor is resolved from the *unfiltered* path. A disabled
-                # control is removed from the event path -- correctly, it must
-                # receive nothing -- but it still has to say "not-allowed",
-                # which is feedback rather than an event.
-                self._cursor_path = (
-                    [self._captured]
-                    if self._captured is not None
-                    else self.hit_path(event.x, event.y)
-                )
+                # The cursor is resolved from the *unfiltered* path -- already
+                # computed above as `raw_path`, so hit testing does not run
+                # twice for the same move. A disabled control is removed from
+                # the event path -- correctly, it must receive nothing -- but
+                # it still has to say "not-allowed", which is feedback rather
+                # than an event.
+                self._cursor_path = raw_path
                 self._update_hover(path)
             case EventType.POINTER_DOWN:
                 # Only the primary button presses, captures, and moves focus.
@@ -408,7 +408,15 @@ class EventDispatcher:
         # A click is press and release over the same element. The live path is
         # filtered the same way, or a press that landed on an enabled ancestor
         # of a disabled child would never match and no click would fire.
-        if event.type is EventType.POINTER_UP and path and path[0] is not None:
+        # Secondary release is excluded the same way secondary press is above --
+        # otherwise a right-click that lands and lifts over a button fires
+        # `on_click` right alongside `on_context_menu`.
+        if (
+            event.type is EventType.POINTER_UP
+            and event.button != MOUSE_SECONDARY
+            and path
+            and path[0] is not None
+        ):
             live = self._enabled_path(self.hit_path(event.x, event.y))
             if live and live[0] is path[0]:
                 self._propagate(live, PointerEvent(EventType.CLICK, x=event.x, y=event.y))

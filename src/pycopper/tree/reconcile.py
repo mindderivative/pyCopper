@@ -101,8 +101,7 @@ def _reconcile_children(element: Any, spec: WidgetSpec, stats: ReconcileStats) -
 
     # Detach then reattach in the new order. Reordering is an index remap, not
     # a destroy-and-rebuild, so state survives a move.
-    for child in old_children:
-        element.remove_child(child)
+    element.clear_children()
     for child in matched:
         if child.parent is not None:
             child.parent.remove_child(child)

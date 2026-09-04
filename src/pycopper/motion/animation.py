@@ -161,6 +161,17 @@ class Ticker:
             self._running.append(animation)
         return animation
 
+    def discard(self, animation: Animation) -> None:
+        """Stop advancing `animation`, if it is running. Safe to call twice.
+
+        The counterpart to `add`, and the only way to stop a repeating one: a
+        `repeat=True` animation is never `done`, so without this it would
+        keep firing `on_change` forever after the element that owns it is
+        disposed, and `active` would never go back to False.
+        """
+        if animation in self._running:
+            self._running.remove(animation)
+
     def tick(self, dt: float) -> int:
         """Advance every running animation. Returns how many are still going."""
         if not self._running:

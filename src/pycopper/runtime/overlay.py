@@ -272,10 +272,6 @@ class OverlayHost:
                 return True
         return False
 
-    def reopen(self, entry: OverlayEntry) -> None:
-        self._dismissed.discard(entry.key)
-        entry.dismissed = False
-
     def sync_dismissals(self) -> None:
         """Forget dismissals for overlays the application has closed itself.
 
@@ -464,12 +460,6 @@ class OverlayHost:
             if found:
                 return list(found)
         return []
-
-    def entry_at(self, x: float, y: float) -> OverlayEntry | None:
-        for entry in reversed(self.visible()):
-            if entry.rect().contains(x, y):
-                return entry
-        return None
 
     def handle_press(self, x: float, y: float) -> bool:
         """Returns True when the press was consumed by the overlay layer.

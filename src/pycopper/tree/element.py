@@ -229,7 +229,6 @@ class ElementMixin:
     _animations: dict[str, Animation]
     _hit_overflow: float
     _hit_insets: EdgeInsets | None
-    _own_hit_inset: float
     _hit_pad: EdgeInsets | None
     _min_hit: float | None
 
@@ -278,7 +277,6 @@ class ElementMixin:
         self._animations = {}
         self._hit_overflow = 0.0
         self._hit_insets = None
-        self._own_hit_inset = 0.0
         self._read_hit_style()
 
     def update_spec(self, spec: WidgetSpec) -> None:
@@ -484,14 +482,7 @@ class ElementMixin:
         chain is O(depth), and depth is small; nothing caches it because a
         cached answer would go stale the moment a signal flipped an ancestor.
         """
-        if self.disabled:
-            return True
-        node = self.parent
-        while node is not None:
-            if isinstance(node, ElementMixin) and node.disabled:
-                return True
-            node = node.parent
-        return False
+        return self.disabled or self._ancestor_disabled
 
     @property
     def supporting(self) -> str:
@@ -576,6 +567,14 @@ class ElementMixin:
             )
             if tpl is not None and not tpl.is_static
         ]
+        # `mount()` re-binds every element on every hot reload, not only newly
+        # created ones (ARCHITECTURE.md 4) -- without disposing the old effect
+        # first, a reused element would pick up a second subscription on top
+        # of the first, and a session with many reloads would end up with one
+        # live, still-firing `Effect` per past reload.
+        if self._effect is not None:
+            self._effect.dispose()
+            self._effect = None
         if not bound:
             return
 
@@ -592,10 +591,17 @@ class ElementMixin:
         self._effect = Effect(refresh)
 
     def dispose(self) -> None:
-        """Release subscriptions. Called when reconciliation drops a node."""
+        """Release subscriptions and running animations. Called when
+        reconciliation drops a node."""
         if self._effect is not None:
             self._effect.dispose()
             self._effect = None
+        # A `repeat=True` animation (a caret blink, a spinner sweep) never
+        # finishes on its own, so without this the ticker would keep firing
+        # it forever after the widget that owns it is gone -- the app would
+        # never go idle again for the rest of the process.
+        for animation in self._animations.values():
+            self.ticker.discard(animation)
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.dispose()
@@ -933,7 +939,6 @@ class ElementMixin:
         self._min_hit = style.min_hit_size
         if self._hit_pad is None and self._min_hit is None:
             self._hit_insets = None
-            self._own_hit_inset = 0.0
         else:
             # Not left to the next layout pass: a reload that changes only
             # these two marks paint, not layout, so nothing would refresh them.
@@ -1014,7 +1019,6 @@ class ElementMixin:
         insets = self.hit_insets()
         self._hit_insets = insets
         reach = max(insets.left, insets.top, insets.right, insets.bottom)
-        self._own_hit_inset = reach
         node = self.parent
         while isinstance(node, ElementMixin) and node._hit_overflow < reach:
             node._hit_overflow = reach

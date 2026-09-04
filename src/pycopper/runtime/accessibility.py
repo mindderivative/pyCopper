@@ -142,7 +142,9 @@ SILENT: Final[frozenset[str]] = frozenset(
 #: Announcing "home" instead of "Home" is the sort of bug that only shows up
 #: when someone actually listens to it, so the label comes from
 #: `supporting_text:` for these and the icon name is never read aloud.
-ICON_NAMED: Final[frozenset[str]] = frozenset({"Icon", "IconButton", "Fab", "NavItem"})
+#: "Icon" itself is not listed: it is in `SILENT`, so `_node_for` never calls
+#: `_label_of` on one at all.
+ICON_NAMED: Final[frozenset[str]] = frozenset({"IconButton", "Fab", "NavItem"})
 
 #: Kinds whose `checked` is meaningful. Anything else reports None, which is
 #: what distinguishes an unchecked checkbox from a button.

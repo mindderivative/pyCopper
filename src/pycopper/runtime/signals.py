@@ -228,7 +228,11 @@ class Signal[T](_Source):
         if self._eq(self._value, value):
             return
         self._value = value
-        self._notify_subscribers()
+        # Wrapped in a batch of its own: `_subs` is an unordered set, so without
+        # this an Effect notified before a sibling Computed would flush and read
+        # it still marked clean -- a stale value from a single, un-batched write.
+        with batch():
+            self._notify_subscribers()
 
     def update(self, fn: Callable[[T], T]) -> None:
         self.set(fn(self._value))
