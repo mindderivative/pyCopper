@@ -375,12 +375,12 @@ class ImageAtlas:
     rather than left to be discovered by a memory profiler; pass a smaller
     `size` for an application that only ever shows a few small images.
 
-    Not wired into `Engine` or `App`: nothing yet calls `add`, so there is
-    nothing to bind the real texture to, and allocating one unconditionally
-    would cost every application 4 MiB for a feature it cannot reach. A widget
-    that draws images should own an `ImageAtlas` the way `TextEngine` owns a
-    `GlyphAtlas`, and bind it with `UIPipeline.bind_image_atlas` the same way
-    `bind_glyph_atlas` is used today.
+    Wired into `Engine` and `App` the same way `TextEngine`'s `GlyphAtlas`
+    is: each owns one, bound with `UIPipeline.bind_image_atlas` the way
+    `bind_glyph_atlas` already was. `Image` calls `add`/`get_or_add` (one
+    decode, cached); `Video` calls `update` instead, to avoid packing a
+    fresh rectangle 30-60 times a second for a stream landing back in the
+    same slot every frame.
     """
 
     __slots__ = (
