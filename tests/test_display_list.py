@@ -125,9 +125,10 @@ def test_opacity_multiplies_fill_alpha() -> None:
 
 def test_border_width_lands_in_params() -> None:
     dl = DisplayList()
-    dl.add_box(0, 0, 1, 1, border_width=3.0, border_color=(0, 1, 0, 1))
+    dl.add_box(0, 0, 1, 1, border_width=3.0, border_color=(0, 1, 0, 1), border_token=5)
     assert dl.view[0]["params"][0] == 3.0
     assert tuple(dl.view[0]["border"]) == (0, 1, 0, 1)
+    assert dl.view[0]["flags"][3] == 5
 
 
 def test_add_shadow_carries_blur_and_offset() -> None:
@@ -146,10 +147,13 @@ def test_add_glyph_sets_uv_and_kind() -> None:
     assert tuple(s["uv"]) == pytest.approx((0.1, 0.2, 0.3, 0.4))
 
 
-def test_add_image_uses_image_kind() -> None:
+def test_add_image_sets_uv_and_kind() -> None:
     dl = DisplayList()
-    dl.add_image(0, 0, 8, 8, uv=(0, 0, 1, 1))
-    assert dl.view[0]["flags"][0] == Kind.IMAGE
+    dl.add_image(0, 0, 8, 8, uv=(0.1, 0.2, 0.3, 0.4), tint=(1, 0, 0, 1))
+    s = dl.view[0]
+    assert s["flags"][0] == Kind.IMAGE
+    assert tuple(s["uv"]) == pytest.approx((0.1, 0.2, 0.3, 0.4))
+    assert tuple(s["fill"]) == (1, 0, 0, 1)
 
 
 def test_clip_defaults_to_unclipped() -> None:

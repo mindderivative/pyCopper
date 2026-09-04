@@ -79,7 +79,7 @@ def test_a_label_is_what_makes_a_button_wide() -> None:
     assert narrow.width >= 64.0, "M3's minimum width still applies to a short label"
 
 
-@pytest.mark.parametrize("kind", ["Chip", "Segment", "Tab", "Tooltip", "Link"])
+@pytest.mark.parametrize("kind", ["Chip", "Segment", "Tab", "Tooltip", "Link", "Badge"])
 def test_the_other_label_bearing_widgets_measure_theirs_too(kind: str) -> None:
     """Checked because Button's bug looked like it should have been shared --
     these paint a label the same way and were the obvious suspects. All four

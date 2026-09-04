@@ -164,6 +164,7 @@ class OverlayHost:
         specs: tuple[WidgetSpec, ...],
         *,
         text_engine: Any = None,
+        image_atlas: Any = None,
         ticker: Any = None,
     ) -> None:
         from ..widgets import build_element
@@ -173,6 +174,8 @@ class OverlayHost:
             element = build_element(spec)
             if text_engine is not None:
                 element.set_text_engine(text_engine)
+            if image_atlas is not None:
+                element.set_image_atlas(image_atlas)
             # Without this an overlay animates against the process-wide default
             # ticker, which the App never advances -- so its fade never moved.
             if ticker is not None:

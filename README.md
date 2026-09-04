@@ -60,7 +60,7 @@ count, focus, or scroll position.
   breaking and grapheme segmentation, bidi, and font fallback. Not a bitmap-font
   approximation.
 - **Material Design 3.** A full 59-token tonal palette from one seed colour, and
-  38 components built to their published specs. Switching theme is a single
+  54 components built to their published specs. Switching theme is a single
   buffer upload — no relayout, no display-list rebuild.
 - **Fine-grained reactivity.** A signal write invalidates exactly the affected
   subtree with a typed reason — build, layout, or paint — not the frame.
@@ -164,7 +164,7 @@ work off the per-frame path. §12 of ARCHITECTURE.md has the measurements.
 
 ## Testing
 
-745 tests, `ruff` and `mypy --strict` clean. Golden-image baselines cover the
+1800 tests, `ruff` and `mypy --strict` clean. Golden-image baselines cover the
 rendered output; everything else — layout, reactivity, reconciliation, text
 segmentation, event dispatch — runs with no GPU on any runner.
 

@@ -101,6 +101,16 @@ def test_apply_reports_errors_without_raising(view) -> None:
     assert events[0].error == "bad view"
 
 
+def test_apply_skips_deleted_files(view) -> None:
+    r = HotReloader([view])
+    r.post(view, change="deleted")
+
+    calls: list[object] = []
+    events = r.apply(calls.append)
+    assert calls == [], "a deleted file must not be reloaded"
+    assert events[0].error is None
+
+
 def test_drain_is_safe_while_the_watcher_runs(view) -> None:
     with HotReloader([view]) as r:
         for _ in range(20):

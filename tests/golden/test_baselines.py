@@ -19,7 +19,11 @@ SEED = "#6750A4"
 
 
 def test_primitives_baseline(render_scene, assert_golden) -> None:
-    """Every SDF primitive kind in one frame."""
+    """The box and shadow kinds: plain, bordered, clipped, and a soft shadow.
+
+    Not every SDF kind -- glyph, image, arc, polygon and segment each get
+    their own baseline instead (`text`, `image`/`video`, `arc`, `shapes`,
+    `canvas`)."""
 
     def paint(dl: DisplayList) -> None:
         dl.add_shadow(
@@ -823,13 +827,15 @@ def test_scroll_baseline(render_scene, assert_golden) -> None:
 
 
 def test_arc_baseline(render_scene, assert_golden) -> None:
-    """Circular progress at several values, plus raw arcs.
+    """Circular progress at several values, thicknesses and a tint.
 
     The top row is the widget at 0/25/50/75/100%, which is what verifies the
     sweep direction: M3 fills clockwise from 12 o'clock, so 25% must light the
-    right-hand quadrant and nothing else. The bottom row exercises the
-    primitive directly -- an offset start angle, a thick stroke, and a full
-    ring, whose join must be seamless.
+    right-hand quadrant and nothing else. The bottom row varies `thickness`
+    (10 vs 2) and swaps both the active and track colour via `color`/
+    `background`. The raw arc primitive itself -- an offset start angle and a
+    full ring's seamless join -- is exercised directly in `test_arc.py` and
+    `tests/golden/test_primitives.py`, not here.
     """
     view = {
         "root": {

@@ -576,6 +576,16 @@ def test_a_maxed_out_side_stops_responding_and_dims() -> None:
     assert dimmed, "expected the maxed-out side's icon to be dimmed"
 
 
+def test_a_minned_out_side_stops_responding_and_dims() -> None:
+    """The mirror of the maxed-out case: `at_min` dims the decrement side the
+    same way `at_max` dims the increment side."""
+    app = _spin_box_app(value="0", min=0)
+    dl = painted_app(app)
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    dimmed = [g for g in glyphs if float(g["fill"][3]) < 1.0]
+    assert dimmed, "expected the minned-out side's icon to be dimmed"
+
+
 def painted_app(app) -> DisplayList:
     dl = DisplayList()
     app.paint(dl)

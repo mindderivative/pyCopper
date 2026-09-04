@@ -21,7 +21,7 @@ from .runtime.engine import Engine
 from .runtime.events import Event, EventDispatcher, EventType, KeyEvent, PointerEvent, WheelEvent
 from .runtime.hotreload import HotReloader
 from .runtime.overlay import OverlayHost
-from .runtime.signals import batch, bind_thread
+from .runtime.signals import bind_thread
 from .runtime.viewmodel import ViewModel, check_naming
 from .spec import SpecError, ViewSpec, load_view, parse_view
 from .text import TextEngine
@@ -82,7 +82,9 @@ class App:
         self._last_tick: float | None = None
 
         self.overlays = OverlayHost()
-        self.overlays.build(self.view.overlays, text_engine=self.text, ticker=self.motion)
+        self.overlays.build(
+            self.view.overlays, text_engine=self.text, image_atlas=self.images, ticker=self.motion
+        )
 
         self.dispatcher = EventDispatcher()
         self.dispatcher.root = self.root
@@ -207,7 +209,7 @@ class App:
         for event in events:
             if event.error:
                 self.reload_errors.append(event.error)
-        applied = sum(1 for e in events if not e.error and e.change != "DELETED")
+        applied = sum(1 for e in events if not e.error and e.change != "deleted")
         if applied and self.engine is not None:
             self.engine.request_draw()
         return applied
@@ -223,6 +225,9 @@ class App:
         self.root.set_text_engine(self.text)
         self.root.set_image_atlas(self.images)
         self.dispatcher.root = self.root
+        self.overlays.build(
+            new_view.overlays, text_engine=self.text, image_atlas=self.images, ticker=self.motion
+        )
         if self._mounted:
             self.mount()
         return stats
@@ -334,10 +339,10 @@ class App:
     def accessibility_tree(self) -> AccessibleNode:
         """Snapshot what this interface *means*, for a bridge or for a test.
 
-        Built on demand rather than maintained: nothing consumes it every
-        frame, and a tree that is rebuilt when asked cannot go stale. See
-        `runtime/accessibility.py` -- the platform bridge that would show this
-        to a screen reader is not built.
+        Built on demand rather than maintained, so it cannot go stale: `paint`
+        calls this every frame once a bridge is bound, but that is cheap
+        because `Bridge.update` itself skips the work when nothing is
+        listening -- see `runtime/accessibility.py`.
         """
         return accessibility_tree(self.root, self.overlays)
 
@@ -438,9 +443,3 @@ class App:
 def run(app: App) -> None:
     """Run *app* until its window closes."""
     app.run()
-
-
-def batched(fn: Callable[[], None]) -> None:
-    """Apply several signal writes as one update."""
-    with batch():
-        fn()

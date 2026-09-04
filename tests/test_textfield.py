@@ -357,6 +357,17 @@ def test_both_m3_variants_render(variant: str) -> None:
     assert len(painted(element)) > 0
 
 
+@pytest.mark.parametrize("variant", ["filled", "outlined"])
+def test_an_error_field_paints_the_error_token(variant: str) -> None:
+    """`error:` drives the same accent slot focus otherwise would -- the
+    indicator for filled, the border for outlined -- even while unfocused."""
+    element = field(value="Ada", style={"variant": variant}, error="true")
+    dl = painted(element)
+    error_token = Palette(Theme()).index("error")
+    tokens = {int(s["flags"][2]) for s in dl.view} | {int(s["flags"][3]) for s in dl.view}
+    assert error_token in tokens
+
+
 # ---------------------------------------------------------------- multiline
 
 LONG = "This is a long value that will certainly wrap onto several lines here."

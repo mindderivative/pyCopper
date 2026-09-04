@@ -158,7 +158,7 @@ class HotReloader:
         """
         events = self.drain()
         for event in events:
-            if event.change == "DELETED":
+            if event.change == "deleted":
                 log.warning("watched view file disappeared: %s", event.path)
                 continue
             try:

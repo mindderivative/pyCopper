@@ -1876,10 +1876,11 @@ this is the shape being drawn, not a border added to something else, so
 `KIND_SEGMENT` has no border and no separate stroke colour the way
 `KIND_BOX`/`KIND_POLYGON` do.
 
-No widget draws a segment yet — Canvas and node-graph are still unbuilt, so
-this ships as a tested engine primitive alone, the way `KIND_BOX` and
-`KIND_SHADOW` were tested directly in `tests/golden/test_primitives.py` before
-any widget existed at M2. `tests/test_segment.py` covers the instance
+No widget drew a segment at the time this primitive shipped — Canvas and
+node-graph were still unbuilt, so it shipped as a tested engine primitive
+alone, the way `KIND_BOX` and `KIND_SHADOW` were tested directly in
+`tests/golden/test_primitives.py` before any widget existed at M2. `Canvas`
+(§5.21) is now that consumer, via its `line()` method. `tests/test_segment.py` covers the instance
 encoding; `tests/golden/test_primitives.py` renders it, including a test that
 specifically distinguishes a round cap from a naively squared-off
 bounding-box cap — a point inside the capsule's true circular cap but outside
@@ -2399,7 +2400,7 @@ collapse frees — now scrolls exactly that far, collapses the bar, and stops.
 
 ### 5.16.1 The frozen surface
 
-`pycopper.__all__` is the whole public API — 24 names — and is covered by
+`pycopper.__all__` is the whole public API — 31 names — and is covered by
 semantic versioning: adding to it is a minor release, removing or re-signing
 anything in it is a major one. `tests/test_public_api.py` pins the list, so a
 change to it is a decision rather than an accident.
@@ -2558,10 +2559,12 @@ No M3 component exists for this either, checked the same way as every other
 ungrounded widget. `Canvas` is the first consumer of two engine primitives
 that had none until now: `DisplayList.add_segment` (§5.15.1, built for
 oriented lines) and the palette-token colour convention every other widget
-already emits through. `add_image`/`ImageAtlas` still has no consumer —
-deliberately: `Canvas.image()` is left unbuilt until the `Image` widget
-itself exists, so the convention for loading, caching and keying a source
-gets designed once rather than reinvented here first and reconciled later.
+already emits through. `add_image`/`ImageAtlas` had no consumer at the time `Canvas` landed —
+`Canvas.image()` was deliberately left unbuilt so the convention for
+loading, caching and keying a source got designed once, by the `Image`
+widget itself (§5.22), rather than reinvented here first and reconciled
+later. `Image` has since become that consumer; `Canvas.image()` remains
+unbuilt.
 
 **Why an imperative callback and not a declarative shape list.** Every other
 widget's content is data a view file states once; `Canvas` exists precisely
@@ -2863,16 +2866,25 @@ pyCopper/
 ├── src/
 │   └── pycopper/
 │       ├── __init__.py          # THE public API surface (§10)
+│       ├── app.py               # App: view + state + handlers + engine (§6)
 │       ├── config.py            # pydantic-settings: PYCOPPER_* env overrides
 │       ├── spec/
 │       │   ├── loader.py        # yaml.safe_load + include resolution
 │       │   ├── models.py        # Pydantic Spec tree
-│       │   └── expressions.py   # {{ }} restricted AST — no eval
+│       │   ├── expressions.py   # {{ }} restricted AST — no eval
+│       │   ├── include.py       # `source:` view composition (§5.1.1)
+│       │   ├── stylesheet.py    # `styles:` rule resolution (§5.17.1)
+│       │   └── typescale.py     # M3 type-scale roles (§5.17.7)
 │       ├── runtime/
 │       │   ├── engine.py        # frame pipeline, canvas/device ownership
 │       │   ├── signals.py       # Signal / Computed / Effect, tracking scope
 │       │   ├── events.py        # queue, hit test, capture/bubble, focus
-│       │   └── hotreload.py     # watchfiles -> reconcile
+│       │   ├── hotreload.py     # watchfiles -> reconcile
+│       │   ├── overlay.py       # dialog/menu/tooltip/snackbar/sheets host (§5.13)
+│       │   ├── accessibility.py # semantic tree snapshot (§5.11)
+│       │   ├── accesskit_bridge.py # optional AccessKit bridge (§5.11)
+│       │   ├── clipboard.py     # in-process clipboard, optional system seam (§5.17.6)
+│       │   └── viewmodel.py     # per-view-file signal/handler namespace
 │       ├── tree/
 │       │   ├── element.py       # mutable runtime node
 │       │   └── reconcile.py     # keyed diff, state preservation
@@ -2894,7 +2906,14 @@ pyCopper/
 │       │   ├── shaping.py       # uharfbuzz -> ShapedRun (numpy), shaped-run cache
 │       │   ├── itemize.py       # bidi (UAX #9) + script runs (UAX #24)
 │       │   ├── segment.py       # line breaks (UAX #14), graphemes (UAX #29)
-│       │   └── layout.py        # line assembly, alignment, caret/selection geometry
+│       │   ├── layout.py        # line assembly, alignment, caret/selection geometry
+│       │   ├── editing.py       # EditState + operations, no pixels (§5.9.1)
+│       │   ├── selection.py     # point <-> offset mapping (§5.17.6)
+│       │   ├── icons.py         # Material Symbols variable-font icons (§5.7.8)
+│       │   └── svgicons.py      # arbitrary SVG compiled to glyph outlines (§5.7.9)
+│       ├── motion/
+│       │   ├── easing.py        # M3 curves + duration tokens (§5.17)
+│       │   └── animation.py     # Ticker, retarget-not-restart animations (§5.17)
 │       ├── assets/
 │       │   ├── __init__.py      # DEFAULT_FONT, MEDIUM_FONT, FALLBACK_CHAIN
 │       │   └── fonts/           # BUNDLED fonts — required by golden tests (§11)
@@ -2909,7 +2928,13 @@ pyCopper/
 │           ├── material.py      # M3 catalogue: card, checkbox, chip, fab, ...
 │           ├── navigation.py    # rail, drawer, app bar, tabs, list item, progress
 │           ├── overlays.py      # dialog, menu, tooltip, snackbar, sheets
-│           └── scroll.py        # clipped viewport + wheel handling
+│           ├── scroll.py        # clipped viewport + wheel handling
+│           ├── textfield.py     # TextField (§5.9.1)
+│           ├── carousel.py      # Carousel + CarouselItem (§5.16)
+│           ├── dock.py          # DockSplit / DockGroup / DockPanel (§5.20)
+│           ├── canvas.py        # Canvas: imperative drawing surface (§5.21)
+│           ├── image.py         # Image (§5.22)
+│           └── video.py         # Video: frame-sink widget (§5.23)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers

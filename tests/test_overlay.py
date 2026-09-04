@@ -110,7 +110,40 @@ def test_anchored_overlay_sits_below_its_anchor() -> None:
 
 
 def test_anchored_overlay_flips_above_when_it_would_overflow() -> None:
-    """A menu that runs off the bottom is useless, so anchoring flips it."""
+    """A menu that runs off the bottom is useless, so anchoring flips it.
+
+    The anchor sits near the bottom of the window (pushed there by an
+    expanding `Spacer`, as `test_a_submenu_flips_to_the_left_when_it_would_
+    overflow` does on the other axis), and the overlay is sized to fit in the
+    room above it but not the room below -- the only way to tell "flipped
+    above" apart from "clamped to the top because it fits nowhere", which is
+    what an anchor near the *top* of the window (as below) always produces
+    regardless of whether the flip itself works.
+    """
+    app = make(
+        [dialog(placement="anchor", anchor="btn", height=300)],
+        root_children=[
+            {"widget": "Spacer", "style": {"height": "expand"}},
+            {
+                "name": "btn",
+                "widget": "Button",
+                "text": "Open",
+                "style": {"width": 150, "height": 40},
+            },
+        ],
+        show=Signal(True),
+    )
+    rect = app.overlays.visible()[0].rect()
+    anchor = app.root.find("btn").absolute_rect()
+    assert rect.bottom <= anchor.y
+    assert rect.y >= 0
+
+
+def test_an_overlay_too_tall_for_either_side_still_starts_on_screen() -> None:
+    """Too tall to fit below the anchor *or* above it: clamped rather than
+    left with a negative origin. The anchor sits near the top here, so there
+    is no room above it either -- this is the one placement an anchored
+    overlay can never actually flip into."""
     app = make(
         [dialog(placement="anchor", anchor="btn", height=2000)],
         show=Signal(True),

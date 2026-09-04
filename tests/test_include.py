@@ -223,6 +223,37 @@ def test_call_site_name_names_the_fragment_root(views) -> None:
     assert app.root.find("card") is None, "the fragment's own root id leaked"
 
 
+def test_an_anchor_naming_a_fragment_local_id_is_namespaced_too(views) -> None:
+    """`anchor:` must follow the same namespacing `name:` gets, or two
+    included copies would end up pointing at each other's target."""
+    (views / "pair.yaml").write_text(
+        textwrap.dedent("""
+        name: pair
+        widget: Column
+        children:
+          - {name: target, widget: Button, text: Open}
+          - {name: near, widget: Button, text: Near, style: {anchor: target}}
+    """)
+    )
+    view = load_view(
+        write(
+            views,
+            """
+            root:
+              name: root
+              widget: Column
+              children:
+                - {name: a, source: pair.yaml}
+                - {name: b, source: pair.yaml}
+        """,
+        )
+    )
+    a_near = next(c for c in view.root.children[0].children if c.name == "a.near")
+    b_near = next(c for c in view.root.children[1].children if c.name == "b.near")
+    assert a_near.style.anchor == "a.target"
+    assert b_near.style.anchor == "b.target"
+
+
 def test_state_survives_a_reload_of_an_included_tree(views) -> None:
     path = write(
         views,

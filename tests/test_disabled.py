@@ -179,7 +179,6 @@ def test_a_disabled_control_ignores_clicks() -> None:
 
     app = two_buttons()
     hits: list[int] = []
-    app.handler(lambda event: hits.append(1), name="hit") if False else None
 
     @app.handler
     def hit(event) -> None:

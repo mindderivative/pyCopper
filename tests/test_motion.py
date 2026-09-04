@@ -229,6 +229,13 @@ def test_animating_marks_paint_and_not_layout() -> None:
     assert not e.needs_layout
 
 
+def test_an_invalid_invalidates_argument_is_rejected() -> None:
+    e = element()
+    e.set_ticker(Ticker())
+    with pytest.raises(ValueError, match="invalidates"):
+        e.animated("x", 1.0, invalidates="repaint")
+
+
 def test_animations_survive_a_spec_update() -> None:
     """They are runtime state, so a hot reload must not restart a transition
     that is mid-flight."""
@@ -335,6 +342,8 @@ def test_the_frame_delta_is_measured_once_per_frame() -> None:
     """Sampled per caller instead, layout and paint would disagree about where
     a moving thing is within a single frame."""
     app = hosted([{"name": "p", "widget": "LinearProgress", "style": {"width": "expand"}}])
-    first = app._frame_delta()
-    assert first >= 0.0
-    assert app._frame_delta() >= 0.0
+    times = iter([1.0, 1.4])
+    app.clock = lambda: next(times)
+    app._last_tick = None
+    assert app._frame_delta() == 0.0, "the first frame has nothing to measure against"
+    assert app._frame_delta() == pytest.approx(0.4)

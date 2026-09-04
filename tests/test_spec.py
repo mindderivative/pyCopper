@@ -165,6 +165,8 @@ def test_expression_evaluation(src, ctx, expected) -> None:
         "obj.__class__",
         "obj.destroy()",
         "eval('1')",
+        "max(1, n=2)",
+        "{**a}",
     ],
 )
 def test_dangerous_expressions_are_rejected(src) -> None:

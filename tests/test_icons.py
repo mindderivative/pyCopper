@@ -64,7 +64,13 @@ def test_unknown_icon_raises_with_a_useful_message(icons: IconSet) -> None:
 
 
 def test_names_are_sorted(icons: IconSet) -> None:
-    assert icons.names == sorted(icons.names)
+    """`.names` sorts regardless of the underlying dict's insertion order --
+    asserting `icons.names == sorted(icons.names)` against the bundled set
+    alone is tautological (`names` always returns `sorted(...)`, and the
+    bundled JSON already happens to be alphabetical), so this constructs an
+    out-of-order set directly to make the property earn the assertion."""
+    unordered = IconSet(icons.face, {"zebra": 1, "apple": 2, "mango": 3})
+    assert unordered.names == ["apple", "mango", "zebra"]
 
 
 # --------------------------------------------------------------- the axes
@@ -96,6 +102,7 @@ def test_axis_values_are_clamped(icons: IconSet) -> None:
     assert icons.coords(fill=5.0)[0] == 1.0
     assert icons.coords(fill=-1.0)[0] == 0.0
     assert icons.coords(weight=9000)[1] == 700.0
+    assert icons.coords(weight=-50)[1] == 100.0
 
 
 def test_light_weights_are_lifted_at_standard_size(icons: IconSet) -> None:
@@ -121,6 +128,19 @@ def test_fill_variants_are_separate_atlas_entries(engine: TextEngine) -> None:
     engine.emit_icon(dl, "favorite", x=0, y=0, fill=0.0)
     before = len(engine.atlas)
     engine.emit_icon(dl, "favorite", x=0, y=0, fill=1.0)
+    assert len(engine.atlas) == before + 1
+
+
+def test_weight_variants_are_separate_atlas_entries(engine: TextEngine) -> None:
+    """Same glyph, same size -- they would collide if wght were not in the
+    key either (the FILL case above covers only one of the two live axes).
+    Rendered at 48dp, above `DEFAULT_ICON_SIZE`, so the M3 minimum-weight
+    lift in `suggested_weight` doesn't mask the two requested weights into
+    the same coordinate."""
+    dl = DisplayList()
+    engine.emit_icon(dl, "favorite", x=0, y=0, size=48, weight=200)
+    before = len(engine.atlas)
+    engine.emit_icon(dl, "favorite", x=0, y=0, size=48, weight=700)
     assert len(engine.atlas) == before + 1
 
 

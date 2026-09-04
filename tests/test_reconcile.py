@@ -43,6 +43,19 @@ def test_style_change_updates_in_place() -> None:
     assert stats.updated >= 1
 
 
+def test_disabled_literal_change_updates_in_place() -> None:
+    """Regression: `update_spec` used to read `disabled:` only in
+    `init_element`, so a reload that flipped it left the old value in place
+    (see the comment in `ElementMixin.update_spec`)."""
+    root = tree(children=[{**CHILD_A, "disabled": "true"}])
+    child = root.find("a")
+    assert child.disabled
+    result, stats = reconcile(root, spec(children=[{**CHILD_A, "disabled": "false"}]))
+    assert result.find("a") is child
+    assert not child.disabled
+    assert stats.updated >= 1
+
+
 def test_state_survives_a_style_change() -> None:
     """The headline claim: editing a view file must not wipe runtime state."""
     root = tree(children=[CHILD_A])

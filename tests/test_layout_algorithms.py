@@ -58,6 +58,14 @@ def test_empty_padding_still_occupies_space() -> None:
     assert Padding(None, EdgeInsets.all(10)).layout(LOOSE_500) == Size(20, 20)
 
 
+def test_single_child_node_rejects_a_second_child() -> None:
+    """Extra children would paint unpositioned on top of each other with no
+    error anywhere -- this must fail loudly instead."""
+    p = Padding(LeafNode(10, 10), EdgeInsets.all(5))
+    with pytest.raises(ValueError, match="single child"):
+        p.add_child(LeafNode(10, 10))
+
+
 # --------------------------------------------------------------- alignment
 
 
@@ -202,6 +210,11 @@ def test_flex_in_unbounded_space_is_an_error() -> None:
     row = Row([Flexible(LeafNode(10, 10))])
     with pytest.raises(ValueError, match="unbounded"):
         row.layout(Constraints.unbounded())
+
+
+def test_negative_flex_is_rejected() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        Flexible(LeafNode(10, 10), flex=-1)
 
 
 def test_inflexible_children_measured_before_flexible() -> None:

@@ -72,6 +72,16 @@ def test_the_parameters_reach_the_instance() -> None:
     assert radius == pytest.approx(4.0)
 
 
+def test_a_border_reaches_the_instance() -> None:
+    """`params[0]` is the border width the docstring above names but the
+    previous test leaves as `_` -- this is what actually exercises it."""
+    inst = shape_instance(
+        {"name": "s", "widget": "Shape", "style": {"border": {"width": 3, "color": "outline"}}}
+    )
+    border_width = inst["params"][0]
+    assert border_width == pytest.approx(3.0)
+
+
 def test_a_shape_is_token_coloured_rather_than_a_literal() -> None:
     """A literal colour would opt the shape out of theming entirely."""
     inst = shape_instance({"name": "s", "widget": "Shape", "style": {"background": "tertiary"}})

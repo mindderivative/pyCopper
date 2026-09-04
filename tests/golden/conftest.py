@@ -92,11 +92,15 @@ def regenerating() -> bool:
     return os.environ.get("PYCOPPER_REGEN_GOLDEN") == "1"
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def assert_golden(regenerating: bool):
     """Compare a rendered frame against a committed baseline PNG."""
     from PIL import Image
 
+    # Session-scoped so `used` survives across test functions: the collision
+    # this guards against (two DIFFERENT tests sharing a baseline name) can
+    # only be caught here if the set persists for the whole run, not just one
+    # test's fixture instance.
     used: set[str] = set()
 
     def _check(name: str, frame: np.ndarray) -> None:

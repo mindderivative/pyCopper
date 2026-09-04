@@ -85,6 +85,12 @@ def test_light_and_dark_differ() -> None:
     assert dark[0] < light[0]
 
 
+def test_contrast_changes_the_palette() -> None:
+    low = Palette(Theme(dark=True, contrast=0.0)).linear("outline")
+    high = Palette(Theme(dark=True, contrast=1.0)).linear("outline")
+    assert low != high
+
+
 def test_rebuild_marks_dirty() -> None:
     p = Palette(Theme(dark=True))
     p.mark_uploaded()

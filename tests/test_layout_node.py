@@ -267,6 +267,17 @@ def test_adding_a_child_dirties_the_parent() -> None:
     assert parent.needs_layout
 
 
+def test_removing_a_child_dirties_the_parent_and_detaches_it() -> None:
+    leaf = LeafNode(10, 10)
+    parent = Column([leaf])
+    parent.layout(Constraints.unbounded())
+    assert not parent.needs_layout
+
+    parent.remove_child(leaf)
+    assert parent.needs_layout
+    assert leaf.parent is None
+
+
 def test_depth_tracks_nesting() -> None:
     leaf = LeafNode()
     root = Column([Column([leaf])])

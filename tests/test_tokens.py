@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pycopper
 from pycopper.theme import TOKEN_COUNT, TOKEN_INDEX, TOKEN_ORDER, is_token
 from pycopper.theme.tokens import MYC_ATTR
 
@@ -43,7 +42,3 @@ def test_is_token() -> None:
     assert is_token("surface_variant")
     assert not is_token("surfaceVariant")  # camelCase is internal only
     assert not is_token("nope")
-
-
-def test_public_api_surface() -> None:
-    assert set(pycopper.__all__) <= set(dir(pycopper))

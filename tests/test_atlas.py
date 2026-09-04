@@ -98,6 +98,16 @@ def test_size_and_subpixel_are_separate_entries(face) -> None:
     assert len(atlas) == 3
 
 
+def test_coords_are_part_of_the_key(face) -> None:
+    """A filled and an unfilled icon are the same glyph id at the same size,
+    and would collide without `coords` in the key -- see `GlyphAtlas.get`."""
+    atlas = GlyphAtlas(size=256)
+    gid = face.glyph_for(ord("A"))
+    atlas.get(face, gid, 24.0, 0, (0.0,))
+    atlas.get(face, gid, 24.0, 0, (1.0,))
+    assert len(atlas) == 2
+
+
 def test_uv_is_normalised_and_ordered(face) -> None:
     atlas = GlyphAtlas(size=256)
     entry = atlas.get(face, face.glyph_for(ord("W")), 32.0)

@@ -112,6 +112,12 @@ def test_unbounded() -> None:
     assert not c.has_bounded_width and not c.has_bounded_height
 
 
+def test_expand_locks_unspecified_axes_to_infinity() -> None:
+    c = Constraints.expand(width=100)
+    assert c.is_tight_width and c.max_width == 100
+    assert c.is_tight_height and c.max_height == INF
+
+
 # -------------------------------------------------------------- operations
 
 
@@ -136,6 +142,12 @@ def test_tighten_clamps_into_range() -> None:
 def test_tighten_leaves_other_axis_alone() -> None:
     c = Constraints(0, 100, 0, 100).tighten(width=50)
     assert c.is_tight_width and not c.is_tight_height
+
+
+def test_copy_with_overrides_only_the_given_fields() -> None:
+    c = Constraints(10, 20, 30, 40)
+    assert c.copy_with(min_width=5) == Constraints(5, 20, 30, 40)
+    assert c.copy_with(max_height=50) == Constraints(10, 20, 30, 50)
 
 
 # ------------------------------------------------------------- other types

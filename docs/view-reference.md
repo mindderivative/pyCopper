@@ -44,7 +44,7 @@ Every node accepts these. Only `widget` is required.
 | `id` | — | **Assigned by the loader.** Never author one. |
 | `view` | — | **Assigned by the loader.** The view file this node was written in. |
 | `style` | mapping | See [Style properties](#style-properties). |
-| `text` | string | Label, or an icon name for `Icon`/`IconButton`/`Fab`. |
+| `text` | string | Label, or an icon name for `Icon`/`IconButton`/`Fab`/`NavItem`. |
 | `value` | string | State binding — what a control *is*. See [Bindings](#bindings). |
 | `supporting_text` | string | Second line, trailing text, or action label, per widget. |
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
@@ -270,7 +270,7 @@ dialog closes only through its own buttons:
 ```
 
 The gallery has one of each, built from the same `Dialog` and one property
-apart: `parts/confirm_dialog.yaml` and `parts/locked_dialog.yaml`.
+apart: `parts/confirm_dialog_View.yaml` and `parts/locked_dialog_View.yaml`.
 
 **`on_dismiss` is not optional for a dismissable overlay whose `open:` is
 bound**, which is every overlay an application controls. The runtime closing it
@@ -930,7 +930,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 |---|---|
 | `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
 | `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. |
-| `Fab` | 56dp standard, 40 small, 96 large. |
+| `Fab` | 56dp standard, 40 small, 80 medium, 96 large. |
 | `Checkbox` | 18dp box, 2dp radius. |
 | `Radio` | 20dp outer, 10dp dot. |
 | `Switch` | 52×32dp track. |

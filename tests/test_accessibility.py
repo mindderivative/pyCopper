@@ -56,6 +56,7 @@ def test_a_navigation_container_is_not_announced() -> None:
 def test_decoration_is_not_announced() -> None:
     assert role_for("Spacer") is None
     assert role_for("Icon") is None, "an icon's meaning is its label, not itself"
+    assert role_for("Shape") is None, "a shape has no label and nothing to do"
 
 
 def test_a_filter_chip_reads_as_a_checkbox_and_the_others_as_buttons() -> None:
@@ -129,9 +130,49 @@ def test_checkable_and_uncheckable_are_distinguishable() -> None:
     assert tree.find(role="button").checked is None
 
 
+def test_selected_and_unselected_are_distinguishable() -> None:
+    view = {
+        "name": "root",
+        "widget": "Row",
+        "children": [
+            {
+                "name": "rail",
+                "widget": "NavigationRail",
+                "value": "home",
+                "children": [
+                    {
+                        "name": "home",
+                        "widget": "NavItem",
+                        "text": "home",
+                        "supporting_text": "Home",
+                    },
+                    {
+                        "name": "settings",
+                        "widget": "NavItem",
+                        "text": "settings",
+                        "supporting_text": "Settings",
+                    },
+                ],
+            },
+            {"name": "go", "widget": "Button", "text": "Go"},
+        ],
+    }
+    tree = tree_of(view)
+    assert tree.find(name="Home").selected is True
+    assert tree.find(name="Settings").selected is False
+    assert tree.find(role="button", name="Go").selected is None, "a button is not unselected"
+
+
 def test_disabled_is_reported() -> None:
     tree = tree_of({"name": "b", "widget": "Button", "text": "Go", "disabled": "true"})
     assert tree.find(role="button").disabled is True
+
+
+def test_focus_is_reported() -> None:
+    root = build_element(parse_view({"name": "b", "widget": "Button", "text": "Go"}).root)
+    root.layout(Constraints.tight(Size(400.0, 300.0)))
+    root.state.focused = True
+    assert accessibility_tree(root).find(role="button").focused is True
 
 
 def test_a_progress_indicator_reports_its_value() -> None:

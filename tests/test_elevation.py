@@ -124,6 +124,8 @@ def test_the_raise_cannot_exceed_the_scale() -> None:
 
 
 def test_level_zero_draws_no_shadow() -> None:
+    """Also guards `self.elevation or FALLBACK`, a pattern that cannot tell an
+    explicit 0 from unset and would silently re-raise a card asked to flatten."""
     app = hosted(
         [
             {
@@ -197,21 +199,6 @@ def test_components_at_the_same_level_cast_the_same_shadow() -> None:
     card = blur_of("Card", {"variant": "elevated", "elevation": 3, "width": 100, "height": 40})
     fab = blur_of("Fab", {"elevation": 3})
     assert card == fab
-
-
-def test_an_explicit_zero_flattens_an_elevated_card() -> None:
-    """`self.elevation or FALLBACK` cannot tell an explicit 0 from unset, and
-    silently re-raised a card the view had asked to flatten."""
-    app = hosted(
-        [
-            {
-                "name": "c",
-                "widget": "Card",
-                "style": {"variant": "elevated", "elevation": 0, "width": 100, "height": 40},
-            }
-        ]
-    )
-    assert shadows(app) == []
 
 
 def test_a_cards_resting_level_follows_its_variant() -> None:

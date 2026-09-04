@@ -295,6 +295,22 @@ def test_arrow_keys_step_the_ratio() -> None:
     assert s._ratio() == pytest.approx(0.50)
 
 
+def test_arrow_keys_use_the_splits_own_axis_when_vertical() -> None:
+    """`Right`/`Left` only make sense for a horizontal split; a vertical one
+    must answer to `Down`/`Up` instead, the same axis-aware mapping its own
+    layout already uses."""
+    view = {"name": "root", "widget": "Column", "children": [_split(value="0.5", axis="vertical")]}
+    a = app(view)
+    s = a.root.find("s")
+    a.dispatcher.focus(s)
+    a.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Down"))
+    a.dispatcher.drain()
+    assert s._ratio() == pytest.approx(0.52)
+    a.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Up"))
+    a.dispatcher.drain()
+    assert s._ratio() == pytest.approx(0.50)
+
+
 def test_a_pane_never_shrinks_below_the_minimum() -> None:
     from pycopper.widgets.dock import DockSplitElement
 

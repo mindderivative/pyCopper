@@ -133,6 +133,13 @@ def test_a_right_click_does_not_press_focus_or_click() -> None:
     assert not button.state.focused
     assert clicks == []
 
+    # A right-click that lands and lifts over the button must not also fire
+    # `on_click` alongside `on_context_menu` -- release is excluded the same
+    # way press is, above.
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=50, y=20, button=MOUSE_SECONDARY))
+    app.dispatcher.drain()
+    assert clicks == [], "a right-click's release fired on_click"
+
     press(app, 50, 20, MOUSE_PRIMARY)
     app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=50, y=20, button=MOUSE_PRIMARY))
     app.dispatcher.drain()

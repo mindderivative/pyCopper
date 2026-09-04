@@ -132,6 +132,15 @@ def test_computed_is_lazy_until_read() -> None:
     assert calls == [1]
 
 
+def test_computed_peek_does_not_subscribe() -> None:
+    a = Signal(1)
+    c = Computed(lambda: a.get() * 2)
+    log: list[int] = []
+    Effect(lambda: log.append(c.peek()))
+    a.set(2)
+    assert log == [2], "reading a computed via peek() must not create a dependency"
+
+
 # ----------------------------------------------------------------- batching
 
 
