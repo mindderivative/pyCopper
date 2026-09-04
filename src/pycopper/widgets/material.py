@@ -280,9 +280,11 @@ class CardElement(_StyledMixin, Padding):
         return outer.constrain(inner)
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        from ..paint import NO_TOKEN
+
         style = self.style
         variant = style.variant if style.variant in self.CONTAINERS else "filled"
-        radius = style.corner_radius[0] or self.RADIUS
+        radii = self.effective_radii
         container = ctx.palette.index(style.background or self.CONTAINERS[variant])
 
         if variant == "elevated":
@@ -295,18 +297,27 @@ class CardElement(_StyledMixin, Padding):
                 # Not `or ELEVATED_LEVEL`: an explicit `elevation: 0` is an
                 # override, and `or` cannot tell zero from unset.
                 level=self.elevation,
-                radii=(radius,) * 4,
+                radii=radii,
             )
-        _box(
-            ctx,
-            absolute.x,
-            absolute.y,
-            self.size.width,
-            self.size.height,
+        # Not `_box`, which only takes one radius for all four corners: a
+        # view is free to set `corner_radius: [tl, tr, br, bl]` (docs' Style
+        # properties table), and `effective_radii` already carries that
+        # through -- so the fill has to be emitted per-corner too, the same
+        # way `ButtonElement.paint_self` does it.
+        outlined = variant == "outlined"
+        dpr = ctx.pixel_ratio
+        ctx.display_list.add_box(
+            absolute.x * dpr,
+            absolute.y * dpr,
+            self.size.width * dpr,
+            self.size.height * dpr,
             token=container,
-            radius=radius,
-            border_width=1.0 if variant == "outlined" else 0.0,
-            border_token=ctx.palette.index("outline_variant"),
+            radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+            border_width=1.0 * dpr if outlined else 0.0,
+            border_token=ctx.palette.index("outline_variant") if outlined else NO_TOKEN,
+            border_color=(1.0, 1.0, 1.0, 1.0),
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
         )
 
 
@@ -404,6 +415,7 @@ class AccordionElement(_StyledMixin, Padding):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(
                 absolute.x * dpr,
@@ -600,7 +612,6 @@ class CheckboxElement(_StyledMixin, Padding):
         primary = ctx.palette.index(self.style.background or "primary")
         on_primary = content_token(ctx, self.style, "on_primary")
 
-        _emit_state_layer(ctx, self, absolute, primary, (self.RADIUS,) * 4)
         t = self.animated(
             "selected",
             1.0 if selected else 0.0,
@@ -634,6 +645,11 @@ class CheckboxElement(_StyledMixin, Padding):
                 radius=self.RADIUS,
                 alpha=t,
             )
+        # After the fill, not before: at t=1 the fill is fully opaque and
+        # would otherwise hide the state layer entirely, leaving a checked
+        # checkbox with no visible hover/focus/press feedback.
+        _emit_state_layer(ctx, self, absolute, primary, (self.RADIUS,) * 4)
+        if t > 0.0:
             # M3 draws the checkmark on; a glyph cannot be drawn progressively,
             # so it fades -- an approximation, and the honest one available.
             ctx.text.emit_icon(
@@ -811,10 +827,6 @@ class ChipElement(_StyledMixin, Padding):
     @property
     def _is_filter(self) -> bool:
         return self.style.variant == "filter"
-
-    @property
-    def _leading(self) -> str:
-        return "check" if self._is_filter and self.checked else ""
 
     def _check_progress(self) -> float:
         """How far the leading checkmark has slid in, 0 to 1.

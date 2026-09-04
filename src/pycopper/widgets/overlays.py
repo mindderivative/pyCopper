@@ -419,7 +419,7 @@ class PopoverElement(_StyledMixin, Padding):
             child.layout(
                 Constraints(
                     min_width=0.0,
-                    max_width=inner_width,
+                    max_width=inner_max,
                     min_height=0.0,
                     max_height=constraints.max_height,
                 )

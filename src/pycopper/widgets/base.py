@@ -30,6 +30,7 @@ from ..spec.typescale import TYPE_SCALE, TypeStyle
 from ..text import TextEngine
 from ..text.fontdb import FontRequest
 from ..text.layout import Alignment as TextAlignment
+from ..theme import is_token
 from ..tree.element import ElementMixin, PaintContext, default_text_engine
 
 __all__ = [
@@ -101,8 +102,6 @@ def paired_content_token(ctx: PaintContext, style: StyleSpec, default: str) -> i
     a component whose background is one part of a larger anatomy keeps its
     variant's content token.
     """
-    from ..theme import is_token
-
     if style.color:
         return ctx.palette.index(style.color)
     if style.background:
@@ -489,8 +488,11 @@ class LinkElement(_StyledMixin, Padding):
 
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
+        style = self.style
         label = (
-            measure_text(self._text, self.style.font_size, engine=self.text_engine)
+            measure_text(
+                self._text, style.font_size, engine=self.text_engine, weight=style.font_weight
+            )
             if self._text.strip()
             else Size(0.0, 0.0)
         )
@@ -501,8 +503,18 @@ class LinkElement(_StyledMixin, Padding):
             return
         style = self.style
         token = content_token(ctx, style, self._color_role())
-        label = measure_text(self._text, style.font_size, engine=self.text_engine)
-        paint_text(ctx, absolute.x, absolute.y, self._text, style.font_size, token)
+        label = measure_text(
+            self._text, style.font_size, engine=self.text_engine, weight=style.font_weight
+        )
+        paint_text(
+            ctx,
+            absolute.x,
+            absolute.y,
+            self._text,
+            style.font_size,
+            token,
+            weight=style.font_weight,
+        )
 
         metrics = self.text_engine.db.face_for(FontRequest(weight=style.font_weight)).metrics(
             style.font_size
@@ -852,9 +864,10 @@ _REGISTRY_COMPLETE = False
 
 def create_element(spec: WidgetSpec) -> Any:
     """Construct the element for one spec node (no children)."""
+    global _REGISTRY_COMPLETE
     if not _REGISTRY_COMPLETE:
         _REGISTRY.update(_material_registry())
-        globals()["_REGISTRY_COMPLETE"] = True
+        _REGISTRY_COMPLETE = True
     return _REGISTRY[spec.widget](spec)
 
 

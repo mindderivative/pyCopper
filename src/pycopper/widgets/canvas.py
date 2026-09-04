@@ -41,6 +41,7 @@ from .base import _StyledMixin, measure_text, paint_text
 __all__ = ["CanvasContext", "CanvasElement"]
 
 _WHITE: Final = (1.0, 1.0, 1.0, 1.0)
+_TRANSPARENT: Final = (0.0, 0.0, 0.0, 0.0)
 
 #: A str names a palette token, resolved through `ctx.palette` so themed
 #: content re-tints on a theme switch the same way every other widget's does.
@@ -114,7 +115,7 @@ class CanvasContext:
         """A filled, optionally rounded and bordered rectangle."""
         fill, token = self._fill(color)
         border_fill, border_token = (
-            self._fill(border_color) if border_color is not None else (_WHITE, NO_TOKEN)
+            self._fill(border_color) if border_color is not None else (_TRANSPARENT, NO_TOKEN)
         )
         d = self._dpr
         self._ctx.display_list.add_box(
@@ -320,6 +321,7 @@ class CanvasElement(_StyledMixin, Padding):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(clip.x, clip.y, width, height),
             clip_radii=ctx.clip_radii,

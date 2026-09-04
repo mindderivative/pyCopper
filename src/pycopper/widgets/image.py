@@ -114,7 +114,16 @@ class ImageElement(_StyledMixin, Padding):
             self._resolved_entry = None
             return None
         key = Path(self.path).expanduser().resolve()
-        if key != self._resolved_key:
+        # A wholesale eviction (`ImageAtlas.reset`, forced by some other image
+        # needing room) invalidates every entry it packed, not just this
+        # widget's -- re-resolve on a stale generation too, the same
+        # every-call check `GlyphAtlas.get` makes for exactly this reason,
+        # or a widget whose `path:` never changes would go on pointing at a
+        # rectangle the atlas has since overwritten.
+        stale = self._resolved_entry is not None and (
+            self._resolved_entry.generation != self.image_atlas.generation
+        )
+        if key != self._resolved_key or stale:
             self._resolved_key = key
             try:
                 self._resolved_entry = self.image_atlas.get_or_add(key, lambda: _decode(key))

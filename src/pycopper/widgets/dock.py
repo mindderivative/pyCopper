@@ -33,7 +33,7 @@ from ..spec import WidgetSpec
 from ..spec.typescale import TYPE_SCALE
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
-from .material import HOVER, STATE_LAYER_CURVE, STATE_LAYER_MOTION, _box
+from .material import HOVER, STATE_LAYER_CURVE, STATE_LAYER_MOTION, _box, _state_alpha
 
 __all__ = ["DockGroupElement", "DockPanelElement", "DockSplitElement"]
 
@@ -87,7 +87,7 @@ class DockPanelElement(_StyledMixin, Padding):
         child = self.child
         if child is None:
             return outer.constrain(constraints.smallest)
-        size = child.layout(constraints)
+        size = child.layout(outer)
         child.offset = Offset(0.0, 0.0)
         return outer.constrain(size)
 
@@ -99,6 +99,7 @@ class DockPanelElement(_StyledMixin, Padding):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(absolute.x * dpr, absolute.y * dpr, self.HIDDEN_EXTENT, self.HIDDEN_EXTENT),
             clip_radii=ctx.clip_radii,
@@ -160,8 +161,9 @@ class DockGroupElement(_StyledMixin, LayoutNode):
         content_h = max(0.0, height - self.TAB_HEIGHT)
         active = self._active_name()
         for child in self.children:
-            child.set_selected(child.name == active)
-            size = Size(width, content_h) if child.name == active else Size(0.0, 0.0)
+            is_active = child.name is not None and child.name == active
+            child.set_selected(is_active)
+            size = Size(width, content_h) if is_active else Size(0.0, 0.0)
             child.layout(Constraints.tight(size))
             child.offset = Offset(0.0, self.TAB_HEIGHT)
         return outer.constrain(Size(width, height))
@@ -438,7 +440,7 @@ class DockSplitElement(_StyledMixin, LayoutNode):
             token=ctx.palette.index(self.style.background or "outline_variant"),
             radius=0.0,
         )
-        alpha = HOVER if (self.state.hovered or self.state.pressed) else 0.0
+        alpha = _state_alpha(self)
         if alpha > 0.001:
             ctx.display_list.add_box(
                 x * dpr,

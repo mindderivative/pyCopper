@@ -38,7 +38,7 @@ from ..text.editing import (
 from ..text.selection import caret_at, index_at, line_end, rects_for
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
-from .material import _box, _emit_state_layer
+from .material import _box, _state_alpha
 
 __all__ = ["TextFieldElement"]
 
@@ -278,6 +278,7 @@ class TextFieldElement(_StyledMixin, Padding):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(
                 (absolute.x + self.PAD_X) * dpr,
@@ -333,7 +334,22 @@ class TextFieldElement(_StyledMixin, Padding):
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
-            _emit_state_layer(ctx, self, absolute, on_surface, (self.RADIUS, self.RADIUS, 0.0, 0.0))
+            # Not `_emit_state_layer`: it sizes to `self.size`, which includes
+            # the supporting-text row beneath the container, and the layer
+            # must stop where the background above it does.
+            alpha = _state_alpha(self)
+            if alpha > 0.001:
+                ctx.display_list.add_box(
+                    absolute.x * dpr,
+                    absolute.y * dpr,
+                    width * dpr,
+                    self._container_height() * dpr,
+                    token=on_surface,
+                    color=(1.0, 1.0, 1.0, alpha),
+                    radii=(self.RADIUS * dpr, self.RADIUS * dpr, 0.0, 0.0),
+                    clip=ctx.clip,
+                    clip_radii=ctx.clip_radii,
+                )
             _box(
                 ctx,
                 absolute.x,

@@ -234,11 +234,7 @@ class CarouselElement(_StyledMixin, Flex):
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
         width = outer.max_width if outer.has_bounded_width else 0.0
-        height = (
-            float(self.style.height.value)
-            if self.style.height.kind == "fixed"
-            else (outer.max_height if outer.has_bounded_height else self.HEIGHT)
-        )
+        height = outer.max_height if outer.has_bounded_height else self.HEIGHT
         item_height = max(0.0, height - self.PAD_Y * 2)
         available = max(0.0, width - self.PAD_X * 2)
 
@@ -326,6 +322,7 @@ class CarouselElement(_StyledMixin, Flex):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(
                 absolute.x * dpr,
@@ -460,6 +457,7 @@ class CarouselItemElement(_StyledMixin, Flex):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(
                 absolute.x * dpr,

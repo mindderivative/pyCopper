@@ -317,6 +317,8 @@ def _resolved_width(style: Any, constraints: Constraints, default: float) -> flo
         return float(style.width.value)
     if style.width.kind == "expand" and constraints.has_bounded_width:
         return constraints.max_width
+    if style.width.kind == "percent" and constraints.has_bounded_width:
+        return constraints.max_width * float(style.width.value)
     return default
 
 
@@ -772,6 +774,7 @@ class SegmentedButtonElement(_SelectionContainer):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(
                 absolute.x * dpr,
@@ -1024,6 +1027,7 @@ class TreeItemElement(_StyledMixin, LayoutNode):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(clip.x, clip.y, width, height),
             clip_radii=ctx.clip_radii,
@@ -1134,8 +1138,17 @@ class LinearProgressElement(_StyledMixin, Padding):
 
     @property
     def indeterminate(self) -> bool:
-        """No `value:` at all means the wait time is unknown."""
-        return self.spec.value is None
+        """No resolved value at all means the wait time is unknown.
+
+        Read from the live `_value` rather than the static `spec.value` --
+        `value:` is templated like `text:`, so a signal bound through it that
+        starts empty must be able to flip this determinate on its own once it
+        reports one, per docs/view-reference.md's "changes from indeterminate
+        to determinate ... as information arrives". `spec.value` is only ever
+        the unrendered template source, which is never None once `value:` is
+        written at all.
+        """
+        return not self._value.strip()
 
     @property
     def progress(self) -> float:
@@ -1178,6 +1191,12 @@ class LinearProgressElement(_StyledMixin, Padding):
             start, length = self._indeterminate_span()
             offset, filled = self.size.width * start, self.size.width * length
         else:
+            # A bound `value:` can flip this element determinate without a
+            # dispose -- nothing else stops the repeat=True animation already
+            # registered with the ticker, so it would keep firing forever.
+            running = self.animation("indeterminate")
+            if running is not None:
+                self.ticker.discard(running)
             offset, filled = 0.0, self.size.width * self.progress
         if filled > 0:
             _box(
@@ -1220,7 +1239,8 @@ class CircularProgressElement(_StyledMixin, Padding):
 
     @property
     def indeterminate(self) -> bool:
-        return self.spec.value is None
+        """Same rule as `LinearProgress.indeterminate` -- see its docstring."""
+        return not self._value.strip()
 
     @property
     def progress(self) -> float:
@@ -1276,6 +1296,10 @@ class CircularProgressElement(_StyledMixin, Padding):
             )
             start, sweep = TAU * turn, TAU * self.INDETERMINATE_SWEEP
         else:
+            # Same repeat=True leak as LinearProgress -- see its paint_self.
+            running = self.animation("spin")
+            if running is not None:
+                self.ticker.discard(running)
             start, sweep = 0.0, TAU * self.progress
         if sweep > 0.0:
             _arc(

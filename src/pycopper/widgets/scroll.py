@@ -324,6 +324,7 @@ class ScrollViewElement(_StyledMixin, Padding):
             display_list=ctx.display_list,
             palette=ctx.palette,
             text=ctx.text,
+            images=ctx.images,
             pixel_ratio=dpr,
             clip=(
                 absolute.x * dpr,
@@ -334,8 +335,13 @@ class ScrollViewElement(_StyledMixin, Padding):
             clip_radii=tuple(r * dpr for r in self.effective_radii),  # type: ignore[arg-type]
         )
 
-    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
-        super().paint_self(ctx, absolute)
+    def paint_foreground(self, ctx: PaintContext, absolute: Any) -> None:
+        """The thumb sits over the scrolled content, not under it.
+
+        `paint_self` runs before children (ElementMixin.paint), so drawing the
+        thumb there would put it behind every row -- invisible under the first
+        opaque one. `paint_foreground` runs after children for exactly this.
+        """
         if self.style.scrollbar and self.scrollable:
             self._paint_scrollbar(ctx, absolute)
 
