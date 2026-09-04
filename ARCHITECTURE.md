@@ -939,6 +939,65 @@ before the fragment shader's `premultiply(texel * fill)` ever sees it. The
 glyph atlas is correctly `r8unorm` with no `-srgb` variant: coverage has no
 colour to decode.
 
+#### 5.8.5 Considered and rejected: a general vector engine as the rendering layer
+
+**ThorVG** (MIT; Godot vendors it, specifically as an SVG-to-texture *import*
+decoder in `modules/svg`, not wired into Godot's own UI layout) was proposed as
+the layer between pyCopper and wgpu/GL/WebGPU — replacing this section's own
+pipeline rather than sitting on top of it. **Rejected, deliberately, not on
+sunk cost alone.** Benchmarked at pyCopper's own scale (1000 rounded rects,
+40×24, 8px radius, 1px border — the exact geometry `tests/bench/bench_paint.py`
+already uses) via `thorvg-python` (ctypes, real wheels, LGPL-2.1), with the
+mechanism verified against ThorVG's own C API docs rather than assumed:
+
+- **Construction dominates, and it is backend-agnostic.** Building 1000
+  `Shape` objects (create, configure, `canvas.add`) cost 5.74 ms — 91% of the
+  cold-path total — against 0.56 ms to actually rasterise them, a number in
+  pyCopper's own ballpark (0.512 ms full-frame, §12.1). ThorVG's per-shape
+  imperative API has no bulk-construction path; the cost is structurally
+  identical to pyCopper's own *rejected* scalar emit (3.3 ms/1000, over
+  budget), not its adopted vectorised one (0.02 ms/1000). A better binding
+  could cut ctypes overhead; it cannot invent an API ThorVG doesn't expose.
+- **No incremental-update benefit, tested three times over.** A single shape
+  changed among 1000 cost the same as redrawing all 1000, with
+  `TVG_ENGINE_OPTION_SMART_RENDER` correctly enabled (verified via ThorVG's
+  own C API docs that `EngineOption` belongs on `tvg_swcanvas_create`, not
+  `tvg_engine_init` — an earlier attempt using the latter was invalid and is
+  not the figure recorded here), in both a scattered and a clustered layout,
+  and with the canvas scaled 64× in area while holding content fixed. Cost
+  tracked total canvas area in every configuration, never the size of what
+  actually changed. `SmartRender` is undocumented-as-supported on `GlCanvas`
+  and explicitly documented as ignored on `WgCanvas` — of the three backends,
+  only the one already tested claims to support it at all.
+- **WebGPU batching is real, and excludes most of what pyCopper draws.**
+  Confirmed from ThorVG's own source (`tvgWgSolidBatch.cpp`): eligibility
+  requires a solid fill (no gradient), convex geometry, **no clip**, **no
+  stroke**, and consecutive submission at one viewport. pyCopper propagates an
+  ancestor clip through its whole element tree and uses borders constantly —
+  the two things this rule excludes are two things pyCopper's content does
+  everywhere.
+- **The backend is real but unreachable without new native work.** The
+  `WgCanvas`/`GlCanvas` C++ classes are genuinely compiled into the shipped
+  wheel (confirmed via `nm`, contradicting the wrapper's own docstring
+  warning). Driving one for real needs an actual `WGPUTexture`, which needs
+  either building ThorVG from source with confirmed WebGPU linkage or writing
+  new interop code to extract wgpu-py's raw device pointer and hand it to a
+  separately-linked backend of unproven ABI compatibility — precisely the
+  category of work this project is not taking on now.
+
+**What survives, unrelated to this decision:** ThorVG's `SwCanvas` for
+rasterising vector *content* — SVG art beyond the icon subset, and Lottie —
+into a bitmap that then flows through §5.8.4's image atlas like any other
+image. That is a one-shot or per-animation-frame cost paid by content that
+needs it, not a per-UI-frame tax on everything, so none of the above bears on
+it: SW's construction cost is irrelevant for one icon, its
+lack-of-incremental-redraw is irrelevant for a job that already runs once, and
+the GPU-interop wall does not need crossing to get a `PIL.Image` out of a
+`SwCanvas`.
+
+Revisit a general vector engine once the project is stable enough to justify
+designing a pluggable rendering backend around one — not as a drop-in swap for
+this section's own pipeline, which none of the above showed a need to replace.
 
 ### 5.11 The accessibility tree — `runtime/accessibility.py`
 
