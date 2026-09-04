@@ -98,6 +98,7 @@ class WidgetKind(StrEnum):
     NODE_GRAPH = "NodeGraph"
     NODE = "Node"
     CODE_EDITOR = "CodeEditor"
+    TERMINAL = "Terminal"
 
 
 class SizeSpec:
@@ -511,10 +512,16 @@ class StyleSpec(_Frozen):
     #: How many spaces a `CodeEditor`'s Tab key inserts.
     tab_size: int = Field(default=4, ge=1)
     #: A font family to request by name (`FontRequest.family`), resolved
-    #: through the same `FontDB` every widget already uses. Only `CodeEditor`
-    #: reads this today -- see its own docstring for why a code editor is
-    #: the first widget with a real reason to ask for one.
+    #: through the same `FontDB` every widget already uses. `CodeEditor` and
+    #: `Terminal` read this -- see either one's own docstring for why a
+    #: monospace-hungry widget is what finally needed to ask for one.
     font_family: str | None = None
+
+    # terminal
+    #: The command line `Terminal` runs, split with `shlex.split` (so
+    #: `"bash -l"` works). Unset resolves `$SHELL`, falling back to a plain
+    #: POSIX shell if that is not set either.
+    shell: str | None = None
 
 
 class EdgeSpec(_Frozen):

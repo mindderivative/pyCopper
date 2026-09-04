@@ -2642,6 +2642,57 @@ def test_codeeditor_baseline(render_scene, assert_golden) -> None:
     assert_golden("codeeditor", np.asarray(engine.canvas.draw()))
 
 
+def test_terminal_baseline(render_scene, assert_golden) -> None:
+    """A prompt line, a coloured line, and a focused blinking cursor: proves
+    the cell grid, per-run background/foreground colour, and cursor all
+    render together. Bytes are fed directly into a `pyte` screen attached to
+    the mounted element rather than through a real spawned shell -- the real
+    PTY pipeline is proven end to end in `test_terminal.py`; a golden image
+    only needs deterministic content, not a race with a live process."""
+    import pyte
+
+    view = {
+        "root": {
+            "name": "term",
+            "widget": "Terminal",
+            "style": {"width": 280, "height": 140},
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=280, height=140, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+
+    term = app.root.find("term")
+    # `app.mount()` already started a real PTY session (`set_ticker` fires
+    # from `App.__init__`) -- stop it before swapping in a fake one, or it
+    # leaks a live shell process and its reader thread for the rest of the
+    # test run. A trivial always-alive stand-in keeps the cursor (drawn only
+    # while `_session.alive`) in the golden without a real subprocess.
+    if term._session is not None:
+        term._session.stop()
+
+    class _AlwaysAlive:
+        alive = True
+
+        def drain(self) -> bytes:
+            return b""
+
+    term._session = _AlwaysAlive()
+    term._screen = pyte.HistoryScreen(term._cols, term._rows, history=200)
+    term._stream = pyte.ByteStream(term._screen)
+    term._feed(b"$ \x1b[32mgit status\x1b[0m\r\n")
+    term._feed(b"\x1b[41mon branch main\x1b[0m\r\n")
+    app.dispatcher.focus(term)
+
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("terminal", np.asarray(engine.canvas.draw()))
+
+
 def test_image_baseline(render_scene, assert_golden, tmp_path) -> None:
     """A real decoded file sampled through the real texture pipeline --
     `Kind.IMAGE`'s first GPU render. Two placements of the same asymmetric

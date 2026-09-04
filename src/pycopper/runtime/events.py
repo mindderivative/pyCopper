@@ -213,6 +213,7 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "DockSplit",
         "Node",
         "CodeEditor",
+        "Terminal",
     }
 )
 

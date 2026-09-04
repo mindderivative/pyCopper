@@ -2985,6 +2985,93 @@ a shared, already-tested cache used by every text-bearing widget deserves
 its own dedicated review (LRU eviction, or a cache key that does not embed
 the whole string), not a change bolted onto one consumer's widget.
 
+### 5.26 Terminal — `widgets/terminal.py`
+
+No M3 component either. Asked of the user directly, the same fork `Video`
+(§5.23) faced: should this widget only render a cell grid an application
+feeds it, or own the whole pipeline -- spawning the shell and parsing its
+output -- internally? Unlike `Video`, where the app-supplies-frames answer
+won because decoding needs a heavy, licence-sensitive dependency (FFmpeg),
+here the answer was the opposite: `pycopper[terminal]` owns the shell, and
+a view just says `widget: Terminal, style: {shell: "/bin/bash"}`.
+
+**Three layers, two of them someone else's problem.** `pexpect` (ISC) gives
+POSIX PTY spawning; `pyte` (LGPLv3) gives the VT/ANSI state machine every
+terminal emulator implements identically. What is actually left for
+pyCopper to build is the third layer -- rendering whatever cell grid
+`pyte.Screen.buffer` currently says is true, and turning keystrokes into
+the bytes a shell expects. `pyte`'s licence forces the whole `pycopper
+[terminal]` extra to stay optional, never a hard dependency, the same rule
+`accesskit` already follows.
+
+**Only POSIX is implemented and verified.** `pexpect.spawn` was exercised
+directly -- spawn a shell, read its output through `read_nonblocking`, feed
+it to `pyte.ByteStream`, read `screen.display` back -- before being relied
+on. Windows would need `pywinpty` wrapping ConPTY entirely, a different
+backend, not `pexpect.spawn`, which is POSIX-only; the platform check is a
+real branch, but nothing here could verify a Windows implementation rather
+than guess at one, so it is left unstarted -- `AccessKit`'s own "untested on
+Windows and macOS" precedent, applied here as "not built" rather than
+"built and hoped."
+
+**No PTY mutation happens off the engine thread**, the identical rule
+`Signal.set` and `HotReloader` (§5.11) already follow. The background
+reader thread's only job is appending raw bytes to a lock-guarded buffer;
+feeding `pyte`'s byte stream and repainting both happen later, back on the
+engine thread. When a real `asyncio` loop can be captured, the reader
+thread also calls `loop.call_soon_threadsafe(...)` to wake an idle app
+promptly -- `VideoElement.push_frame`'s (§5.23) own docstring already
+prescribes this exact pattern for "a worker thread has news." Whether or
+not that wake succeeds, `paint_self` unconditionally drains pending bytes
+on every call, and a `repeat=True` animation keeps a repaint scheduled
+roughly twice a second for as long as a session is alive, focused or not --
+so PTY output is never permanently stuck even if loop capture fails; the
+wake is an optimisation for instant updates, not a correctness requirement.
+
+**Cell backgrounds and the cursor are grid-accurate regardless of font
+metrics; glyphs inside a run are not, without a genuinely monospace face.**
+No monospace font ships with pyCopper -- the identical gap `CodeEditor`
+(§5.25) documents. Rather than rely on natural text-shaping advances to
+land glyphs on cell boundaries (correct only for a real monospace face,
+silently wrong otherwise), each row is walked as runs of cells sharing one
+foreground/background colour; a run's background box and its text's start
+position are both placed at an analytically computed `column * cell_width`,
+so the grid itself never drifts even when the requested font is
+proportional -- only the glyphs drawn inside one run can visually
+misalign, a strictly smaller and more honest failure mode than a
+background box landing in the wrong place.
+
+**A real bug, caught and fixed before shipping, not after: literal colours
+were being treated as sRGB when the render target wants linear.** The
+surface format is `rgba8unorm-srgb` (§5.6.1), which encodes on write --
+verified empirically that a literal `color=(0.5, 0.5, 0.5, 1.0)` reads back
+as `(188, 188, 188)`, not `(128, 128, 128)`, unless converted first. This
+widget's own ANSI colour table was originally written as plain "looks about
+right" floats -- exactly the double-encoding mistake §5.6.1 already
+documents for the palette upload path, recurring on a literal colour
+instead of a token. Fixed with a small `_srgb()` helper (`theme.
+srgb_to_linear`, already used for the palette itself) that every literal
+colour in this widget now goes through; `CodeEditor`'s own syntax-highlight
+colours had the identical bug and were fixed the same way in the same
+pass, with both golden baselines regenerated afterward. A broader audit of
+literal colours reaching application code through `Canvas` (§5.21) is
+tracked separately, not fixed here.
+
+ARIA/AT-SPI has a real, dedicated role for this -- unlike most of this
+session's ungrounded widgets, which settle for the nearest ARIA
+approximation, AT-SPI's own role vocabulary defines `TERMINAL` outright
+(verified against the installed `accesskit` package's `Role` enum, not
+assumed), and it is wired all the way through, including
+`accesskit_bridge.py`'s own role table, not just the abstract vocabulary in
+`runtime/accessibility.py`.
+
+**Deliberately out of scope for this pass**: mouse text selection and
+copy (Ctrl+C is always the interrupt byte sent to the shell here, never a
+copy shortcut -- there is no selection to copy without one), underline and
+strikethrough rendering, function keys beyond F1-F4, true-colour-aware
+theme adaptation (the ANSI palette is fixed, not part of the M3 theme), and
+Windows support.
+
 ---
 
 ## 6. Frame Lifecycle

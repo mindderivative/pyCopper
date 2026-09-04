@@ -75,6 +75,8 @@ from __future__ import annotations
 
 from typing import Any, Final
 
+import numpy as np
+
 from ..layout import Constraints, EdgeInsets, Offset, Padding, Size
 from ..runtime.clipboard import clipboard
 from ..runtime.events import ChangeEvent, EventType, is_accelerator, modifiers_of
@@ -90,6 +92,7 @@ from ..text.editing import (
 )
 from ..text.fontdb import FontRequest
 from ..text.selection import caret_at, index_at, line_end, line_index_at, rects_for
+from ..theme import srgb_to_linear
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token
 from .material import _box
@@ -106,25 +109,45 @@ try:
 except ImportError:
     _PYGMENTS_AVAILABLE = False
 
+
+def _srgb(r: float, g: float, b: float, a: float = 1.0) -> tuple[float, float, float, float]:
+    """An sRGB-intended colour, converted to the linear RGBA every literal
+    `color=` on the display list actually expects.
+
+    Verified empirically, not assumed: the render target is
+    `rgba8unorm-srgb` (ARCHITECTURE.md 5.6.1), which encodes linear values
+    written to it -- a literal `color=(0.5, 0.5, 0.5, 1.0)` reads back as
+    `(188, 188, 188)`, not `(128, 128, 128)`, unless converted first. These
+    syntax colours were originally written as plain "looks about right"
+    floats, which is exactly the double-encoding bug ARCHITECTURE.md 5.6.1
+    already documents for the palette upload path -- the same mistake, once
+    removed, on a literal colour instead of a token.
+    """
+    lr, lg, lb = srgb_to_linear(np.array([r, g, b], dtype=np.float64))
+    return (float(lr), float(lg), float(lb), a)
+
+
 if _PYGMENTS_AVAILABLE:
     #: Not M3-sourced -- see the module docstring. Chosen to read
     #: reasonably against a dark `surface_container_lowest` background,
     #: the way most editor colour schemes assume a dark canvas; there is no
-    #: attempt to adapt these to a light theme.
+    #: attempt to adapt these to a light theme. Written as the sRGB values
+    #: they are meant to look like; `_srgb()` converts each to the linear
+    #: form the shader actually wants.
     _SYNTAX_COLORS: Final[dict[Any, tuple[float, float, float, float]]] = {
-        _PygmentsToken.Comment: (0.47, 0.53, 0.60, 1.0),
-        _PygmentsToken.Keyword: (0.78, 0.52, 0.87, 1.0),
-        _PygmentsToken.Keyword.Constant: (0.62, 0.71, 0.93, 1.0),
-        _PygmentsToken.Name.Builtin: (0.62, 0.71, 0.93, 1.0),
-        _PygmentsToken.Name.Function: (0.53, 0.75, 0.95, 1.0),
-        _PygmentsToken.Name.Class: (0.90, 0.75, 0.45, 1.0),
-        _PygmentsToken.Name.Decorator: (0.90, 0.75, 0.45, 1.0),
-        _PygmentsToken.String: (0.60, 0.80, 0.55, 1.0),
-        _PygmentsToken.Number: (0.85, 0.62, 0.45, 1.0),
-        _PygmentsToken.Operator: (0.80, 0.82, 0.87, 1.0),
-        _PygmentsToken.Error: (0.94, 0.40, 0.40, 1.0),
+        _PygmentsToken.Comment: _srgb(0.47, 0.53, 0.60),
+        _PygmentsToken.Keyword: _srgb(0.78, 0.52, 0.87),
+        _PygmentsToken.Keyword.Constant: _srgb(0.62, 0.71, 0.93),
+        _PygmentsToken.Name.Builtin: _srgb(0.62, 0.71, 0.93),
+        _PygmentsToken.Name.Function: _srgb(0.53, 0.75, 0.95),
+        _PygmentsToken.Name.Class: _srgb(0.90, 0.75, 0.45),
+        _PygmentsToken.Name.Decorator: _srgb(0.90, 0.75, 0.45),
+        _PygmentsToken.String: _srgb(0.60, 0.80, 0.55),
+        _PygmentsToken.Number: _srgb(0.85, 0.62, 0.45),
+        _PygmentsToken.Operator: _srgb(0.80, 0.82, 0.87),
+        _PygmentsToken.Error: _srgb(0.94, 0.40, 0.40),
     }
-    _SYNTAX_DEFAULT: Final = (0.82, 0.84, 0.88, 1.0)
+    _SYNTAX_DEFAULT: Final = _srgb(0.82, 0.84, 0.88)
 
     def _syntax_color(tok_type: Any) -> tuple[float, float, float, float]:
         """Walk a Pygments token type up to its nearest mapped ancestor."""

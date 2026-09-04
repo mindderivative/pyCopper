@@ -64,6 +64,7 @@ _ROLES: dict[str, str] = {
     "separator": "SPLITTER",
     "status": "STATUS",
     "banner": "BANNER",
+    "terminal": "TERMINAL",
 }
 
 #: Roles a pointer can activate, and which therefore must offer the click

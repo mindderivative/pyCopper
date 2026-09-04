@@ -67,6 +67,15 @@ svg = ["svgelements>=1.9,<2"]
 # a CodeEditor with no `style.language` set, or this extra not installed,
 # still works as a plain editable multi-line text control, just uncoloured.
 code = ["pygments>=2.18,<3"]
+# Terminal (widgets/terminal.py). pyte is LGPLv3 -- an optional extra, never
+# a hard dependency, the same rule accesskit's own licence follows. Only a
+# real POSIX pseudo-terminal (pexpect, ISC) is implemented and verified in
+# this pass; Windows would need pywinpty (MIT) wrapping ConPTY, which is
+# architected for but not yet built -- see the widget's own docstring.
+terminal = [
+    "pyte>=0.8,<1",
+    "pexpect>=4.9,<5; sys_platform != 'win32'",
+]
 dev = [
     "pytest>=8.0",
     "hypothesis>=6.100",
@@ -77,6 +86,8 @@ dev = [
     "accesskit>=0.7,<0.8",
     "svgelements>=1.9,<2",
     "pygments>=2.18,<3",
+    "pyte>=0.8,<1",
+    "pexpect>=4.9,<5; sys_platform != 'win32'",
 ]
 
 [project.urls]
@@ -139,6 +150,13 @@ ignore_missing_imports = true
 # module (widgets/codeeditor.py) is not worth it. Same reasoning as
 # accesskit above.
 module = ["pygments", "pygments.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# pyte and pexpect ship no inline types. Same reasoning as accesskit/pygments
+# above -- scoped to the one lazily-imported, optional module that uses them
+# (widgets/terminal.py).
+module = ["pyte", "pyte.*", "pexpect", "pexpect.*"]
 ignore_missing_imports = true
 
 [tool.mypy]

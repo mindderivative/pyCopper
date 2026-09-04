@@ -767,6 +767,48 @@ scope for the widget itself — that is an application concern, composed from
 whatever LSP client a project already uses, not something `CodeEditor`
 hard-depends on.
 
+## Terminal
+
+`Terminal` is a real shell, spawned and parsed by pyCopper itself. No M3
+component exists for it. Unlike `Video`, which only displays frames an
+application decodes and pushes, `Terminal` owns the whole pipeline: point it
+at a shell and it works.
+
+```yaml
+- name: shell
+  widget: Terminal
+  style: {shell: "bash -l", width: expand, height: 400}
+```
+
+`style.shell` is the command line (`shlex.split`, so `"bash -l"` works);
+left unset it resolves `$SHELL`, falling back to `/bin/sh`. The grid size
+(columns × rows) follows the widget's own pixel size and cell size — there
+is no separate `cols:`/`rows:` to keep in sync by hand, and resizing the
+widget resizes the shell's own idea of its terminal size too.
+
+**POSIX only in this pass.** Spawning a real pseudo-terminal needs
+`pycopper[terminal]` (`pyte` for VT/ANSI parsing, `pexpect` for the PTY —
+both optional; `pyte` is LGPLv3, so it can never become a hard dependency).
+Without them, or on Windows (not yet implemented — see the widget's own
+docstring for why), the terminal area shows a message explaining what is
+missing instead of a shell.
+
+**No monospace font ships with pyCopper**, the same gap
+[Code editor](#code-editor) documents. `style.font_family` names a face by
+family; without one, text still renders, proportionally, so columns and
+box-drawn tables will not line up — load a real monospace face with
+`app.text.db.load(path)` before the view mounts to fix that.
+
+**Scrollback** is 2000 lines, not configurable per view. The mouse wheel
+pages through it; typing anything snaps back to the live bottom (inherited
+from `pyte`'s own scrollback behaviour, not something pyCopper adds on top).
+**Ctrl+C is always the interrupt byte** sent to the shell, never a copy
+shortcut — there is no text selection to copy in this pass, so nothing was
+taken from Ctrl+C to make room for one.
+
+**Not implemented**: mouse text selection and copy, underline and
+strikethrough rendering, function keys beyond F1–F4, and Windows support.
+
 ## Text selection
 
 A `Text` widget with `selectable: true` can be selected with the mouse:
@@ -976,6 +1018,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | `ScrollView` | A clipped viewport. **Must** have a bounded size on its scroll axis. |
 | `TextField` | The editable one. 56dp, `filled` or `outlined`. See [Text fields](#text-fields). |
 | `CodeEditor` | Multi-line, line-numbered, optionally syntax-highlighted. No M3 component. See [Code editor](#code-editor). |
+| `Terminal` | A real shell, spawned and parsed internally. No M3 component. See [Terminal](#terminal). |
 
 Inside a `Row` or `Column`, a child with `width: expand` (or `flex`) on the main
 axis shares the free space; anything else is measured first and takes what it
@@ -1409,7 +1452,8 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `language` | `CodeEditor` — a Pygments lexer name/alias; unset or unrecognised means no highlighting |
 | `line_numbers` | `CodeEditor` — show the gutter (default on) |
 | `tab_size` | `CodeEditor` — spaces the Tab key inserts (default 4) |
-| `font_family` | `CodeEditor` — request a face by name; see [Code editor](#code-editor) |
+| `font_family` | `CodeEditor`, `Terminal` — request a face by name; see [Code editor](#code-editor) |
+| `shell` | `Terminal` — the command line to run; unset resolves `$SHELL`, else `/bin/sh` |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |
 
 ---

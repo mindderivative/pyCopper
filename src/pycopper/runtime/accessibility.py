@@ -38,6 +38,12 @@ ROLES: Final[dict[str, str]] = {
     # "textbox" (with aria-multiline) is the same role a multi-line HTML
     # <textarea> reports, which is the closest real anatomy this has.
     "CodeEditor": "textbox",
+    # No M3 component -- see TerminalElement's own docstring. Unlike most
+    # gaps in this module, this one has a precise real answer rather than an
+    # approximation: AT-SPI/AccessKit's own role vocabulary has a dedicated
+    # "terminal" role, verified against the installed accesskit package
+    # (`accesskit.Role.TERMINAL`) rather than assumed.
+    "Terminal": "terminal",
     "LinearProgress": "progressbar",  # "role of 'progressbar'"
     "CircularProgress": "progressbar",  # "role of 'progressbar'"
     "NavItem": "tab",  # "The role is 'tab'"
