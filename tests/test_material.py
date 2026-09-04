@@ -451,6 +451,137 @@ def test_link_draws_only_its_label_and_underline() -> None:
     assert len(own_boxes) == 1
 
 
+# ------------------------------------------------------------- spin box
+
+
+def test_spin_box_is_forty_high() -> None:
+    e = laid_out(widget="SpinBox", value="3")
+    assert e.size.height == 40.0
+
+
+def test_spin_box_widens_for_a_bigger_number() -> None:
+    small = laid_out(widget="SpinBox", value="1")
+    big = laid_out(widget="SpinBox", value="1000000")
+    assert big.size.width > small.size.width
+
+
+def _spin_box_app(*, value="3", min=None, max=None, step=1, on_change=None):
+    style = {"step": step}
+    if min is not None:
+        style["min"] = min
+    if max is not None:
+        style["max"] = max
+    child = {"name": "sb", "widget": "SpinBox", "value": value, "style": style}
+    if on_change is not None:
+        child["handlers"] = {"on_change": "change"}
+    view = {"name": "root", "widget": "Column", "children": [child]}
+    app = App(view, theme=Theme(dark=True))
+    if on_change is not None:
+        app._handlers["change"] = on_change
+    app.mount()
+    app.update()
+    return app
+
+
+def _click(app, x, y):
+    from pycopper.runtime.events import EventType, PointerEvent
+
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=x, y=y))
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=x, y=y))
+    app.dispatcher.drain()
+
+
+def test_clicking_the_right_side_increments() -> None:
+    app = _spin_box_app(value="3")
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    _click(app, rect.right - 5, rect.y + 20)
+    assert sb.number == 4.0
+
+
+def test_clicking_the_left_side_decrements() -> None:
+    app = _spin_box_app(value="3")
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    _click(app, rect.x + 5, rect.y + 20)
+    assert sb.number == 2.0
+
+
+def test_clicking_the_middle_does_nothing() -> None:
+    app = _spin_box_app(value="3")
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    _click(app, rect.x + rect.width / 2, rect.y + 20)
+    assert sb.number == 3.0
+
+
+def test_value_clamps_at_the_maximum() -> None:
+    app = _spin_box_app(value="4", max=5)
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    for _ in range(3):
+        _click(app, rect.right - 5, rect.y + 20)
+    assert sb.number == 5.0
+
+
+def test_value_clamps_at_the_minimum() -> None:
+    app = _spin_box_app(value="1", min=0)
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    for _ in range(3):
+        _click(app, rect.x + 5, rect.y + 20)
+    assert sb.number == 0.0
+
+
+def test_step_is_configurable() -> None:
+    app = _spin_box_app(value="0", step=5)
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    _click(app, rect.right - 5, rect.y + 20)
+    assert sb.number == 5.0
+
+
+def test_on_change_carries_the_new_value() -> None:
+    calls = []
+    app = _spin_box_app(value="3", on_change=lambda e: calls.append(e.value))
+    sb = app.root.find("sb")
+    rect = sb.absolute_rect()
+    _click(app, rect.right - 5, rect.y + 20)
+    assert calls == ["4"]
+
+
+def test_arrow_keys_step_the_value() -> None:
+    from pycopper.runtime.events import EventType, KeyEvent
+
+    app = _spin_box_app(value="3")
+    sb = app.root.find("sb")
+    app.dispatcher.focus(sb)
+    app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Up"))
+    app.dispatcher.drain()
+    assert sb.number == 4.0
+    app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Down"))
+    app.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key="Down"))
+    app.dispatcher.drain()
+    assert sb.number == 2.0
+
+
+def test_a_maxed_out_side_stops_responding_and_dims() -> None:
+    """Clicking past the bound is a silent no-op, and the icon dims to M3's
+    disabled-content opacity -- reused by analogy, not because the whole
+    control is `disabled`."""
+    app = _spin_box_app(value="5", max=5)
+    dl = painted_app(app)
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    dimmed = [g for g in glyphs if float(g["fill"][3]) < 1.0]
+    assert dimmed, "expected the maxed-out side's icon to be dimmed"
+
+
+def painted_app(app) -> DisplayList:
+    dl = DisplayList()
+    app.paint(dl)
+    return dl
+
+
 # --------------------------------------------------------------- accordion
 
 

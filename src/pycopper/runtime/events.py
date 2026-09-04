@@ -207,6 +207,7 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "Segment",
         "ListItem",
         "TextField",
+        "SpinBox",
     }
 )
 

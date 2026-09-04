@@ -45,6 +45,9 @@ ROLES: Final[dict[str, str]] = {
     "IconButton": "button",
     "Fab": "button",
     "Link": "link",
+    # ARIA's own name for exactly this control -- no M3 page to quote a role
+    # from, since SpinBox has no M3 component at all (see its docstring).
+    "SpinBox": "spinbutton",
     # A submenu trigger (`style.has_submenu`) should additionally carry
     # `aria-haspopup`/`aria-expanded`, per ARIA convention -- not modelled:
     # `_node_for` sees one element at a time and has no visibility into
@@ -240,7 +243,9 @@ def _node_for(element: Any) -> AccessibleNode | None:
         node.name = (element.spec.text or "").strip()
         node.description = (getattr(element, "supporting", "") or "").strip()
         node.value = getattr(element, "content", "") or ""
-    elif role == "progressbar":
+    elif role in ("progressbar", "spinbutton"):
+        # aria-valuemin/-valuemax have no field on AccessibleNode to carry
+        # them -- not modelled, same honesty as the rest of this module.
         node.value = str(element.number)
     elif role in ("dialog", "menu", "tooltip", "status"):
         node.expanded = bool(element.is_open)

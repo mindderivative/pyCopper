@@ -86,6 +86,7 @@ class WidgetKind(StrEnum):
     TREE_VIEW = "TreeView"
     TREE_ITEM = "TreeItem"
     LINK = "Link"
+    SPIN_BOX = "SpinBox"
 
 
 class SizeSpec:
@@ -364,6 +365,13 @@ class StyleSpec(_Frozen):
     #: affordance for a drag gesture that is not wired to the pointer yet,
     #: so showing one by default would promise behaviour that does not exist.
     handle: bool = False
+    #: A SpinBox's bounds. None on either end means unbounded in that
+    #: direction, not "clamp to zero" -- a generic increment control has no
+    #: reason to assume a lower bound of zero unless told one.
+    min: float | None = None
+    max: float | None = None
+    #: How much one click or arrow-key press changes a SpinBox's value by.
+    step: float = Field(default=1.0, gt=0)
 
     # text
     font_size: float = Field(default=14.0, gt=0)

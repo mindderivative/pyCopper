@@ -934,8 +934,10 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | `Chip` | 32dp high. `assist`, `filter`, `input`, `suggestion`. |
 | `Badge` | 6dp dot, or a 16dp pill carrying `value:`. |
 | `Link` | Hyperlinked text: always underlined, `primary` (default) or `tertiary`. Sized with `font_size` like `Text`, not a fixed label role — it's meant to sit inline with body text. No container, no state layer. |
+| `SpinBox` | A number with `remove`/`add` icon buttons either side (40dp, `IconButton`'s own anatomy). `value:` is the current number; `style: {min, max, step}` bound it (either end `None`/omitted means unbounded). Arrow keys step it too. Named to avoid M3's own "Stepper" (a multi-step flow indicator, a different widget) — not a component M3 has a page for either way. |
 
 Selection is a **binding, not style**: `value: "{{ checked.get() }}"`.
+A `SpinBox` fires `on_change` with its new value already computed and clamped — the application does not do the arithmetic, only `qty.set(event.value)`.
 
 ### Structure
 
@@ -1080,6 +1082,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `scrollbar` | `ScrollView` — show the indicator when content overflows |
 | `handle` | `BottomSheet` — draw the drag handle |
 | `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
+| `min`, `max`, `step` | `SpinBox` — bounds and increment; `min`/`max` default to unbounded |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |
 
 ---

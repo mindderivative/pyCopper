@@ -1552,6 +1552,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `IconButton` | 40dp container, 24dp icon | `standard` / `filled` / `filled_tonal` / `outlined` |
 | `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3 |
 | `Badge` | 6dp dot, or 16dp-high pill | `value:` carries the count |
+| `SpinBox` | Two 40dp `IconButton`-anatomy regions (`remove`/`add`) flanking a number | No M3 component; named to dodge M3's own "Stepper" (a multi-step flow indicator). Grounded in the Sliders page's "icon buttons placed outside the slider" convention instead. `on_change` carries the new value already clamped to `style.min`/`max` and stepped by `style.step` |
 
 **Wave 2** added navigation and structure in `widgets/navigation.py`:
 
@@ -1639,6 +1640,21 @@ whatever body text surrounds it. The underline itself is a 1dp box positioned
 from the resolved face's real ascent/descent (`Face.metrics`), not a rough
 fraction of the label's measured height — but exactly how far into the
 descent it sits is not sourced, since no measurement table exists for it.
+
+**`SpinBox` (`widgets/material.py`) also has no M3 page.** M2's own "Steppers"
+component is a multi-step flow indicator, not a numeric control, which is why
+this widget is named `SpinBox` rather than the more familiar "Stepper" —
+deliberately, to keep the collision from ever landing in a view file. The
+nearest M3 grounding is the Sliders page's own convention for the same need:
+"Icon buttons placed outside the slider should have the button role", applied
+here as two flanking `IconButton`-anatomy regions (no container, plain
+`on_surface_variant` icons) rather than a slider's own thumb. A side at its
+bound dims to M3's disabled-content opacity (38%) by analogy, not because the
+side is actually `disabled`; hover is tracked per side (new state, since
+nothing else in the framework needs sub-element hover), but press and focus
+are not, to avoid building that machinery for one widget. Typing a value
+directly is deliberately unsupported — that needs `TextField`'s full editing
+stack, and a half-built version of it would be worse than not having one.
 
 **Selection is a binding, not style.** `Checkbox`, `Radio`, `Switch`, and the
 filter `Chip` read a new `value:` field on the spec, templated exactly like

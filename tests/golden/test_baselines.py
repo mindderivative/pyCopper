@@ -2352,3 +2352,32 @@ def test_link_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("link", np.asarray(engine.canvas.draw()))
+
+
+def test_spin_box_baseline(render_scene, assert_golden) -> None:
+    """One mid-range, one pinned to its minimum.
+
+    Proves the anatomy (icon buttons flanking the number) and the at-bound
+    dimming: the second one's decrement side should read visibly fainter
+    than its own increment side.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24, "spacing": 20},
+            "children": [
+                {"name": "mid", "widget": "SpinBox", "value": "3", "style": {"min": 0, "max": 5}},
+                {"name": "floor", "widget": "SpinBox", "value": "0", "style": {"min": 0, "max": 5}},
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=200, height=120, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("spin_box", np.asarray(engine.canvas.draw()))

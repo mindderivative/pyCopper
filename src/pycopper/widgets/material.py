@@ -23,6 +23,7 @@ import math
 from typing import Any, Final
 
 from ..layout import INF, Constraints, EdgeInsets, Offset, Padding, Size
+from ..runtime.events import ChangeEvent, EventType
 from ..spec import StyleSpec, WidgetSpec
 from ..text.icons import DEFAULT_ICON_SIZE
 from ..tree.element import PaintContext
@@ -38,6 +39,7 @@ __all__ = [
     "FabElement",
     "IconButtonElement",
     "RadioElement",
+    "SpinBoxElement",
     "SwitchElement",
 ]
 
@@ -1061,6 +1063,193 @@ class FabElement(_StyledMixin, Padding):
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
+
+
+# ----------------------------------------------------------------- spin box
+
+
+class SpinBoxElement(_StyledMixin, Padding):
+    """A numeric value with increment/decrement buttons.
+
+    M3 has no dedicated component for this. Deliberately named `SpinBox`
+    rather than the more common "Stepper" to avoid a real collision: M3's
+    own (M2-inherited) vocabulary uses "Stepper" for a multi-step flow
+    indicator, a completely different widget this is not.
+
+    The nearest M3 grounding is the Sliders page's convention for the same
+    underlying need -- "Icon buttons placed outside the slider should have
+    the button role" -- applied here as two 40dp icon-button regions
+    (`IconButton`'s own anatomy: no container, `on_surface_variant`
+    content) flanking a numeric display, rather than only at a slider's
+    ends.
+
+    `value:` is the current number, read through the same generic
+    `number` property every other value-bearing widget uses. Clicking
+    either side computes the new value itself (clamped to `style.min`/
+    `style.max`, stepped by `style.step`), updates its own display
+    immediately, and fires `on_change` with the result -- the same split
+    `TextField._commit` already makes between updating its own display and
+    telling the application what changed. Arrow keys do the same, borrowing
+    Sliders' own quoted keyboard convention ("Arrows: Increase and decrease
+    the value") since no closer M3 analogue exists.
+
+    A side at its bound dims to M3's disabled-content opacity (38%) --
+    reused by analogy, not because this component is actually disabled --
+    and stops responding, but keeps a plain pointer cursor rather than
+    "not-allowed"; only the whole element's `cursor_at` is a place to hang a
+    cursor override, not one half of it. Hover feedback is per side; press
+    and focus are not, since neither is tracked per-region anywhere else in
+    the framework and adding it here would be new machinery for one widget.
+
+    **Deliberately out of scope: typing a value directly.** That needs
+    `TextField`'s whole editing machinery (caret, selection, IME) for what
+    would otherwise be a half-built text field wearing a SpinBox's paint.
+    Only the two buttons and the keyboard are wired.
+    """
+
+    SIZE: Final = 40.0
+    ICON: Final = 24.0
+    VALUE_MIN_WIDTH: Final = 32.0
+    VALUE_PAD_X: Final = 8.0
+    #: Reuses M3's disabled-content opacity for a bound that can't move
+    #: further -- the same visual language, not the same mechanism as
+    #: `effective_disabled` (which recolours the whole element automatically).
+    AT_BOUND_OPACITY: Final = 0.38
+    CURSOR = "pointer"
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        Padding.__init__(self, None, EdgeInsets())
+        self.init_element(spec)
+
+    @staticmethod
+    def _format(n: float) -> str:
+        return str(int(n)) if n == int(n) else str(n)
+
+    def _clamped(self, value: float) -> float:
+        style = self.style
+        if style.min is not None:
+            value = max(style.min, value)
+        if style.max is not None:
+            value = min(style.max, value)
+        return value
+
+    def _step(self, direction: float) -> None:
+        if self.effective_disabled:
+            return
+        new = self._clamped(self.number + direction * self.style.step)
+        if new == self.number:
+            return
+        self._value = self._format(new)
+        handler = self.handlers.get("on_change")
+        if handler is not None:
+            handler(ChangeEvent(EventType.CHANGE, target=self, value=self._value))
+        self.mark_needs_layout()
+
+    def _value_width(self) -> float:
+        label = measure_text(
+            self._format(self.number), self.style.font_size, engine=self.text_engine
+        )
+        return max(self.VALUE_MIN_WIDTH, label.width + 2 * self.VALUE_PAD_X)
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        width = 2 * self.SIZE + self._value_width()
+        return outer.constrain(Size(width, self.SIZE))
+
+    # ------------------------------------------------------------- pointer
+
+    def _side_at(self, x: float) -> str | None:
+        local = x - self.absolute_rect().x
+        if local < self.SIZE:
+            return "dec"
+        if local > self.size.width - self.SIZE:
+            return "inc"
+        return None
+
+    def on_click(self, event: Any) -> None:
+        side = self._side_at(event.x)
+        if side == "dec":
+            self._step(-1.0)
+        elif side == "inc":
+            self._step(1.0)
+
+    def on_pointer_move(self, event: Any) -> None:
+        side = self._side_at(event.x)
+        if self.state.data.get("spin_hover") != side:
+            self.state.data["spin_hover"] = side
+            self.mark_needs_paint()
+
+    def on_pointer_leave(self, event: Any) -> None:
+        if self.state.data.get("spin_hover") is not None:
+            self.state.data["spin_hover"] = None
+            self.mark_needs_paint()
+
+    # ---------------------------------------------------------------- keys
+
+    def on_key_down(self, event: Any) -> None:
+        key = str(getattr(event, "key", "")).lower()
+        if key in ("up", "right"):
+            self._step(1.0)
+        elif key in ("down", "left"):
+            self._step(-1.0)
+
+    # --------------------------------------------------------------- paint
+
+    def _side_alpha(self, side: str) -> float:
+        target = HOVER if self.state.data.get("spin_hover") == side else 0.0
+        return self.animated(
+            f"spin_{side}", target, duration=STATE_LAYER_MOTION, curve=STATE_LAYER_CURVE
+        )
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        style = self.style
+        content = content_token(ctx, style, "on_surface_variant")
+        dpr = ctx.pixel_ratio
+        at_min = style.min is not None and self.number <= style.min
+        at_max = style.max is not None and self.number >= style.max
+
+        for side, icon, center_x, at_bound in (
+            ("dec", "remove", absolute.x + self.SIZE / 2, at_min),
+            ("inc", "add", absolute.x + self.size.width - self.SIZE / 2, at_max),
+        ):
+            if not at_bound:
+                alpha = self._side_alpha(side)
+                if alpha > 0.001:
+                    ctx.display_list.add_box(
+                        (center_x - self.SIZE / 2) * dpr,
+                        absolute.y * dpr,
+                        self.SIZE * dpr,
+                        self.SIZE * dpr,
+                        token=content,
+                        color=(1.0, 1.0, 1.0, alpha),
+                        radii=(self.SIZE / 2 * dpr,) * 4,
+                        clip=ctx.clip,
+                        clip_radii=ctx.clip_radii,
+                    )
+            ctx.text.emit_icon(
+                ctx.display_list,
+                icon,
+                x=center_x - self.ICON / 2,
+                y=absolute.y + (self.SIZE - self.ICON) / 2,
+                size=self.ICON,
+                pixel_ratio=dpr,
+                token=content,
+                color=(1.0, 1.0, 1.0, self.AT_BOUND_OPACITY if at_bound else 1.0),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+
+        value_text = self._format(self.number)
+        label = measure_text(value_text, style.font_size, engine=self.text_engine)
+        value_token = content_token(ctx, style, "on_surface")
+        paint_text(
+            ctx,
+            absolute.x + self.SIZE + (self._value_width() - label.width) / 2,
+            absolute.y + (self.SIZE - label.height) / 2,
+            value_text,
+            style.font_size,
+            value_token,
+        )
 
 
 # ------------------------------------------------------------------ badges
