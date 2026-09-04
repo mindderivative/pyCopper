@@ -83,6 +83,8 @@ class WidgetKind(StrEnum):
     SHAPE = "Shape"
     POPOVER = "Popover"
     ACCORDION = "Accordion"
+    TREE_VIEW = "TreeView"
+    TREE_ITEM = "TreeItem"
 
 
 class SizeSpec:

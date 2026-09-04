@@ -20,19 +20,23 @@ import math
 from typing import Any, Final
 
 from ..layout import (
+    INF,
     Axis,
     Constraints,
     EdgeInsets,
     Flex,
+    LayoutNode,
     MainAxisSize,
+    Offset,
     Padding,
+    Rect,
     Size,
 )
 from ..spec import WidgetSpec
 from ..spec.typescale import TYPE_SCALE
 from ..tree.element import PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
-from .material import _arc, _box, _emit_state_layer
+from .material import SELECTION_CURVE, SELECTION_MOTION, _arc, _box, _emit_state_layer, _state_alpha
 
 __all__ = [
     "CircularProgressElement",
@@ -46,6 +50,8 @@ __all__ = [
     "TabElement",
     "TabsElement",
     "TopAppBarElement",
+    "TreeItemElement",
+    "TreeViewElement",
 ]
 
 #: The components' own M3 type roles, quoted from M3_COMPONENT_SPECS.md: a
@@ -791,6 +797,215 @@ class ListItemElement(_StyledMixin, Padding):
                 self.HEADLINE,
                 headline,
             )
+
+
+# --------------------------------------------------------------- tree view
+
+
+class TreeViewElement(_SelectionContainer):
+    """M3 has no Tree component -- the same gap Accordion fills, and the same
+    source: Lists' "List items containing other list items can expand and
+    collapse in a folder-like manner" (`COMPONENT_LISTS.md`). A tree is that
+    statement applied recursively rather than once.
+
+    Reuses `_SelectionContainer`'s shape -- `value:` names the selected item
+    -- but a tree's selected item can sit at any depth, not just among direct
+    children, so `apply_selection` is overridden to walk the whole subtree
+    instead of one level.
+    """
+
+    axis = Axis.VERTICAL
+
+    def apply_selection(self) -> None:
+        active = self._value.strip()
+
+        def walk(node: Any) -> None:
+            for child in node.children:
+                if isinstance(child, TreeItemElement):
+                    child.set_selected(bool(active) and child.name == active)
+                    walk(child)
+
+        walk(self)
+
+
+class TreeItemElement(_StyledMixin, LayoutNode):
+    """One node. `children:` of further `TreeItem`s makes it a branch; none
+    makes it a leaf, with no chevron and nothing to expand.
+
+    **Anatomy is `ListItem`'s**, exactly as Accordion's is, for the same
+    reason: M3 gives this nothing of its own. **Expand state, the chevron
+    swap, and the height-animation-plus-clip reveal are Accordion's
+    mechanism reused verbatim** -- see `AccordionElement`'s docstring for why
+    each of those is shaped the way it is; a tree node is an accordion that
+    can nest.
+
+    **Two things ARE new here, because recursion makes them unavoidable:**
+
+    - **Indentation.** Each level indents by one chevron-width (`INDENT`).
+      Not sourced from M3 -- no tree page exists to source it from -- chosen
+      to line a child's content up under where its own children's chevrons
+      would begin, the common convention across desktop tree views.
+    - **The clip intersects its ancestor's, rather than replacing it.**
+      Accordion and `ScrollView` both simply overwrite the incoming
+      `ctx.clip` with their own rect, which is safe only because neither is
+      ever nested inside its own kind in practice. A tree item routinely is:
+      collapsing a node must hide every descendant regardless of which of
+      them are individually expanded, so a grandchild's effective clip has
+      to be its own rect intersected with everything above it, not just its
+      immediate parent's.
+
+    Selection is a **separate, orthogonal concern** owned by the enclosing
+    `TreeView` (`value:` naming the selected node), not by this class --
+    the same split Accordion has none of, because it never had a container.
+    """
+
+    HEADER_ONE_LINE: Final = 56.0
+    HEADER_TWO_LINE: Final = 72.0
+    PAD_X: Final = 16.0
+    HEADLINE: Final = 16.0
+    SUPPORTING: Final = 14.0
+    CHEVRON: Final = 24.0
+    #: One chevron-width per nesting level -- see the class docstring.
+    INDENT: Final = CHEVRON
+    CURSOR = "pointer"
+    CLIPS_CHILDREN = True
+
+    def __init__(self, spec: WidgetSpec) -> None:
+        LayoutNode.__init__(self)
+        self.init_element(spec)
+
+    @property
+    def depth(self) -> int:
+        """Nesting level, derived from ancestry rather than stored -- the
+        same idiom `NavItemElement._in_drawer` uses for its own context."""
+        depth = 0
+        node = self.parent
+        while node is not None:
+            if isinstance(node, TreeItemElement):
+                depth += 1
+            node = node.parent
+        return depth
+
+    def _header_height(self) -> float:
+        return self.HEADER_TWO_LINE if self._supporting.strip() else self.HEADER_ONE_LINE
+
+    def _progress(self) -> float:
+        """0 (collapsed) to 1 (fully expanded) -- see `AccordionElement._progress`."""
+        return self.animated(
+            "expanded",
+            1.0 if self.checked else 0.0,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
+            invalidates="layout",
+        )
+
+    def perform_layout(self, constraints: Constraints) -> Size:
+        outer = self.sized(constraints, self.style)
+        width = outer.max_width if outer.has_bounded_width else 320.0
+        header_h = self._header_height()
+
+        # Every child is laid out and stacked at its NATURAL height regardless
+        # of this node's own current (animated) height -- same reasoning as
+        # Accordion's single child, generalised to however many there are.
+        cursor = header_h
+        if self._children:
+            child_constraints = Constraints(
+                min_width=width, max_width=width, min_height=0.0, max_height=INF
+            )
+            for child in self._children:
+                size = child.layout(child_constraints)
+                child.offset = Offset(0.0, cursor)
+                cursor += size.height
+        body_h = cursor - header_h
+
+        revealed = body_h * self._progress()
+        return outer.constrain(Size(width, header_h + revealed))
+
+    def child_paint_context(self, ctx: PaintContext, absolute: Any) -> PaintContext:
+        """Clip to this node's own (animated) size, INTERSECTED with whatever
+        clip already reached it -- see the class docstring for why this
+        cannot simply replace the incoming clip the way Accordion's does."""
+        dpr = ctx.pixel_ratio
+        own = Rect(
+            absolute.x * dpr, absolute.y * dpr, self.size.width * dpr, self.size.height * dpr
+        )
+        clip = own if ctx.clip[2] == 0.0 and ctx.clip[3] == 0.0 else Rect(*ctx.clip).intersect(own)
+        return PaintContext(
+            display_list=ctx.display_list,
+            palette=ctx.palette,
+            text=ctx.text,
+            pixel_ratio=dpr,
+            clip=(clip.x, clip.y, clip.width, clip.height),
+            clip_radii=ctx.clip_radii,
+        )
+
+    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        style = self.style
+        header_h = self._header_height()
+        headline_tok = content_token(ctx, style, "on_surface")
+        supporting_tok = ctx.palette.index("on_surface_variant")
+
+        if self.selected:
+            dpr = ctx.pixel_ratio
+            ctx.display_list.add_box(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                self.size.width * dpr,
+                header_h * dpr,
+                token=ctx.palette.index("secondary_container"),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+            headline_tok = ctx.palette.index("on_secondary_container")
+
+        # Scoped to the header row alone -- see AccordionElement.paint_self
+        # for why `_emit_state_layer` (sized from the whole animated element)
+        # is the wrong helper here.
+        alpha = _state_alpha(self)
+        if alpha > 0.001:
+            dpr = ctx.pixel_ratio
+            ctx.display_list.add_box(
+                absolute.x * dpr,
+                absolute.y * dpr,
+                self.size.width * dpr,
+                header_h * dpr,
+                token=headline_tok,
+                color=(1.0, 1.0, 1.0, alpha),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+
+        indent = self.PAD_X + self.depth * self.INDENT
+        x = absolute.x + indent
+        if self._children:
+            icon = "expand_less" if self.checked else "expand_more"
+            ctx.text.emit_icon(
+                ctx.display_list,
+                icon,
+                x=x,
+                y=absolute.y + (header_h - self.CHEVRON) / 2,
+                size=self.CHEVRON,
+                pixel_ratio=ctx.pixel_ratio,
+                token=supporting_tok,
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+        # A leaf's label starts where a branch's would, chevron or not, so
+        # sibling labels stay aligned regardless of which ones can expand.
+        x += self.CHEVRON + 8.0
+
+        second = self._supporting.strip()
+        if second:
+            top = measure_text(self._text, self.HEADLINE, engine=self.text_engine)
+            bottom = measure_text(second, self.SUPPORTING, engine=self.text_engine)
+            block = top.height + bottom.height
+            y = absolute.y + (header_h - block) / 2
+            paint_text(ctx, x, y, self._text, self.HEADLINE, headline_tok)
+            paint_text(ctx, x, y + top.height, second, self.SUPPORTING, supporting_tok)
+        elif self._text.strip():
+            label = measure_text(self._text, self.HEADLINE, engine=self.text_engine)
+            y = absolute.y + (header_h - label.height) / 2
+            paint_text(ctx, x, y, self._text, self.HEADLINE, headline_tok)
 
 
 # --------------------------------------------------------------- progress

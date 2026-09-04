@@ -77,6 +77,8 @@ RAIL = [
         "Segment",
         "ListItem",
         "LinearProgress",
+        "TreeView",
+        "TreeItem",
     ],
 )
 def test_kind_builds(kind: str) -> None:
@@ -329,3 +331,229 @@ def test_items_are_focusable(kind: str) -> None:
     from pycopper.runtime.events import FOCUSABLE_KINDS
 
     assert kind in FOCUSABLE_KINDS
+
+
+# --------------------------------------------------------------- tree view
+
+
+def _tree_view(*, root_value: str = "true", leaf_value: str = "false") -> dict:
+    return {
+        "name": "tv",
+        "widget": "TreeView",
+        "children": [
+            {
+                "name": "src",
+                "widget": "TreeItem",
+                "text": "src",
+                "value": root_value,
+                "children": [
+                    {"name": "main", "widget": "TreeItem", "text": "main.py"},
+                    {
+                        "name": "utils",
+                        "widget": "TreeItem",
+                        "text": "utils",
+                        "value": leaf_value,
+                        "children": [
+                            {"name": "helpers", "widget": "TreeItem", "text": "helpers.py"}
+                        ],
+                    },
+                ],
+            },
+            {"name": "readme", "widget": "TreeItem", "text": "README.md"},
+        ],
+    }
+
+
+def test_a_leaf_is_a_header_row_only() -> None:
+    e = laid_out({"name": "w", "widget": "TreeItem", "text": "leaf"})
+    assert e.size.height == 56.0
+
+
+def test_two_line_tree_item_is_seventy_two_dp() -> None:
+    e = laid_out({"name": "w", "widget": "TreeItem", "text": "leaf", "supporting_text": "detail"})
+    assert e.size.height == 72.0
+
+
+def test_a_collapsed_branch_shows_only_its_header() -> None:
+    e = laid_out(
+        {
+            "name": "w",
+            "widget": "TreeItem",
+            "text": "src",
+            "value": "false",
+            "children": [{"name": "c", "widget": "TreeItem", "text": "child"}],
+        }
+    )
+    assert e.size.height == 56.0
+
+
+def test_an_expanded_branch_sums_its_children() -> None:
+    e = laid_out(
+        {
+            "name": "w",
+            "widget": "TreeItem",
+            "text": "src",
+            "value": "true",
+            "children": [
+                {"name": "c1", "widget": "TreeItem", "text": "one"},
+                {"name": "c2", "widget": "TreeItem", "text": "two"},
+            ],
+        }
+    )
+    assert e.size.height == 56.0 + 56.0 + 56.0
+
+
+def test_depth_is_derived_from_ancestry() -> None:
+    e = laid_out(_tree_view())
+    assert e.find("src").depth == 0
+    assert e.find("utils").depth == 1
+    assert e.find("helpers").depth == 2
+    assert e.find("readme").depth == 0
+
+
+def test_only_branches_draw_a_chevron() -> None:
+    """A leaf gets no `expand_more`/`expand_less` -- nothing to expand.
+
+    Both variants share one label and an empty-text child, so the only
+    possible difference in glyph count is the chevron itself -- a body child
+    with real text would add its own glyphs regardless of the parent's own
+    collapsed state, since the clip only hides them, it does not cull them
+    from the display list (see AccordionElement's own chevron test).
+    """
+
+    def render(children: list[dict]) -> DisplayList:
+        view = {
+            "name": "root",
+            "widget": "Column",
+            "children": [{"name": "w", "widget": "TreeItem", "text": "item", "children": children}],
+        }
+        app = App(view, theme=Theme(dark=True))
+        app.mount()
+        dl = DisplayList()
+        app.paint(dl)
+        return dl
+
+    leaf = render([])
+    branch = render([{"name": "c", "widget": "TreeItem", "text": ""}])
+    glyphs = lambda dl: sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)  # noqa: E731
+    assert glyphs(branch) == glyphs(leaf) + 1
+
+
+def test_tree_selection_is_bindable_at_any_depth() -> None:
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "tv",
+                "widget": "TreeView",
+                "value": "{{ sel.get() }}",
+                "children": [_tree_view()["children"][0]],
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    sel = Signal("helpers")
+    app.expose(sel=sel)
+    app.mount()
+    app.update()
+    assert app.root.find("helpers").selected
+    assert not app.root.find("src").selected
+    sel.set("src")
+    app.update()
+    assert app.root.find("src").selected
+    assert not app.root.find("helpers").selected
+
+
+def test_expand_state_is_bindable() -> None:
+    """Layout-invalidating `animated()` retargets but does not jump on the
+    first `update()` -- same two-step as AccordionElement's own binding test
+    and `test_motion.py`'s switch, driven by `app.motion.tick`."""
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "src",
+                "widget": "TreeItem",
+                "text": "src",
+                "value": "{{ open.get() }}",
+                "children": [{"name": "c", "widget": "TreeItem", "text": "child"}],
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    open_ = Signal(False)
+    app.expose(open=open_)
+    app.mount()
+    app.update()
+    collapsed = app.root.find("src").size.height
+
+    open_.set(True)
+    app.update()
+    assert app.root.find("src").size.height == collapsed
+
+    app.motion.tick(1.0)
+    app.update()
+    assert app.root.find("src").size.height > collapsed
+
+
+def test_collapsing_an_ancestor_clips_every_descendant() -> None:
+    """A tree item's clip intersects its ancestor's rather than replacing it
+    -- unlike Accordion/ScrollView (never nested inside their own kind in
+    practice), a tree item routinely is. Collapsing `a` must hide `c` even
+    though `b`, in between, is itself expanded.
+    """
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "style": {"background": "surface"},
+        "children": [
+            {
+                "name": "a",
+                "widget": "TreeItem",
+                "text": "a",
+                "value": "false",
+                "children": [
+                    {
+                        "name": "b",
+                        "widget": "TreeItem",
+                        "text": "b",
+                        "value": "true",
+                        "children": [{"name": "c", "widget": "TreeItem", "text": "c"}],
+                    }
+                ],
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    app.mount()
+    dl = DisplayList()
+    app.paint(dl)
+
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    above_fold = [s for s in glyphs if s["rect"][1] < 56.0]
+    below_fold = [s for s in glyphs if s["rect"][1] >= 56.0]
+    assert above_fold, "expected a's own header glyph to exist"
+    assert below_fold, "expected b/c's glyphs to exist further down the display list"
+
+    def visible(clip, rect) -> bool:
+        """Would the shader's per-pixel clip test let any of `rect` through.
+
+        A clip rect can have real area and still hide its own content -- b's
+        header clip is a's own restrictive (0, 0, w, 56) rect, which has
+        plenty of area but sits nowhere near where b is actually positioned
+        (b starts at y=56, entirely below it). So this checks overlap with
+        the glyph's own rect, not just whether the clip rect is degenerate.
+        """
+        cx, cy, cw, ch = (float(v) for v in clip)
+        if cw == 0.0 and ch == 0.0:  # the dtype's own "unclipped" sentinel
+            return True
+        rx, ry, rw, rh = (float(v) for v in rect)
+        return rx < cx + cw and rx + rw > cx and ry < cy + ch and ry + rh > cy
+
+    # a is at the root with no ancestor clip, so its own header is visible.
+    assert all(visible(s["clip"], s["rect"]) for s in above_fold)
+    # b and c sit below a's collapsed 56px boundary -- both are hidden by
+    # a's clip regardless of b's own (expanded) state.
+    assert not any(visible(s["clip"], s["rect"]) for s in below_fold)

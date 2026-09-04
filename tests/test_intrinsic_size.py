@@ -33,6 +33,7 @@ EMPTY_IS_HONEST = {
     "Container": "a box around nothing",
     "Row": "as wide as its children, and it has none",
     "Column": "as tall as its children, and it has none",
+    "TreeView": "as wide as its items, and it has none",
     "Spacer": "space is all it is; with no flex or size there is none to take",
     "SegmentedButton": "as wide as its segments; it keeps its 40dp height",
     "BottomSheet": "as tall as its content, and its drag handle is opt-in",

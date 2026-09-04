@@ -2196,3 +2196,62 @@ def test_accordion_baseline(render_scene, assert_golden) -> None:
     app.update()
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("accordion", np.asarray(engine.canvas.draw()))
+
+
+def test_tree_view_baseline(render_scene, assert_golden) -> None:
+    """`src` expanded (one selected leaf, one collapsed nested branch) plus a
+    top-level leaf.
+
+    Proves indentation, the selected-item highlight, and that a collapsed
+    branch's own children stay hidden even while its parent is expanded --
+    the property `test_collapsing_an_ancestor_clips_every_descendant` checks
+    at the display-list level.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Column",
+            "style": {"background": "surface", "padding": 24},
+            "children": [
+                {
+                    "name": "tv",
+                    "widget": "TreeView",
+                    "value": "main",
+                    "children": [
+                        {
+                            "name": "src",
+                            "widget": "TreeItem",
+                            "text": "src",
+                            "value": "true",
+                            "children": [
+                                {"name": "main", "widget": "TreeItem", "text": "main.py"},
+                                {
+                                    "name": "utils",
+                                    "widget": "TreeItem",
+                                    "text": "utils",
+                                    "value": "false",
+                                    "children": [
+                                        {
+                                            "name": "helpers",
+                                            "widget": "TreeItem",
+                                            "text": "helpers.py",
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
+                        {"name": "readme", "widget": "TreeItem", "text": "README.md"},
+                    ],
+                }
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=360, height=320, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("tree_view", np.asarray(engine.canvas.draw()))

@@ -62,6 +62,11 @@ ROLES: Final[dict[str, str]] = {
     # docstring. ARIA's disclosure-widget convention is a button that
     # controls an adjacent region, which is exactly its shape here.
     "Accordion": "button",
+    # Also no M3 Tree component -- see AccordionElement's docstring for the
+    # same gap. ARIA has dedicated tree/treeitem roles, unlike Accordion's
+    # borrowed "button", so those are used directly rather than approximated.
+    "TreeView": "tree",
+    "TreeItem": "treeitem",
     "Menu": "menu",
     "Tooltip": "tooltip",
     "Snackbar": "status",  # "announced ... but don't trap focus"
@@ -108,7 +113,9 @@ ICON_NAMED: Final[frozenset[str]] = frozenset({"Icon", "IconButton", "Fab", "Nav
 CHECKABLE: Final[frozenset[str]] = frozenset({"Checkbox", "Radio", "Switch"})
 
 #: Kinds whose `selected` is meaningful.
-SELECTABLE: Final[frozenset[str]] = frozenset({"Tab", "NavItem", "Segment", "ListItem", "MenuItem"})
+SELECTABLE: Final[frozenset[str]] = frozenset(
+    {"Tab", "NavItem", "Segment", "ListItem", "MenuItem", "TreeItem"}
+)
 
 
 def role_for(kind: str) -> str | None:
@@ -236,6 +243,10 @@ def _node_for(element: Any) -> AccessibleNode | None:
         # Keyed on kind, not on role == "button" -- a plain Button shares that
         # role and has no `is_open`/`checked` disclosure state to read.
         node.expanded = bool(element.checked)
+    elif kind == "TreeItem":
+        # A leaf reports no expanded state at all, same as an unchecked box
+        # differs from a plain button -- there is nothing here to expand.
+        node.expanded = bool(element.checked) if element.children else None
     return node
 
 
