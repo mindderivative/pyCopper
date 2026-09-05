@@ -237,13 +237,30 @@ class Engine:
         original_close = canvas.close
 
         def _close() -> None:
-            context = getattr(self, "context", None)
-            if context is not None:
-                context.unconfigure()
-                del self.context
+            self._release_context()
             original_close()
 
         canvas.close = _close
+
+    def _release_context(self) -> None:
+        """Drop every reference to the wgpu context -- including the
+        surface-resize bound method `__init__` derived from it.
+
+        `self._set_surface_size` is a bound method of
+        `self.context._wgpu_context` (see `__init__`, "Configures the
+        swapchain"), which is a reference to that object independent of
+        `self.context` itself. Dropping `self.context` alone leaves the
+        actual surface object -- the one whose `__del__` calls
+        `wgpuSurfaceRelease` -- alive via that bound method's own
+        `__self__`, which is exactly what kept it alive past window
+        destruction the first time this was fixed (same crash, same
+        `faulthandler` trace, before and after `del self.context` alone).
+        """
+        context = getattr(self, "context", None)
+        if context is not None:
+            context.unconfigure()
+            del self.context
+        self._set_surface_size = None
 
     @property
     def pixel_ratio(self) -> float:
@@ -387,10 +404,7 @@ class Engine:
         So the surface is unconfigured first, then the resources the device
         owns, then the device. Calling this twice is harmless.
         """
-        context = getattr(self, "context", None)
-        if context is not None:
-            context.unconfigure()
-            del self.context
+        self._release_context()
         if getattr(self, "text", None) is not None:
             self.text.atlas.destroy()
         if getattr(self, "images", None) is not None:
