@@ -2992,18 +2992,21 @@ files, and any language server integration -- the package survey that
 grounded this widget's design was explicit that an LSP client is an
 application concern, not something a widget should hard-depend on.
 
-**A pre-existing `TextEngine.layout` cache-growth concern applies more
-sharply here than anywhere it was already true.** `TextEngine._layouts` is
-keyed by the full text string among other parameters and nothing ever
-evicts it (`text/__init__.py`), so a widget whose content changes on every
-keystroke accumulates one new full-`Paragraph` entry per keystroke for the
-life of the process -- already true of `TextField` today, not introduced by
-this widget, but worse here because a code buffer is typically much larger
-than a text field's value and a long editing session performs many more
-edits than a form field usually receives. Not fixed as part of this pass --
-a shared, already-tested cache used by every text-bearing widget deserves
-its own dedicated review (LRU eviction, or a cache key that does not embed
-the whole string), not a change bolted onto one consumer's widget.
+**A pre-existing `TextEngine.layout` cache-growth concern applied more
+sharply here than anywhere it was already true, and has since been fixed.**
+`TextEngine._layouts` was keyed by the full text string among other
+parameters and nothing ever evicted it (`text/__init__.py`), so a widget
+whose content changes on every keystroke accumulated one new full-
+`Paragraph` entry per keystroke for the life of the process -- already true
+of `TextField`, but worse here because a code buffer is typically much
+larger than a text field's value and a long editing session performs many
+more edits than a form field usually receives. `_layouts` is now an
+`OrderedDict` bounded to `layout_cache_size` entries (default 512, set at
+`TextEngine` construction), evicting the least-recently-used paragraph once
+full; a cache hit moves its entry to the end, so actively-reused static
+labels are not the ones evicted. This keeps "static labels cost nothing
+after frame one" for the common case while capping worst-case memory for
+`TextField` and `CodeEditor`.
 
 ### 5.26 Terminal — `widgets/terminal.py`
 
