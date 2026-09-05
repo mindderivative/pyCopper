@@ -188,6 +188,49 @@ class CarouselElement(_StyledMixin, Flex):
         if moved:
             event.stop_propagation()
 
+    #: Drag distance, in logical px, a snapping carousel needs before it
+    #: commits to the next/previous item. Not M3-sourced -- the guidelines
+    #: describe "swipe through one item at a time" but give no pixel
+    #: threshold for a pointer's equivalent of a touch swipe.
+    DRAG_INDEX_THRESHOLD: Final = 60.0
+
+    def on_pointer_down(self, event: Any) -> None:
+        self.state.data["carousel_drag_x"] = event.x
+        self.state.data["carousel_drag_accum"] = 0.0
+        event.capture()
+
+    def on_pointer_move(self, event: Any) -> None:
+        """Drag-to-scroll, additive to `on_wheel` -- M3's own guidelines
+        describe moving through a carousel as swiping, and a pointer's
+        direct-manipulation equivalent of a swipe is a drag, not a wheel
+        notch. A snapping carousel accumulates drag distance and commits
+        one index per `DRAG_INDEX_THRESHOLD` crossed, so a long drag can
+        step through several items in one gesture, the same way a fast
+        swipe would; an uncontained one just scrolls by the exact pixel
+        delta, 1:1 with the pointer, since it is already free scrolling
+        and has no items to snap to.
+        """
+        last_x = self.state.data.get("carousel_drag_x")
+        if last_x is None:
+            return
+        dx = event.x - last_x
+        self.state.data["carousel_drag_x"] = event.x
+        if not self.snaps:
+            self.set_scroll(self.scroll_x - dx)
+            return
+        accum = self.state.data.get("carousel_drag_accum", 0.0) + dx
+        while accum <= -self.DRAG_INDEX_THRESHOLD:
+            self.set_index(self.index + 1)
+            accum += self.DRAG_INDEX_THRESHOLD
+        while accum >= self.DRAG_INDEX_THRESHOLD:
+            self.set_index(self.index - 1)
+            accum -= self.DRAG_INDEX_THRESHOLD
+        self.state.data["carousel_drag_accum"] = accum
+
+    def on_pointer_up(self, event: Any) -> None:
+        self.state.data.pop("carousel_drag_x", None)
+        self.state.data.pop("carousel_drag_accum", None)
+
     # --------------------------------------------------------------- layout
 
     def _slot_width(self, slot_index: int, large: float) -> float:

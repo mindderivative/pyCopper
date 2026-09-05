@@ -13,7 +13,7 @@ import pytest
 from pycopper import App, Settings, Theme
 from pycopper.layout import Constraints, Offset, Size
 from pycopper.paint import NO_TOKEN, DisplayList
-from pycopper.runtime.events import EventType, WheelEvent
+from pycopper.runtime.events import EventType, PointerEvent, WheelEvent
 from pycopper.spec import parse_view
 from pycopper.theme import Palette
 from pycopper.widgets import build_element
@@ -286,6 +286,61 @@ def test_the_wheel_chains_outwards_at_the_last_item() -> None:
     event = WheelEvent(EventType.WHEEL, x=100, y=50, dy=100.0)
     c.on_wheel(event)
     assert not event.stopped
+
+
+# --------------------------------------------------------------------- drag
+
+
+def drag(c, *xs: float) -> None:
+    """A press followed by one or more moves, mirroring one continuous
+    gesture -- each `x` is a pointer position, in order."""
+    c.on_pointer_down(PointerEvent(EventType.POINTER_DOWN, x=xs[0], y=80.0))
+    for x in xs[1:]:
+        c.on_pointer_move(PointerEvent(EventType.POINTER_MOVE, x=x, y=80.0, button=1))
+
+
+def test_dragging_left_past_the_threshold_advances_a_snapping_carousel() -> None:
+    """M3's own guidelines describe moving through a carousel as swiping;
+    a pointer drag is the direct-manipulation equivalent."""
+    c = carousel("multi_browse")
+    drag(c, 300.0, 300.0 - CarouselElement.DRAG_INDEX_THRESHOLD - 10.0)
+    assert c.index == 1
+
+
+def test_dragging_right_past_the_threshold_reverses_it() -> None:
+    c = carousel("multi_browse")
+    c.set_index(2)
+    drag(c, 100.0, 100.0 + CarouselElement.DRAG_INDEX_THRESHOLD + 10.0)
+    assert c.index == 1
+
+
+def test_a_snapping_drag_below_the_threshold_does_not_move_it() -> None:
+    c = carousel("multi_browse")
+    drag(c, 300.0, 300.0 - CarouselElement.DRAG_INDEX_THRESHOLD + 5.0)
+    assert c.index == 0
+
+
+def test_a_long_drag_can_step_through_more_than_one_item() -> None:
+    c = carousel("multi_browse", n=8)
+    drag(c, 500.0, 500.0 - 3 * CarouselElement.DRAG_INDEX_THRESHOLD - 10.0)
+    assert c.index == 3
+
+
+def test_dragging_an_uncontained_strip_scrolls_by_the_exact_pixel_delta() -> None:
+    c = carousel("uncontained", n=6, width=300)
+    drag(c, 300.0, 250.0)
+    assert c.scroll_x == pytest.approx(50.0)
+    drag_more_x = 220.0
+    c.on_pointer_move(PointerEvent(EventType.POINTER_MOVE, x=drag_more_x, y=80.0, button=1))
+    assert c.scroll_x == pytest.approx(80.0)
+
+
+def test_pointer_up_ends_the_drag_so_a_later_move_does_nothing() -> None:
+    c = carousel("uncontained", n=6, width=300)
+    c.on_pointer_down(PointerEvent(EventType.POINTER_DOWN, x=300.0, y=80.0))
+    c.on_pointer_up(PointerEvent(EventType.POINTER_UP, x=300.0, y=80.0))
+    c.on_pointer_move(PointerEvent(EventType.POINTER_MOVE, x=200.0, y=80.0, button=1))
+    assert c.scroll_x == 0.0
 
 
 # -------------------------------------------------------------------- paint
