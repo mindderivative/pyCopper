@@ -26,7 +26,7 @@ pyCopper is a **distributable** desktop GUI framework: users `pip install pycopp
 | Web, mobile, or embedded targets | **Desktop-only, and not merely for now** — see §1.2.1. |
 | Touch input | No touch, stylus, or gesture handling. Pointer, keyboard, and scroll wheel only. |
 | Complex text shaping (Arabic, Devanagari, CJK vertical) | Requires HarfBuzz; a seam is designed in, see §5.7. |
-| Screen-reader bridge (AT-SPI / UIA / NSAccessibility) | Native and per-OS. The *semantic tree* is built (§5.11); the bridge that would push it to a platform is not. |
+| Screen-reader bridge (UIA / NSAccessibility) | Native and per-OS. The *semantic tree* is built (§5.11), and the AT-SPI bridge that pushes it to Linux is too (v1.5, `runtime/accesskit_bridge.py`); Windows and macOS need their own AccessKit platform wheels and are untested here. |
 | CSS compatibility | The style vocabulary is MD3-shaped, not CSS-shaped. |
 | Hot-reload of Python application logic | YAML reload only. Python reload is a different, much harder problem. |
 | Multi-window | Single window in v1; the engine is written so the canvas is not a singleton. |
@@ -63,8 +63,8 @@ should be built before mobile-shaped components:
   navigated (§5.11.1, built).
 - **Visible scrollbars** and wheel-driven scrolling (§5.14, built).
 - **Right-click and context menus**, **cursor shape**, and **mouse text
-  selection** are desktop conventions with no mobile analogue, and are not
-  built yet.
+  selection** are desktop conventions with no mobile analogue — built in v1.2
+  (§5.17.4, §5.17.5, §5.17.6).
 
 ### 1.3 Design principles
 
@@ -3230,7 +3230,10 @@ pyCopper/
 │           ├── dock.py          # DockSplit / DockGroup / DockPanel (§5.20)
 │           ├── canvas.py        # Canvas: imperative drawing surface (§5.21)
 │           ├── image.py         # Image (§5.22)
-│           └── video.py         # Video: frame-sink widget (§5.23)
+│           ├── video.py         # Video: frame-sink widget (§5.23)
+│           ├── nodegraph.py     # NodeGraph + Node (§5.24)
+│           ├── codeeditor.py    # CodeEditor (§5.25)
+│           └── terminal.py      # Terminal: real PTY spawning (§5.26)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers
@@ -3410,7 +3413,8 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M8** ✅ `1.2.0` | Styling and interaction: the stylesheet and cross-file sharing, disabled state, M3 elevation levels, right-click context menus, cursor shapes, mouse text selection, drag gestures, **the M3 type scale** (size, weight, tracking, line height), separated hit and paint rects, and the `TextField` | **Done.** 1316 tests green. The type scale is sourced from material-web rather than invented — the scraped token tables were empty and the scattered values disagreed with themselves. Hit rects separate from paint rects, so M3's 48dp touch target no longer implies a 48dp button |
 | **M9** ✅ `1.3.0` | Platform integration: the resize investigation and its reversal (§5.8.1), `vsync` defaulting to False, server-side decorations, the **system clipboard**, multi-line text entry, explicit modal-dialog semantics, and **per-file ViewModels** | **Done.** 1362 tests green. A view file still cannot decide what Python is imported: `_View.yaml`/`_ViewModel.py` naming is enforced, binding is explicit, and `app.py` stays the entry point rather than the logic holder |
 | **M10** ✅ `1.4.0`–`1.5.0` | Accessibility: `runtime/accessibility.py` (the semantic tree, `1.4.0`) and `runtime/accesskit_bridge.py` (AT-SPI through AccessKit, `1.5.0`) | **Done.** 1392 tests green, and verified against a live screen reader rather than only against the tree it would be handed. Windows and macOS need their own AccessKit platform wheels and say so instead of pretending |
-| **M11** 🔨 | Correctness and latency, unreleased: intrinsic widget sizes locked in by golden and by assertion, the quadratic line wrap closed (§5.7.1), and the swapchain pinned during a resize (§5.8.1) | **In progress.** 1469 tests green. The pointer trailing on Wayland is gone — the swapchain rebuild it came from is amortised, after the note saying that was impossible turned out to be wrong |
+| **M11** ✅ | Correctness and latency: intrinsic widget sizes locked in by golden and by assertion, the quadratic line wrap closed (§5.7.1), and the swapchain pinned during a resize (§5.8.1) | **Done.** The pointer trailing on Wayland is gone — the swapchain rebuild it came from is amortised, after the note saying that was impossible turned out to be wrong. Did not touch the view format or `__all__`, so no version moved for it |
+| **M12** ✅ `1.6.0` | The desktop widget catalogue: sixteen widgets with no M3 catalogue entry of their own — `Popover`, `Accordion`, `TreeView`/`TreeItem`, submenu support for `Menu`/`MenuItem`, `Link`, `SpinBox`, `Pagination`, `StatusBar`, `DockSplit`/`DockGroup`/`DockPanel` (§5.20), `Canvas` (§5.21), `Image` (§5.22), `Video` (§5.23), `NodeGraph`/`Node` (§5.24), `CodeEditor` (§5.25), and `Terminal` (§5.26) — plus SVG icon compilation. Two new optional extras, neither a hard dependency: `pycopper[code]` (Pygments syntax highlighting) and `pycopper[terminal]` (`pyte`/`pexpect`, POSIX only). A full-codebase review (60 subagents, four phases, `docs/CODE_REVIEW_2026-09.md`) ran alongside it | **Done.** 1917 tests collected. Genuinely cross-cutting bugs found and fixed along the way, not scoped to one widget: a `repeat=True` `Ticker` animation leak, `PaintContext` clones silently dropping `images` at nine clip sites, three hot-reload no-ops (overlays never rebuilt, `image_atlas` never threaded to them, a `watchfiles` enum-casing miss), a `Signal.set` ordering race, and literal (non-token) display-list colours being written as sRGB when the render target treats them as linear, washing out every one that was not re-derived from a palette token |
 
 ---
 

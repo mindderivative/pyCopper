@@ -100,6 +100,23 @@ versioning and pinned by a test; adding to it is a minor release, changing or
 removing anything in it is a major one. (1.1 was that rule in action: motion
 added four names and nothing else moved.)
 
+**v1.6 — the desktop widget catalogue.** Sixteen widgets with no M3 catalogue
+entry of their own, designed from pyCopper's own precedent and grounded in the
+nearest real M3 guidance where any existed: `Popover`, `Accordion`, `TreeView`/
+`TreeItem`, submenu support for `Menu`/`MenuItem`, `Link`, `SpinBox`,
+`Pagination`, `StatusBar`, `DockSplit`/`DockGroup`/`DockPanel`, `Canvas`,
+`Image`, `Video`, `NodeGraph`/`Node`, `CodeEditor`, and `Terminal` — plus SVG
+icon compilation (`pycopper[svg]`). `CodeEditor` and `Terminal` are optional
+capabilities, not hard dependencies: Pygments syntax highlighting
+(`pycopper[code]`) and a real spawned shell via `pyte`/`pexpect`
+(`pycopper[terminal]`, POSIX only — Windows needs a ConPTY backend not yet
+built). None of it touched `__all__`; the version moves for the view format's
+sake, the same rule v1.2 established. A full-codebase review (60 subagents,
+four phases) accompanied this release: a real ticker leak, a `PaintContext`
+field silently dropped at nine clip sites, three hot-reload no-ops, and a
+`Signal` race were all found and fixed along the way — see
+`docs/CODE_REVIEW_2026-09.md`.
+
 **v1.5 — the screen-reader bridge.** `app.bind_accessibility(AccessKitBridge(...))`
 pushes the semantic tree to AT-SPI, and a reader can activate controls as well
 as read them. Optional: `pip install 'pycopper[a11y]'`. Verified against the
@@ -152,6 +169,7 @@ Frozen does not mean finished. What is deliberately **not** built yet:
 | A Windows or macOS screen-reader bridge | The AT-SPI bridge works; the other two need AccessKit's platform wheels and are untested |
 | IME preedit | Committed characters only, so CJK input methods are unsupported |
 | Clipboard access without focus | Copy and paste use the system clipboard, but Wayland grants that only to a focused window with a real keypress behind it — true of Ctrl+C/Ctrl+V, not of a background thread |
+| `Terminal` on Windows | `pexpect.spawn` is POSIX-only; a `pywinpty`/ConPTY backend is architected for but not built |
 
 Mobile and touch are explicit non-goals.
 
