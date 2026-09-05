@@ -7,9 +7,10 @@ runs, paragraph layouts, and rasterised glyphs in the atlas.
 
 from __future__ import annotations
 
+import math
 from collections import OrderedDict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
 
@@ -63,6 +64,27 @@ _NO_CLIP = (0.0, 0.0, 0.0, 0.0)
 # has more than a few hundred distinct (text, style) combinations on screen
 # at once, so this ceiling doesn't touch that case in practice.
 _DEFAULT_LAYOUT_CACHE_SIZE = 512
+
+# Rounds a bounded `max_width` up to the nearest multiple before it is used as
+# part of the layout cache key (and as the width actually handed to the
+# shaper). A widget whose wrap width tracks a live window size -- any `Text`
+# under a `cross_alignment: stretch` column, say -- gets a fresh `max_width`
+# on nearly every pixel of a resize drag, and the cache key embeds that width
+# verbatim, so a continuous drag was a guaranteed miss on almost every frame:
+# measured at 10-40ms per re-shape for a real paragraph of prose, which is
+# well past the resize-repaint throttle's 1/120s budget and, once individual
+# paints run longer than that, reproduces the very glfw.poll_events() backlog
+# `_coalesce_resize_paints` (runtime/engine.py) exists to prevent -- a window
+# that visibly freezes mid-drag and then snaps to wherever the cursor ended
+# up. Rounding UP (never down) guarantees the bucketed width is never
+# *smaller* than what was asked for, which is what keeps
+# `test_text_laid_out_at_its_own_ink_width_stays_on_one_line` (test_text.py)
+# holding: a widget laid out again at exactly its own measured ink width must
+# never wrap, and it can't if it is never given less room than it measured.
+# 16px is small enough that the extra slack is imperceptible in prose (well
+# under one average glyph) while cutting the number of distinct cache keys a
+# smooth per-pixel drag produces by roughly the same factor.
+_WRAP_WIDTH_BUCKET_PX: Final = 16.0
 
 
 def _span_arrays(
@@ -208,6 +230,17 @@ class TextEngine:
         `_layouts` without limit over a long editing session.
         """
         req = request or FontRequest()
+        if max_width is not None and alignment == Alignment.START:
+            # Bucketing is only safe for START alignment. `layout_text` sets
+            # `box_width = max_width` and centres/ends lines against THAT --
+            # not against the line's own ink width -- so a centered or
+            # end-aligned paragraph laid out against a rounded-up `max_width`
+            # would visibly drift from true centre by up to half a bucket
+            # (caught by `tests/golden/test_baselines.py::test_wrapped_text_baseline`,
+            # whose "centred" line shifted right when this was tried
+            # unconditionally). START alignment has no such box-relative
+            # offset, so it is the only case bucketing is free.
+            max_width = math.ceil(max_width / _WRAP_WIDTH_BUCKET_PX) * _WRAP_WIDTH_BUCKET_PX
         key = (text, px, max_width, req.key(), alignment, tracking, line_height)
         hit = self._layouts.get(key)
         if hit is not None:

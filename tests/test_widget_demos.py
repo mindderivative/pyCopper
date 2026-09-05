@@ -21,7 +21,11 @@ import pytest
 from pycopper import App, Theme
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "widgets"
-DEMO_DIRS = sorted(p for p in EXAMPLES_DIR.iterdir() if p.is_dir()) if EXAMPLES_DIR.exists() else []
+DEMO_DIRS = (
+    sorted(p for p in EXAMPLES_DIR.iterdir() if p.is_dir() and (p / "app.py").exists())
+    if EXAMPLES_DIR.exists()
+    else []
+)
 
 
 def _load_viewmodel_class(vm_path: Path) -> type:

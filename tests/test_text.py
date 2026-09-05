@@ -312,6 +312,30 @@ def test_engine_layout_cache_keeps_recently_used_entries() -> None:
     assert te.layout("kept", px=16) is kept
 
 
+def test_engine_layout_coalesces_close_widths_into_one_cache_entry() -> None:
+    """A resize drag changes `max_width` by roughly one pixel per frame; this
+    is the fix for the pointer-trailing regression a live drag-resize caused
+    on the widget-demo apps -- see `_WRAP_WIDTH_BUCKET_PX`'s own docstring."""
+    te = TextEngine()
+    text = "The quick brown fox jumps over the lazy dog and keeps running"
+    # 289..304 all round up to the same 16px bucket (304 = 19 * 16).
+    first = te.layout(text, px=14, max_width=289.0)
+    for w in range(290, 305):
+        assert te.layout(text, px=14, max_width=float(w)) is first
+
+
+def test_engine_layout_never_gives_less_room_than_requested() -> None:
+    """Bucketing rounds up, never down: a request for exactly its own ink
+    width must still fit on one line, or the knife-edge single-line
+    invariant (`test_text_laid_out_at_its_own_ink_width_stays_on_one_line`)
+    would break for any widget whose ink width isn't already a bucket
+    multiple."""
+    te = TextEngine()
+    unwrapped = te.layout("title-small", px=14)
+    rewrapped = te.layout("title-small", px=14, max_width=unwrapped.size.width)
+    assert rewrapped.line_count == 1
+
+
 def test_engine_measure_matches_layout() -> None:
     te = TextEngine()
     assert te.measure("Hello", px=16) == te.layout("Hello", px=16).size

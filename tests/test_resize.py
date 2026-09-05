@@ -121,7 +121,12 @@ def test_a_pixel_ratio_change_repaints() -> None:
         return display_list
 
     single = widest(at_ratio(1.0))
-    assert widest(at_ratio(2.0)) == pytest.approx(single * 2, rel=1e-6)
+    # abs, not rel=1e-6: whichever rect is widest can be a text glyph rather
+    # than a solid box, and a glyph's physical extent is font-hinting-rounded
+    # independently at each DPI, so it will not double exactly. The stale-slice
+    # bug this test exists to catch would leave `ratio=2.0` close to `single`
+    # (undoubled, a huge gap), not a couple of physical pixels off of double.
+    assert widest(at_ratio(2.0)) == pytest.approx(single * 2, abs=2.0)
 
 
 def test_a_changed_clip_repaints() -> None:
