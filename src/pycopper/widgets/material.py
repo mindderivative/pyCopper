@@ -589,6 +589,15 @@ class CheckboxElement(_StyledMixin, Padding):
     finger-precision rule and a pointer is pixel-precise. An application that
     wants the M3 figure anyway writes `min_hit_size: 48` on the node; the box
     is still drawn at 18dp.
+
+    `indeterminate:` is M3's third state -- a dash instead of a checkmark,
+    for a parent checkbox whose children are only partly checked
+    (`COMPONENT_CHECKBOX.md`: "If some, but not all, child checkboxes are
+    checked, the parent checkbox becomes an indeterminate checkbox"). It
+    takes over which glyph paints but is otherwise inert here -- deciding
+    what "some but not all" means for a given tree of children, and setting
+    `indeterminate:` from that, is application logic this widget has no way
+    to know on its own.
     """
 
     BOX: Final = 18.0
@@ -607,7 +616,7 @@ class CheckboxElement(_StyledMixin, Padding):
         return self.sized(constraints, self.style).constrain(Size(self.BOX, self.BOX))
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
-        selected = self.checked
+        selected = self.checked or self.indeterminate
         outline = ctx.palette.index("on_surface_variant")
         primary = ctx.palette.index(self.style.background or "primary")
         on_primary = content_token(ctx, self.style, "on_primary")
@@ -654,7 +663,7 @@ class CheckboxElement(_StyledMixin, Padding):
             # so it fades -- an approximation, and the honest one available.
             ctx.text.emit_icon(
                 ctx.display_list,
-                "check",
+                "remove" if self.indeterminate else "check",
                 x=absolute.x,
                 y=absolute.y,
                 size=self.BOX,
@@ -1007,17 +1016,35 @@ class FabElement(_StyledMixin, Padding):
     Defaults to `primary_container` on `on_primary_container`, M3's default
     colour mapping. M3 puts a FAB at resting **level 3**, alongside modal
     dialogs -- the highest resting level any component uses.
+
+    `variant: extended` is the fifth M3 size, and the odd one out: 56dp tall
+    like `standard` and the same 16dp radius, but a **dynamic width** (80dp
+    minimum) driven by its content rather than a fixed square -- icon plus a
+    text label, 16dp padding on every side, an 8dp gap between them
+    (`COMPONENT_EXTENDED_FABS.md`'s own measurements: "Container height 56dp,
+    Container width Dynamic, 80dp min, Padding 16dp"). `text:` is already
+    spoken for (the icon glyph name, same as every other size), so the label
+    reuses `supporting_text:` -- the same "second bit of text" role it plays
+    on `ListItem`/`Accordion`. An extended FAB with no label just measures as
+    an icon-only pill at the 80dp floor, which is a legitimate fallback
+    rather than a special case to guard against.
     """
 
     RESTING_ELEVATION = 3
 
-    #: variant -> (container size, corner radius, icon size)
+    #: variant -> (container size, corner radius, icon size). `extended`'s
+    #: first element is unused (its width is computed, not fixed) but kept
+    #: so `_geometry()` returns a uniform 3-tuple for every variant.
     SIZES: Final = {
         "small": (40.0, 12.0, 24.0),
         "standard": (56.0, 16.0, 24.0),
         "medium": (80.0, 20.0, 28.0),
         "large": (96.0, 28.0, 36.0),
+        "extended": (56.0, 16.0, 24.0),
     }
+    EXTENDED_MIN_WIDTH: Final = 80.0
+    EXTENDED_PAD_X: Final = 16.0
+    EXTENDED_GAP: Final = 8.0
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
@@ -1031,9 +1058,23 @@ class FabElement(_StyledMixin, Padding):
         variant = self.style.variant
         return self.SIZES.get(variant, self.SIZES["standard"])
 
+    def _label_width(self) -> float:
+        label = self._supporting.strip()
+        if not label:
+            return 0.0
+        return measure_text(label, self.style.font_size, engine=self.text_engine).width
+
     def perform_layout(self, constraints: Constraints) -> Size:
-        size, _, _ = self._geometry()
-        return self.sized(constraints, self.style).constrain(Size(size, size))
+        height, _, icon = self._geometry()
+        if self.style.variant == "extended":
+            has_icon = bool(self._text.strip())
+            label_width = self._label_width()
+            content = (icon if has_icon else 0.0) + (
+                self.EXTENDED_GAP + label_width if has_icon and label_width else label_width
+            )
+            width = max(self.EXTENDED_MIN_WIDTH, content + 2 * self.EXTENDED_PAD_X)
+            return self.sized(constraints, self.style).constrain(Size(width, height))
+        return self.sized(constraints, self.style).constrain(Size(height, height))
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         style = self.style
@@ -1062,7 +1103,9 @@ class FabElement(_StyledMixin, Padding):
         )
         _emit_state_layer(ctx, self, absolute, content, (radius,) * 4)
 
-        if self._text.strip():
+        if style.variant == "extended":
+            self._paint_extended(ctx, absolute, icon, content)
+        elif self._text.strip():
             ctx.text.emit_icon(
                 ctx.display_list,
                 self._text.strip(),
@@ -1076,6 +1119,37 @@ class FabElement(_StyledMixin, Padding):
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
+
+    def _paint_extended(self, ctx: PaintContext, absolute: Any, icon: float, content: int) -> None:
+        style = self.style
+        label = self._supporting.strip()
+        has_icon = bool(self._text.strip())
+        label_width = self._label_width()
+        total = (icon if has_icon else 0.0) + (
+            self.EXTENDED_GAP + label_width if has_icon and label else label_width
+        )
+        x = absolute.x + (self.size.width - total) / 2
+        y_center = absolute.y + self.size.height / 2
+
+        if has_icon:
+            ctx.text.emit_icon(
+                ctx.display_list,
+                self._text.strip(),
+                x=x,
+                y=y_center - icon / 2,
+                size=icon,
+                fill=style.icon_fill,
+                weight=style.icon_weight,
+                pixel_ratio=ctx.pixel_ratio,
+                token=content,
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+            x += icon + self.EXTENDED_GAP
+
+        if label:
+            metrics = measure_text(label, style.font_size, engine=self.text_engine)
+            paint_text(ctx, x, y_center - metrics.height / 2, label, style.font_size, content)
 
 
 # ----------------------------------------------------------------- spin box

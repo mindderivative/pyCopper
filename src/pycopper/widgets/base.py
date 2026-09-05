@@ -798,6 +798,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import overlays as o
     from . import pagehost as ph
     from . import scroll as sc
+    from . import slider as sl
     from . import terminal as tm
     from . import textfield as tf
     from . import video as vd
@@ -814,6 +815,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.FAB: m.FabElement,
         WidgetKind.BADGE: m.BadgeElement,
         WidgetKind.SPIN_BOX: m.SpinBoxElement,
+        WidgetKind.SLIDER: sl.SliderElement,
         WidgetKind.PAGINATION: m.PaginationElement,
         WidgetKind.ACCORDION: m.AccordionElement,
         WidgetKind.NAVIGATION_RAIL: n.NavigationRailElement,

@@ -156,6 +156,49 @@ def test_fab_sizes(variant: str, side: float) -> None:
     assert e.size == Size(side, side)
 
 
+def test_extended_fab_is_fifty_six_high_like_standard() -> None:
+    """COMPONENT_EXTENDED_FABS.md: "Container height 56dp"."""
+    e = laid_out(widget="Fab", text="add", supporting_text="Compose", style={"variant": "extended"})
+    assert e.size.height == 56.0
+
+
+def test_extended_fab_with_no_content_is_the_eighty_dp_floor() -> None:
+    """COMPONENT_EXTENDED_FABS.md: "Container width Dynamic, 80dp min"."""
+    e = laid_out(widget="Fab", style={"variant": "extended"})
+    assert e.size.width == 80.0
+
+
+def test_extended_fab_widens_for_a_longer_label() -> None:
+    short = laid_out(widget="Fab", text="add", supporting_text="Go", style={"variant": "extended"})
+    long = laid_out(
+        widget="Fab",
+        text="add",
+        supporting_text="Compose a much longer message",
+        style={"variant": "extended"},
+    )
+    assert long.size.width > short.size.width
+
+
+def test_extended_fab_with_an_icon_is_wider_than_label_only() -> None:
+    """The icon reserves 24dp plus an 8dp gap on top of the label alone."""
+    label_only = laid_out(widget="Fab", supporting_text="Compose", style={"variant": "extended"})
+    with_icon = laid_out(
+        widget="Fab", text="add", supporting_text="Compose", style={"variant": "extended"}
+    )
+    assert with_icon.size.width - label_only.size.width == pytest.approx(24.0 + 8.0)
+
+
+def test_extended_fab_paints_both_icon_and_label() -> None:
+    """Icons and text both emit as GLYPH -- distinguished here by count, not
+    kind: adding the icon must add glyph instances on top of the label alone."""
+    label_only = painted(widget="Fab", supporting_text="Compose", style={"variant": "extended"})
+    with_icon = painted(
+        widget="Fab", text="add", supporting_text="Compose", style={"variant": "extended"}
+    )
+    glyphs = lambda dl: sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)  # noqa: E731
+    assert glyphs(with_icon) > glyphs(label_only) > 0
+
+
 def test_badge_dot_is_six_dp() -> None:
     assert laid_out(widget="Badge", style={"variant": "dot"}).size == Size(6, 6)
 
@@ -226,6 +269,52 @@ def test_value_is_bindable_to_a_signal() -> None:
     assert app.root.find("cb").checked is False
     on.set(True)
     assert app.root.find("cb").checked is True
+
+
+def test_indeterminate_checkbox_paints_the_dash_glyph_not_a_checkmark() -> None:
+    """COMPONENT_CHECKBOX.md's third state: a dash, unrelated to `value:`."""
+    dl = painted(widget="Checkbox", value="false", indeterminate="true")
+    # emit_icon writes the glyph's own codepoint into the instance's `uv`
+    # rect (the atlas region), which is how "remove" and "check" are told
+    # apart at this level -- comparing paints against the checked (checkmark)
+    # case is a simpler, still-real way to prove a different glyph painted.
+    checked_dl = painted(widget="Checkbox", value="true")
+    indeterminate_glyph = next(s for s in dl.view if s["flags"][0] == Kind.GLYPH)
+    checked_glyph = next(s for s in checked_dl.view if s["flags"][0] == Kind.GLYPH)
+    assert tuple(indeterminate_glyph["uv"]) != tuple(checked_glyph["uv"])
+
+
+def test_indeterminate_looks_filled_even_when_value_is_false() -> None:
+    """The box fills (background painted) the same way a checked one does --
+    only the glyph choice differs -- since M3 shows indeterminate as a
+    filled state, not an empty box with a dash floating in it."""
+    unchecked = tokens_in(painted(widget="Checkbox", value="false"))
+    indeterminate = tokens_in(painted(widget="Checkbox", value="false", indeterminate="true"))
+    checked = tokens_in(painted(widget="Checkbox", value="true"))
+    assert indeterminate == checked
+    assert indeterminate != unchecked
+
+
+def test_indeterminate_is_bindable() -> None:
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "cb",
+                "widget": "Checkbox",
+                "value": "false",
+                "indeterminate": "{{ some.get() }}",
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    some = Signal(False)
+    app.expose(some=some)
+    app.mount()
+    assert app.root.find("cb").indeterminate is False
+    some.set(True)
+    assert app.root.find("cb").indeterminate is True
 
 
 def test_badge_count_is_bindable() -> None:

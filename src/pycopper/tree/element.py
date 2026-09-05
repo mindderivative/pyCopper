@@ -216,6 +216,8 @@ class ElementMixin:
     _error: str
     _collapsed_template: Template | None
     _collapsed: str
+    _indeterminate_template: Template | None
+    _indeterminate: str
     _path_template: Template | None
     _path: str
     _cached: np.ndarray | None
@@ -254,6 +256,8 @@ class ElementMixin:
         self._error = spec.error or ""
         self._collapsed_template = spec.collapsed_template()
         self._collapsed = spec.collapsed or ""
+        self._indeterminate_template = spec.indeterminate_template()
+        self._indeterminate = spec.indeterminate or ""
         self._path_template = spec.path_template()
         self._path = spec.path or ""
         self._cached = None
@@ -313,6 +317,9 @@ class ElementMixin:
         self._collapsed_template = spec.collapsed_template()
         if self._collapsed_template is None or self._collapsed_template.is_static:
             self._collapsed = spec.collapsed or ""
+        self._indeterminate_template = spec.indeterminate_template()
+        if self._indeterminate_template is None or self._indeterminate_template.is_static:
+            self._indeterminate = spec.indeterminate or ""
         self._path_template = spec.path_template()
         if self._path_template is None or self._path_template.is_static:
             self._path = spec.path or ""
@@ -511,6 +518,11 @@ class ElementMixin:
         return self._collapsed.strip().lower() in ("true", "1", "yes")
 
     @property
+    def indeterminate(self) -> bool:
+        """`Checkbox`'s third state. Meaningless on anything else."""
+        return self._indeterminate.strip().lower() in ("true", "1", "yes")
+
+    @property
     def _ancestor_disabled(self) -> bool:
         node = self.parent
         while node is not None:
@@ -610,6 +622,7 @@ class ElementMixin:
                 ("_disabled", self._disabled_template),
                 ("_error", self._error_template),
                 ("_collapsed", self._collapsed_template),
+                ("_indeterminate", self._indeterminate_template),
                 ("_path", self._path_template),
             )
             if tpl is not None and not tpl.is_static

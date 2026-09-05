@@ -63,6 +63,10 @@ ROLES: Final[dict[str, str]] = {
     # ARIA's own name for exactly this control -- no M3 page to quote a role
     # from, since SpinBox has no M3 component at all (see its docstring).
     "SpinBox": "spinbutton",
+    # Stated directly, unlike most of this module's approximations:
+    # COMPONENT_SLIDERS.md's own accessibility page says "It should have the
+    # slider role" -- ARIA's own dedicated role, used verbatim.
+    "Slider": "slider",
     # A submenu trigger (`style.has_submenu`) should additionally carry
     # `aria-haspopup`/`aria-expanded`, per ARIA convention -- not modelled:
     # `_node_for` sees one element at a time and has no visibility into

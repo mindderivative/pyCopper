@@ -1706,12 +1706,12 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 |---|---|---|
 | `Card` | 12dp radius, 16dp padding | `elevated` / `filled` / `outlined` |
 | `Divider` | 1dp, `outline_variant` | `full_bleed` / `inset` |
-| `Checkbox` | 18dp box, 2dp radius | checkmark glyph when selected |
+| `Checkbox` | 18dp box, 2dp radius | checkmark glyph when selected; `indeterminate:` (M3's third state) swaps it for a dash, taking precedence over `value:` for which glyph paints but not changing `value:` itself |
 | `Radio` | 20dp outer, 10dp dot | a circle is a rounded box at radius = side/2 |
 | `Switch` | 52×32dp track, 16/24dp thumb | thumb grows when selected |
 | `Chip` | 32dp high, 8dp radius, 18dp icon | filter variant shows a leading checkmark |
 | `IconButton` | 40dp container, 24dp icon | `standard` / `filled` / `filled_tonal` / `outlined` |
-| `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3 |
+| `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3. `variant: extended` (`COMPONENT_EXTENDED_FABS.md`) is the fifth size: 56dp tall like `standard` but a dynamic width (80dp floor) fitting an icon plus a `supporting_text:` label, 16dp padding, 8dp gap between them |
 | `Badge` | 6dp dot, or 16dp-high pill | `value:` carries the count |
 | `SpinBox` | Two 40dp `IconButton`-anatomy regions (`remove`/`add`) flanking a number | No M3 component; named to dodge M3's own "Stepper" (a multi-step flow indicator). Grounded in the Sliders page's "icon buttons placed outside the slider" convention instead. `on_change` carries the new value already clamped to `style.min`/`max` and stepped by `style.step` |
 | `Pagination` | 40dp prev/next arrows around 40dp page-number buttons | No M3 component — "pagination" appears once in the whole reference library, as a prohibition on Cards. Windows around the current page, collapsing runs into `...`; below 8 total pages nothing is ever collapsed. The current page uses `Chip`/`Segment`'s own selected pairing (`secondary_container`/`on_secondary_container`) |
@@ -1729,8 +1729,8 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
 | `Accordion` | 56 / 72dp header, `ListItem`'s anatomy | M3 has no component for this — only Lists' "expand and collapse" behaviour statement; disclosure state is `value:`, animated height reveal clipped like `ScrollView`, chevron **swaps** `expand_more`/`expand_less` rather than rotating (a glyph instance has no rotation parameter) |
 | `TreeView` + `TreeItem` | Accordion's mechanism, recursive | same M3 gap, same reveal/clip/chevron-swap machinery, applied to a `TreeItem` that nests further `TreeItem`s; a leaf has no chevron. Two things a single level of nesting never needed: per-level **indentation** (one chevron-width per depth, not M3-sourced — no tree page exists to source it from) and a **clip that intersects its ancestor's** rather than replacing it, since — unlike Accordion or `ScrollView` — a tree item is routinely nested inside its own kind, so collapsing a node must hide every descendant regardless of which of them are individually expanded. The intersection's own degenerate case needed a further fix, covered in §5.8.6. `TreeView` generalises `_SelectionContainer`'s `value:`-names-the-selected-child shape to select at any depth |
-| `LinearProgress` | 4dp, rounded ends | determinate only — indeterminate is an animation |
-| `CircularProgress` | 4dp ring, clockwise from 12 o'clock | determinate only; needs the arc primitive (§5.15). The 48dp default diameter is **not** sourced — that page's size table is an image |
+| `LinearProgress` | 4dp, rounded ends | both determinate and indeterminate; omitting `value:` selects the indeterminate animation (shipped in M7, §5.17) |
+| `CircularProgress` | 4dp ring, clockwise from 12 o'clock | both determinate and indeterminate, same `value:`-omitted convention; needs the arc primitive (§5.15). The 48dp default diameter is **not** sourced — that page's size table is an image |
 | `Carousel` + `CarouselItem` | 28dp items, 16dp leading/trailing, 8dp gaps | three layouts; items resize and snap (§5.16) |
 
 **Wave 3** added the six components the overlay layer (§5.13) exists for, in
@@ -1766,9 +1766,12 @@ can be checked:
 **Bottom-anchored navigation is deliberately absent.** M3's Navigation Bar and
 Bottom App Bar are mobile patterns (§1.2.1); the rail and drawer are their
 desktop counterparts. A `BottomSheet` is not an exception to this: it is a
-desktop-legitimate surface for secondary content, and its drag handle is drawn
-as an affordance but is **not draggable**, since dragging needs the motion
-system pyCopper does not have. It is off by default for that reason.
+desktop-legitimate surface for secondary content. Its drag handle (`style.handle`,
+off by default, opt-in the way a view chooses any other affordance) **is
+draggable** — `BottomSheetElement.on_pointer_down`/`on_pointer_move`/
+`on_pointer_up` (§5.17.2) drag-and-dismiss with or without the handle drawn,
+using the motion system §5.17 added in M7, after this paragraph was first
+written.
 
 Four of these share one shape — a container of items where exactly one is
 selected — modelled once as `_SelectionContainer`: the container carries
@@ -3290,6 +3293,56 @@ things," so it is treated as a plain `"group"`, the same as `Container`/
 `NavigationDrawer` are, since those have a stated "role is not announced"
 in M3 itself and `PageHost` has no such statement to point to.
 
+### 5.28 Slider — `widgets/slider.py`
+
+The one gap that mattered most from the M3-catalogue review this session
+opened: `SpinBox` (§5.12) was built once already citing this exact page
+("Icon buttons placed outside the slider should have the button role"), but
+the actual slider -- a track with a draggable handle -- was never built.
+Standard variant, XS size: M3's own stated default (`COMPONENT_SLIDERS.md`'s
+size table calls XS "existing default"; S/M/L/XL are M3 Expressive
+additions, the same shape as `Fab`'s own small/standard/medium/large
+ladder). Discrete (stop indicators) and Range (two handles) are real M3
+variants, deliberately out of scope -- each is a materially different widget
+shape, not a style tweak on this one.
+
+**Anatomy, XS:** 16dp track height, 8dp track corner radius, a 4dp-wide by
+44dp-tall handle -- taller than the track by design (M3's visual refresh:
+"a vertical handle that narrows when pressed", not a circular thumb the way
+`Switch`'s is). Colour roles are not fully specified in the scraped tokens
+table (an interactive image, not text -- the same gap `CircularProgress`'s
+default diameter has), so this reuses M3's own established selection-control
+pairing directly: `primary` for the active track and the handle,
+`secondary_container` for the inactive track, the same role `Chip`/`Segment`
+already use for "filled and selected".
+
+**All three of M3's own named behaviours are implemented, not just one.**
+"Select & drag" (`on_pointer_down` jumps to the press position and starts a
+drag; `on_pointer_move` while pressed keeps committing the value under the
+pointer, since "Changes made with sliders must take effect immediately", not
+only on release) and "Select jump" ("Select a value by selecting part of the
+track" -- the identical first frame of a drag here, not a second code path)
+share one implementation; "Select & arrow" is `on_key_down` -- Left/Down
+decrement, Right/Up increment by `style.step`, Home/End jump to the bound
+minimum/maximum, exactly the page's own keyboard table.
+
+`value:` is the current number, the same `ElementMixin.number` property
+every other value-bearing widget already reads. `style.min`/`max` bound it
+but fall back to 0.0/1.0 when unset rather than `SpinBox`'s "unbounded" --
+`StyleSpec.min`'s own docstring states why: an unbounded slider has no track
+to draw a handle on. `on_change` fires with the value already clamped and
+snapped to the nearest step, the same split `SpinBox._step` and
+`TextField._commit` already make between updating the display and telling
+the application what changed.
+
+ARIA has a real, dedicated `"slider"` role -- M3's own accessibility page
+states it outright ("It should have the slider role"), used directly rather
+than approximated.
+
+**Deliberately out of scope**, matching M3's own "optional" anatomy: the
+value indicator (a label above the handle while dragging), stop indicators,
+the inset icon, and vertical orientation.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -3429,7 +3482,8 @@ pyCopper/
 │           ├── nodegraph.py     # NodeGraph + Node (§5.24)
 │           ├── codeeditor.py    # CodeEditor (§5.25)
 │           ├── terminal.py      # Terminal: real PTY spawning (§5.26)
-│           └── pagehost.py      # PageHost: single-active-child container (§5.27)
+│           ├── pagehost.py      # PageHost: single-active-child container (§5.27)
+│           └── slider.py        # Slider: drag/click/keyboard value picker (§5.28)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers

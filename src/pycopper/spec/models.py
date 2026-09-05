@@ -87,6 +87,7 @@ class WidgetKind(StrEnum):
     TREE_ITEM = "TreeItem"
     LINK = "Link"
     SPIN_BOX = "SpinBox"
+    SLIDER = "Slider"
     PAGINATION = "Pagination"
     STATUS_BAR = "StatusBar"
     DOCK_SPLIT = "DockSplit"
@@ -262,6 +263,7 @@ Variant = Literal[
     "small",
     "medium",
     "large",
+    "extended",
     # chips
     "assist",
     "filter",
@@ -387,12 +389,16 @@ class StyleSpec(_Frozen):
     #: behind it is unwired (`BottomSheetElement.on_pointer_down/_move/_up`
     #: already drag-and-dismiss with or without the handle drawn).
     handle: bool = False
-    #: A SpinBox's bounds. None on either end means unbounded in that
-    #: direction, not "clamp to zero" -- a generic increment control has no
-    #: reason to assume a lower bound of zero unless told one.
+    #: A SpinBox's or Slider's bounds. For `SpinBox`, None on either end means
+    #: unbounded in that direction, not "clamp to zero" -- a generic
+    #: increment control has no reason to assume a lower bound of zero unless
+    #: told one. `Slider` reads the same two fields but falls back to 0.0/1.0
+    #: when unset instead of leaving that end unbounded, since a slider with
+    #: no upper or lower bound has no track to draw a handle on.
     min: float | None = None
     max: float | None = None
-    #: How much one click or arrow-key press changes a SpinBox's value by.
+    #: How much one click or arrow-key press changes a SpinBox's or Slider's
+    #: value by.
     step: float = Field(default=1.0, gt=0)
     #: A Pagination's total number of pages.
     count: int = Field(default=1, ge=1)
@@ -599,6 +605,15 @@ class WidgetSpec(_Frozen):
     #: rail for a drawer as a signal flips needs a **state** field, not a
     #: style one. Meaningless on anything else.
     collapsed: str | None = None
+    #: `Checkbox`'s third M3 state -- a dash instead of a checkmark, for a
+    #: parent whose children are only partly checked. Templated like
+    #: `disabled:`, since it is state a signal should drive (recomputed from
+    #: the children's own checked count), not a fixed design-time choice.
+    #: Takes precedence over `value:` for which glyph paints, but does not
+    #: itself change `value:` -- checking an indeterminate box is still the
+    #: view's own `on_click` to handle, same as any other checkbox click.
+    #: Meaningless on anything else.
+    indeterminate: str | None = None
     #: An `Image`'s file to decode and display. Templated like `value:`, so
     #: `path: "{{ avatar.get() }}"` swaps the picture when a signal changes.
     #: **Not** `source:` -- that key is already view-*composition* syntax
@@ -649,6 +664,9 @@ class WidgetSpec(_Frozen):
 
     def collapsed_template(self) -> Template | None:
         return Template(self.collapsed) if self.collapsed is not None else None
+
+    def indeterminate_template(self) -> Template | None:
+        return Template(self.indeterminate) if self.indeterminate is not None else None
 
     def supporting_template(self) -> Template | None:
         return Template(self.supporting_text) if self.supporting_text is not None else None

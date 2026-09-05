@@ -52,6 +52,7 @@ Every node accepts these. Only `widget` is required.
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
 | `collapsed` | string | Whether `NavigationRail`/`NavigationDrawer` collapses to zero width. Templated like `disabled`. Meaningless on anything else. |
+| `indeterminate` | string | `Checkbox`'s third M3 state — a dash instead of a checkmark, for a parent whose children are only partly checked. Templated like `disabled`. Takes precedence over `value` for which glyph paints. Meaningless on anything else. |
 | `path` | string | An `Image`'s file to decode. Templated like `value`. See [Image](#image). |
 | `inputs`, `outputs` | string or list | A `Node`'s named ports. Meaningless outside `NodeGraph`. See [Node graph](#node-graph). |
 | `edges` | list | A `NodeGraph`'s declared wires, each `{source, target}` as `"node.port"`. See [Node graph](#node-graph). |
@@ -1095,14 +1096,15 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 |---|---|
 | `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
 | `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. |
-| `Fab` | 56dp standard, 40 small, 80 medium, 96 large. |
-| `Checkbox` | 18dp box, 2dp radius. |
+| `Fab` | 56dp standard, 40 small, 80 medium, 96 large, plus `extended` — same 56dp height, a dynamic width (80dp floor) fitting an icon and a `supporting_text:` label side by side. |
+| `Checkbox` | 18dp box, 2dp radius. `indeterminate:` shows a dash instead of a checkmark, M3's third state for a partly-checked group. |
 | `Radio` | 20dp outer, 10dp dot. |
 | `Switch` | 52×32dp track. |
 | `Chip` | 32dp high. `assist`, `filter`, `input`, `suggestion`. |
 | `Badge` | 6dp dot, or a 16dp pill carrying `value:`. |
 | `Link` | Hyperlinked text: always underlined, `primary` (default) or `tertiary`. Sized with `font_size` like `Text`, not a fixed label role — it's meant to sit inline with body text. No container, no state layer. |
 | `SpinBox` | A number with `remove`/`add` icon buttons either side (40dp, `IconButton`'s own anatomy). `value:` is the current number; `style: {min, max, step}` bound it (either end `None`/omitted means unbounded). Arrow keys step it too. Named to avoid M3's own "Stepper" (a multi-step flow indicator, a different widget) — not a component M3 has a page for either way. |
+| `Slider` | Standard variant, XS size: 16dp track, an 8dp-radius track corner, a 4×44dp handle. `value:` is the current number; `style: {min, max, step}` bound it (unlike `SpinBox`, an unset `min`/`max` falls back to 0.0/1.0, not "unbounded" — a slider needs a real range to draw a track). Click or drag anywhere on the track to jump the handle there and keep dragging; Left/Right/Up/Down step by `style.step`; Home/End jump to the bounds. Fires `on_change` the same way `SpinBox` does. |
 | `Pagination` | Prev/next arrows around page-number buttons (40dp). `value:` is the current page (1-indexed); `style: {count}` is the total. Below 8 pages every number shows; above that, only the first, last, and the current page's neighbours do, with the rest collapsed into `...`. Left/Right arrow keys step it. No M3 component — the word "pagination" appears exactly once in the whole reference library, as a prohibition on Cards. |
 
 Selection is a **binding, not style**: `value: "{{ checked.get() }}"`.
@@ -1504,7 +1506,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `scrollbar` | `ScrollView` — show the indicator when content overflows |
 | `handle` | `BottomSheet` — draw the drag handle |
 | `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
-| `min`, `max`, `step` | `SpinBox` — bounds and increment; `min`/`max` default to unbounded |
+| `min`, `max`, `step` | `SpinBox`/`Slider` — bounds and increment; `min`/`max` default to unbounded for `SpinBox`, 0.0/1.0 for `Slider` |
 | `count` | `Pagination` — total number of pages |
 | `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |
 | `x`, `y` | `Node` — initial world position in its `NodeGraph`; see [Node graph](#node-graph) |
