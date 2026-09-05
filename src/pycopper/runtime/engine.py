@@ -11,6 +11,7 @@ flag. Polling GLFW here would double-pump the event queue.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -31,6 +32,76 @@ __all__ = ["Engine"]
 #: synchronously per compositor configure, so this is a handful of frames after
 #: the drag stops, not a wall-clock delay.
 SETTLE_FRAMES: Final = 3
+
+#: Cap on how often a raw input-driven resize notification is allowed to
+#: trigger an eager repaint -- see `_coalesce_resize_paints`. 120 Hz is far
+#: above anything a human perceives as a distinct frame, so it costs nothing
+#: to feel smooth, but it bounds how large a backlog `glfw.poll_events()` can
+#: be made to drain synchronously before the input event underneath it (a
+#: mouse-up, say) is even delivered.
+RESIZE_REPAINT_MIN_INTERVAL: Final = 1.0 / 120.0
+
+
+def _coalesce_resize_paints() -> None:
+    """Rate-limit `GlfwRenderCanvas._on_size_change`'s eager repaint.
+
+    `glfw.poll_events()` drains every pending native event before returning,
+    and rendercanvas documents it as blocking during a resize for exactly
+    this reason. Unpatched, every one of those native configure events fires
+    `_on_size_change`, which synchronously does a full render for EACH one --
+    no coalescing at all, despite rendercanvas's own comment ("we may get
+    notified too often, but that's ok, they'll result in a single draw")
+    claiming otherwise; that claim does not hold for this backend, which
+    calls `_time_to_paint()` synchronously and directly rather than
+    scheduling it through an event loop that would naturally collapse
+    several requests into one.
+
+    A fast drag can queue native resize events faster than pyCopper renders
+    them, and the input event that ends the drag (a mouse-up) sits in that
+    same native queue, behind all of them -- so `poll_events()` will not
+    return, and the app will not even see the mouse-up, until every queued
+    resize has been fully rendered. That is a real, measured symptom (the
+    2026-09 resize investigation): the window keeps visibly resizing for a
+    perceptible stretch after the drag has actually stopped, working through
+    a backlog rather than being slow to render any single frame. Confirmed
+    the swapchain pin (`_pin_surface`) was not the cause first -- disabling
+    `resize_bucket` entirely made no difference -- before finding this.
+
+    **Unrelated to the "never decline a compositor-requested frame" rule**
+    the reverted resize throttle established (ARCHITECTURE.md 5.8.1): that
+    rule is about not declining a frame the compositor actually asked for.
+    This is about not eagerly OFFERING a redraw for every single raw input
+    notification when they arrive faster than any display could show them.
+    Skipping an intermediate one is safe because every draw re-reads the
+    CURRENT true size fresh (`get_physical_size()`), never a stale cached
+    one -- so throttling this path can only ever skip drawing a size that a
+    later, permitted draw in the same burst already supersedes.
+
+    Patches the class, not an instance: `weakbind` (rendercanvas's own
+    wrapper around the glfw callback) captures the underlying function
+    object at bind time, which happens inside `GlfwRenderCanvas.__init__` --
+    an instance-attribute patch applied after construction would silently
+    have no effect. Must therefore run before any `RenderCanvas` is
+    constructed. Applied once per process, guarded against double-wrapping
+    if more than one `Engine` is created (every golden test does this).
+    """
+    from rendercanvas.glfw import RenderCanvas
+
+    if getattr(RenderCanvas._on_size_change, "_pycopper_coalesced", False):
+        return
+
+    def _throttled(self: Any, *args: Any) -> None:
+        self._determine_size()
+        now = time.perf_counter()
+        last = getattr(self, "_pycopper_last_resize_paint", 0.0)
+        if now - last < RESIZE_REPAINT_MIN_INTERVAL:
+            return
+        self._pycopper_last_resize_paint = now
+        if self._is_in_poll_events and not self._is_minimized:
+            self._time_to_paint()
+
+    _throttled._pycopper_coalesced = True  # type: ignore[attr-defined]
+    RenderCanvas._on_size_change = _throttled
 
 
 def surface_size_for(
@@ -106,6 +177,7 @@ class Engine:
     def _make_canvas(self) -> Any:
         from rendercanvas.glfw import RenderCanvas
 
+        _coalesce_resize_paints()
         s = self.settings
         if s.wayland_decorations == "server":
             # Must precede GLFW's init, which rendercanvas defers until the

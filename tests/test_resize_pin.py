@@ -111,3 +111,94 @@ def test_the_buffer_never_exceeds_the_window_by_more_than_the_bucket(bucket: int
         target, _ = surface_size_for((width, 700), (0, 0), 0, bucket)
         assert 0 <= target[0] - width < bucket
         assert target[0] % bucket == 0
+
+
+# ------------------------------------------------------- resize event coalescing
+
+
+class _FakeGlfwCanvas:
+    """Duck-types just what `_on_size_change` touches on a real
+    `GlfwRenderCanvas` -- no real window or GPU needed, since the bug this
+    guards is about how often the callback FIRES, not what it draws."""
+
+    def __init__(self) -> None:
+        self._is_in_poll_events = True
+        self._is_minimized = False
+        self.determine_size_calls = 0
+        self.paint_calls = 0
+
+    def _determine_size(self) -> None:
+        self.determine_size_calls += 1
+
+    def _time_to_paint(self) -> None:
+        self.paint_calls += 1
+
+
+def test_a_burst_of_native_resize_events_coalesces_to_one_paint() -> None:
+    """The real bug: `glfw.poll_events()` drains every queued native
+    configure event before returning, and each one used to trigger its own
+    synchronous `_time_to_paint()` with no coalescing at all -- so a fast
+    drag could queue far more resize events than could be rendered, and the
+    mouse-up sitting behind them in the same native queue would not even be
+    delivered until the whole backlog had been drawn. Confirmed against a
+    real screen recording where releasing the mouse did not stop the window
+    from continuing to resize, exactly like a backlog draining."""
+    from rendercanvas.glfw import RenderCanvas
+
+    from pycopper.runtime.engine import _coalesce_resize_paints
+
+    _coalesce_resize_paints()
+    canvas = _FakeGlfwCanvas()
+
+    for _ in range(50):
+        RenderCanvas._on_size_change(canvas)
+
+    assert canvas.determine_size_calls == 50, "size state must stay fresh on every notification"
+    assert canvas.paint_calls == 1, "but only one of the 50 should have actually painted"
+
+
+def test_coalescing_still_paints_once_the_interval_has_passed() -> None:
+    """Coalescing must never mean the window stops updating -- only that it
+    does not repaint faster than any display could show anyway."""
+    from rendercanvas.glfw import RenderCanvas
+
+    import pycopper.runtime.engine as engine_module
+    from pycopper.runtime.engine import RESIZE_REPAINT_MIN_INTERVAL, _coalesce_resize_paints
+
+    _coalesce_resize_paints()
+    canvas = _FakeGlfwCanvas()
+
+    clock = [1000.0]
+    orig_perf_counter = engine_module.time.perf_counter
+    engine_module.time.perf_counter = lambda: clock[0]
+    try:
+        RenderCanvas._on_size_change(canvas)
+        RenderCanvas._on_size_change(canvas)  # too soon, coalesced away
+        assert canvas.paint_calls == 1
+
+        clock[0] += RESIZE_REPAINT_MIN_INTERVAL * 2
+        RenderCanvas._on_size_change(canvas)
+        assert canvas.paint_calls == 2, "a later notification, past the interval, must still paint"
+    finally:
+        engine_module.time.perf_counter = orig_perf_counter
+
+
+def test_coalescing_is_skipped_while_minimized_or_outside_poll_events() -> None:
+    """Matches the ORIGINAL, unpatched guard exactly -- this throttle adds a
+    rate limit, it does not loosen when a repaint is allowed to happen at
+    all."""
+    from rendercanvas.glfw import RenderCanvas
+
+    from pycopper.runtime.engine import _coalesce_resize_paints
+
+    _coalesce_resize_paints()
+
+    minimized = _FakeGlfwCanvas()
+    minimized._is_minimized = True
+    RenderCanvas._on_size_change(minimized)
+    assert minimized.paint_calls == 0
+
+    outside_poll = _FakeGlfwCanvas()
+    outside_poll._is_in_poll_events = False
+    RenderCanvas._on_size_change(outside_poll)
+    assert outside_poll.paint_calls == 0

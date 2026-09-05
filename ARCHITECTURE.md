@@ -896,6 +896,77 @@ continuous shrink was 0–22 ms/frame before this fix and 5.4 ms mean / 7.5 ms
 max after it, with the deferred grid confirmed to catch up correctly a few
 frames after the drag stops.
 
+**Neither of the above was the actual complaint, and the real one lived
+one layer further out than anything `Engine` measures.** After both fixes
+above, per-frame cost was clean (p50 2.8 ms, p99 6.1 ms across ~5300
+frames) but the window still visibly trailed the pointer — and, tellingly,
+releasing the mouse mid-flick did not stop it: the window kept working
+through a sequence of sizes the pointer had already passed, "like it's
+following a queue" (reported verbatim, and it was exactly right). Video
+analysis of the symptom was inconclusive on purpose-forced grounds: a
+screen-recorder duplicating frames to hit its target rate is
+indistinguishable, from the recording alone, from a genuine render lag, so
+a second capture on a plain white background with automated edge-tracking
+was still not enough to settle it. What settled it was reading `glfw`'s
+raw, unbuffered cursor position (`glfw.get_cursor_pos`, logged next to the
+window size on every frame) directly from the running process — no
+recording in between at all — followed by a decisive cross-check: the
+identical corner-drag on another window entirely (Dolphin) tracked the
+cursor with no trailing whatsoever on the same compositor and hardware,
+which ruled out KWin/Wayland itself as the cause.
+
+**The actual mechanism, found by reading `rendercanvas.glfw`'s own
+source.** `_rc_gui_poll` calls `glfw.poll_events()`, which the library's
+own comment documents as blocking "when the window is being resized" —
+because it drains *every* pending native event before returning. Each
+queued configure event fires `GlfwRenderCanvas._on_size_change`, which
+synchronously calls `_time_to_paint()` — a full render — for every single
+one, with **no coalescing at all**, despite the class's own comment on the
+callback registrations claiming otherwise ("we may get notified too often,
+but that's ok, they'll result in a single draw"). That claim holds for
+backends where painting is scheduled through an event loop that naturally
+collapses repeated requests; it does not hold here, where the call is
+direct and synchronous. A fast drag can queue native configure events
+faster than pyCopper renders them, and the mouse-up event that ends the
+drag sits in that *same* native queue, behind every one of them —
+`poll_events()` will not return, and the app will not even see the
+mouse-up, until the entire backlog has been rendered. That is a real,
+measured behaviour, not a metaphor: the window keeps visibly resizing for
+however long the backlog takes to drain, entirely independent of how fast
+any single frame is.
+
+This is why disabling `resize_bucket` (`PYCOPPER_RESIZE_BUCKET=0`) made no
+measurable difference when tested live — that lever controls the *cost* of
+one render, not the *count* of renders queued up, and the two problems
+turned out to be unrelated despite sharing a symptom.
+
+**The fix rate-limits eager, input-driven repaints — `Engine.
+_coalesce_resize_paints` — patched onto `GlfwRenderCanvas._on_size_change`
+at the class level before any canvas is constructed.** It must be the
+class, not the instance: `weakbind` (rendercanvas's own wrapper around the
+glfw callback) captures the underlying function object at bind time, which
+happens inside `GlfwRenderCanvas.__init__` — patching the instance
+attribute afterward would silently do nothing, confirmed by hand before
+writing the fix. The throttle caps eager repaints at 120 Hz
+(`RESIZE_REPAINT_MIN_INTERVAL`), far above anything perceptible, which
+bounds how large a backlog a burst of native events can force before the
+input event behind it is delivered. `_determine_size()` still runs on
+*every* notification, unthrottled, so the canvas's own size state is never
+stale; only the eager `_time_to_paint()` call is rate-limited, and every
+draw that does happen re-reads the size fresh, so a skipped intermediate
+notification can never show as a wrong size — only ever one a later,
+permitted draw in the same burst already supersedes.
+
+**This is a different rule from the one the reverted throttle established
+above, not a reversal of it.** That experiment was about declining a frame
+the *compositor* explicitly asked for, and found that doing so caused
+multi-second stalls because Wayland expects a client to commit in response
+to a configure. This throttle never declines a compositor-requested
+present — it only limits how often pyCopper *itself* opportunistically
+offers an extra one in response to raw, input-driven notifications arriving
+faster than any display could show them. The two are easy to conflate and
+worth keeping distinct.
+
 `wp_viewporter` appears nowhere in wgpu-py, and `xdg_surface` geometry is not
 reachable either — `glfw.get_wayland_window` does expose the raw `wl_surface`,
 but GLFW owns the `xdg_surface` and fighting it for geometry is unnecessary now
