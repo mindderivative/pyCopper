@@ -9,27 +9,42 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from pycopper import ViewModel
 
 _CORNERS = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.5, 0.5))
 
-_EXPLANATION = (
-    "Every child is laid out against the Stack's own size and then "
-    "positioned by its own style.align_x/align_y (0.0 to 1.0, fraction "
-    "of the leftover space) rather than by a shared main/cross axis the "
-    "way Row/Column place children relative to each other. Later "
-    "children paint on top of earlier ones -- the same convention Badge "
-    "uses to sit on an icon's corner in its own demo. Since "
-    "align_x/align_y are plain style properties, the button below drives "
-    "the front child's position by rebuilding the view in Python and "
-    "calling self.app.reload(...).\n\n"
-    "Use cases: overlaying content -- a badge on an icon, a loading "
-    "spinner over disabled content, a caption over an image."
-)
+
+def _find(node: Any, name: str) -> dict[str, Any] | None:
+    """The first node named *name* in a parsed view document, depth-first."""
+    if isinstance(node, dict):
+        if node.get("name") == name:
+            return node
+        for child in node.get("children", ()):
+            found = _find(child, name)
+            if found is not None:
+                return found
+    elif isinstance(node, list):
+        for item in node:
+            found = _find(item, name)
+            if found is not None:
+                return found
+    return None
 
 
 class StackDemo(ViewModel):
-    """State and commands for `Stack_View.yaml`."""
+    """State and commands for `Stack_View.yaml`.
+
+    `align_x`/`align_y` are plain `style.*` properties, not one of the
+    handful of templated fields (`text:`, `value:`, ...), so they cannot be
+    bound to a Signal with `{{ }}`. The button instead reloads
+    `Stack_View.yaml` ITSELF -- parsed fresh, never hand-duplicated -- with
+    only the front square's style patched, via `self.app.reload(...)`, the
+    same mechanism hot reload uses. Reconciliation matches by `name:`, so
+    everything outside `live_demo` (scroll position included) survives the
+    reload untouched.
+    """
 
     def __init__(self) -> None:
         self._corner_index = 0
@@ -39,143 +54,19 @@ class StackDemo(ViewModel):
 
     def _view(self) -> dict[str, Any]:
         align_x, align_y = _CORNERS[self._corner_index]
-        return {
-            "name": "root",
-            "widget": "ScrollView",
-            "style": {"width": "expand", "height": "expand"},
-            "children": [
-                {
-                    "widget": "Column",
-                    "style": {
-                        "background": "surface",
-                        "padding": 32,
-                        "spacing": 20,
-                        "width": "expand",
-                        "cross_alignment": "stretch",
-                    },
-                    "children": [
-                        {
-                            "name": "title",
-                            "widget": "Text",
-                            "text": "Stack",
-                            "style": {"text_style": "headline-small", "color": "on_surface"},
-                        },
-                        {
-                            "name": "summary",
-                            "widget": "Text",
-                            "text": (
-                                "A z-order container: children paint in declaration "
-                                "order, each positioned independently within the same box."
-                            ),
-                            "style": {"text_style": "body-large", "color": "on_surface_variant"},
-                        },
-                        {"name": "div1", "widget": "Divider", "style": {"width": "expand"}},
-                        {
-                            "name": "explanation",
-                            "widget": "Text",
-                            "text": _EXPLANATION,
-                            "style": {"text_style": "body-medium", "color": "on_surface_variant"},
-                        },
-                        {"name": "div2", "widget": "Divider", "style": {"width": "expand"}},
-                        {
-                            "name": "live_heading",
-                            "widget": "Text",
-                            "text": "Live example -- click to move the front square",
-                            "style": {"text_style": "title-medium", "color": "primary"},
-                        },
-                        {
-                            "name": "live_demo",
-                            "widget": "Stack",
-                            "style": {
-                                "width": 260,
-                                "height": 160,
-                                "background": "surface_container_low",
-                                "corner_radius": 8,
-                            },
-                            "children": [
-                                {
-                                    "widget": "Container",
-                                    "style": {
-                                        "width": 220,
-                                        "height": 120,
-                                        "background": "secondary_container",
-                                        "corner_radius": 8,
-                                        "align_x": 0.5,
-                                        "align_y": 0.5,
-                                    },
-                                },
-                                {
-                                    "widget": "Container",
-                                    "style": {
-                                        "width": 64,
-                                        "height": 64,
-                                        "background": "primary",
-                                        "corner_radius": 8,
-                                        "align_x": align_x,
-                                        "align_y": align_y,
-                                    },
-                                },
-                            ],
-                        },
-                        {
-                            "name": "label",
-                            "widget": "Text",
-                            "text": f"front square: align_x={align_x}, align_y={align_y}",
-                            "style": {"color": "on_surface_variant"},
-                        },
-                        {
-                            "name": "controls",
-                            "widget": "Row",
-                            "style": {"spacing": 8},
-                            "children": [
-                                {
-                                    "widget": "Button",
-                                    "text": "Move front square",
-                                    "style": {"variant": "outlined"},
-                                    "handlers": {"on_click": "cycle_alignment"},
-                                }
-                            ],
-                        },
-                        {"name": "div3", "widget": "Divider", "style": {"width": "expand"}},
-                        {
-                            "name": "code_heading",
-                            "widget": "Text",
-                            "text": "Source",
-                            "style": {"text_style": "title-medium", "color": "primary"},
-                        },
-                        {
-                            "name": "code_panels",
-                            "widget": "Row",
-                            "style": {"spacing": 16, "width": "expand", "height": 260},
-                            "children": [
-                                {
-                                    "name": "yaml_source",
-                                    "widget": "CodeEditor",
-                                    "value": "{{ view_source }}",
-                                    "style": {
-                                        "width": "expand",
-                                        "height": "expand",
-                                        "language": "yaml",
-                                        "read_only": True,
-                                    },
-                                },
-                                {
-                                    "name": "python_source",
-                                    "widget": "CodeEditor",
-                                    "value": "{{ viewmodel_source }}",
-                                    "style": {
-                                        "width": "expand",
-                                        "height": "expand",
-                                        "language": "python",
-                                        "read_only": True,
-                                    },
-                                },
-                            ],
-                        },
-                    ],
-                }
-            ],
-        }
+        doc = yaml.safe_load(self.view_source)
+        assert isinstance(doc, dict)
+        live_demo = _find(doc, "live_demo")
+        assert live_demo is not None
+        # The front square is `live_demo`'s second child in the YAML's own
+        # declared order -- the first is the fixed back panel.
+        front = live_demo["children"][1]
+        front["style"]["align_x"] = align_x
+        front["style"]["align_y"] = align_y
+        label = _find(doc, "label")
+        assert label is not None
+        label["text"] = f"front square: align_x={align_x}, align_y={align_y}"
+        return doc
 
     def cycle_alignment(self, event: Any) -> None:
         self._corner_index = (self._corner_index + 1) % len(_CORNERS)
