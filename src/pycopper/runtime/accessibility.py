@@ -64,6 +64,10 @@ ROLES: Final[dict[str, str]] = {
     "Chip": "button",  # ...except a filter chip, which toggles -- see `_node_for`
     "IconButton": "button",
     "Fab": "button",
+    # No dedicated ARIA role exists for a split button's two independently-
+    # clickable regions as one compound control -- treated the same opaque
+    # way `Pagination`'s own two internal buttons are, above.
+    "SplitButton": "button",
     "Link": "link",
     # ARIA's own name for exactly this control -- no M3 page to quote a role
     # from, since SpinBox has no M3 component at all (see its docstring).

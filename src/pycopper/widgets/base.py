@@ -800,6 +800,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import scroll as sc
     from . import search as se
     from . import slider as sl
+    from . import splitbutton as sb
     from . import terminal as tm
     from . import textfield as tf
     from . import video as vd
@@ -857,6 +858,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.TERMINAL: tm.TerminalElement,
         WidgetKind.PAGE_HOST: ph.PageHostElement,
         WidgetKind.SEARCH_BAR: se.SearchBarElement,
+        WidgetKind.SPLIT_BUTTON: sb.SplitButtonElement,
     }
 
 

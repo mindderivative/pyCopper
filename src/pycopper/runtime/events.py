@@ -211,6 +211,7 @@ FOCUSABLE_KINDS: frozenset[str] = frozenset(
         "Slider",
         "Pagination",
         "SearchBar",
+        "SplitButton",
         "DockGroup",
         "DockSplit",
         "Node",

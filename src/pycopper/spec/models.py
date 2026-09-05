@@ -102,6 +102,7 @@ class WidgetKind(StrEnum):
     TERMINAL = "Terminal"
     PAGE_HOST = "PageHost"
     SEARCH_BAR = "SearchBar"
+    SPLIT_BUTTON = "SplitButton"
 
 
 class SizeSpec:

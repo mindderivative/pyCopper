@@ -3381,6 +3381,45 @@ means the leading search glyph alone, M3's own stated baseline.
 ARIA has a real, dedicated `"searchbox"` role, distinct from `TextField`'s
 plain `"textbox"`, used directly rather than approximated.
 
+### 5.30 Split Button — `widgets/splitbutton.py`
+
+M3's split button: a primary action attached to a menu trigger, sized M
+only -- XS/S/L/XL are real M3 variants, the same size ladder `Fab` already
+models, but a second ladder here is a materially separate piece of work.
+The two regions sit 2dp apart (`COMPONENT_SPLIT_BUTTONS.md`'s own
+measurements); the touching corners are squared to 4dp while every outer
+corner stays fully rounded, so the pair still reads as one pill split in
+two -- the closest existing precedent is `SpinBox`'s own two icon-button
+regions flanking a number (`material.py`), and `_side_at`/per-side hover
+tracking is that same pattern, adapted to two filled regions.
+
+**A real bug, caught by testing, not by inspection: a widget's own method
+literally named `on_click` double-fires against a view's `on_click:`
+handler.** `EventDispatcher._invoke` (`runtime/events.py`) calls a
+view-declared handler for an event type *and*, separately, a same-named
+native method on the element, for every dispatched event -- documented
+there as deliberate ("some widgets respond to an event natively rather than
+through a view-declared handler"), but it means a widget cannot *also* use
+that same reserved name to relay to the view's own handler without calling
+it twice. First written with a native `on_click` that itself called
+`self.handlers.get("on_click")`; a plain click produced two invocations,
+caught immediately by a test asserting exactly one. The fix routes both
+regions from `on_pointer_down`/`_up` instead (the same fix `Switch`'s own
+drag support needed, for the identical underlying reason), dispatching to
+two names the framework has no built-in opinion about:
+`handlers.on_leading_click` and `handlers.on_trailing_click`. A press and
+release that land on *different* regions commit to neither, matching how a
+real button behaves when a press is dragged off it before release.
+
+The trailing trigger typically opens a `Menu` overlay anchored to this
+widget's own `name` from `on_trailing_click` -- M3's own placement rule
+("The menu should be 4dp from the split button") needs no new framework
+support, the identical anchor mechanism `MenuItem.style.has_submenu`
+already uses for its own submenu.
+
+ARIA has no dedicated role for a compound two-region control; treated the
+same opaque way `Pagination`'s own two internal buttons already are.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -3522,7 +3561,8 @@ pyCopper/
 │           ├── terminal.py      # Terminal: real PTY spawning (§5.26)
 │           ├── pagehost.py      # PageHost: single-active-child container (§5.27)
 │           ├── slider.py        # Slider: drag/click/keyboard value picker (§5.28)
-│           └── search.py        # SearchBar: M3 search bar (§5.29)
+│           ├── search.py        # SearchBar: M3 search bar (§5.29)
+│           └── splitbutton.py   # SplitButton: primary action + menu trigger (§5.30)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers
