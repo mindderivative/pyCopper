@@ -9,15 +9,28 @@ check), paint (build + layout + paint), upload, acquire
 changed — every hook wraps the existing method and calls straight through to
 it, so this measures the exact code path a normal `python app.py` run uses.
 
+**Also logs the raw OS cursor position, window-relative, from `glfw`
+directly** (`glfw.get_cursor_pos`) alongside the window size Engine sees on
+every frame. This is the direct way to answer "does the window trail the
+cursor": during an edge/corner drag, the dragged edge's cursor coordinate
+and the window's current size on that axis should stay coincident if there
+is no lag. A screen recording cannot settle this on its own -- capture
+tools commonly duplicate frames to hit their target frame rate, which looks
+identical to a real render lag but isn't one. Reading both numbers from
+inside the same process at the moment each frame is drawn has no such
+confound.
+
 Usage::
 
     python examples/gallery/resize_probe.py
 
 A one-line summary prints to stdout roughly once a second while the app
-runs. Drag-resize the window for several seconds (try both a slow drag and
-a fast one), then close it normally. The full per-frame log is written to
-`examples/gallery/resize_probe_log.csv` next to this file — send that file
-back along with whatever printed to the terminal.
+runs, including the current cursor-vs-window-edge gap. Drag-resize the
+window for several seconds (try both a slow drag and a fast one, and drag
+from a corner so both axes are covered), then close it normally. The full
+per-frame log is written to `examples/gallery/resize_probe_log.csv` next to
+this file — send that file back along with whatever printed to the
+terminal.
 """
 
 from __future__ import annotations
@@ -27,6 +40,8 @@ import csv
 import sys
 import time
 from pathlib import Path
+
+import glfw
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -80,6 +95,17 @@ def _draw_frame(self: Engine) -> None:
     settle_before = self._settle
     last_before = self._last_size
 
+    # `glfw.get_cursor_pos` is in the same window-relative LOGICAL coordinate
+    # space as `get_logical_size` -- comparable directly, unlike
+    # `get_physical_size` on a HiDPI display where the two would differ by
+    # the pixel ratio for no reason related to resize lag at all.
+    logical_size = tuple(self.canvas.get_logical_size())
+    window = getattr(self.canvas, "_window", None)
+    if window is not None:
+        cursor_x, cursor_y = glfw.get_cursor_pos(window)
+    else:
+        cursor_x = cursor_y = float("nan")
+
     orig_painter = self.painter
 
     def timed_painter(dl):
@@ -119,10 +145,18 @@ def _draw_frame(self: Engine) -> None:
         self.device.queue.submit = orig_submit
     total_ms = (time.perf_counter() - t_start) * 1000.0
 
+    gap_x = round(cursor_x - logical_size[0], 2)
+    gap_y = round(cursor_y - logical_size[1], 2)
     row = {
         "t": t_start,
         "w": size_before[0],
         "h": size_before[1],
+        "logical_w": round(logical_size[0], 2),
+        "logical_h": round(logical_size[1], 2),
+        "cursor_x": round(cursor_x, 2),
+        "cursor_y": round(cursor_y, 2),
+        "gap_x": gap_x,
+        "gap_y": gap_y,
         "settle_before": settle_before,
         "settle_after": self._settle,
         "resized_this_frame": int(size_before != last_before),
@@ -147,7 +181,9 @@ def _draw_frame(self: Engine) -> None:
         print(
             f"[{time.strftime('%H:%M:%S')}] {n} frames/s | "
             f"mean {mean_ms:.2f}ms max {max_ms:.2f}ms | "
-            f"size {size_before[0]}x{size_before[1]} | "
+            f"size {logical_size[0]:.0f}x{logical_size[1]:.0f} | "
+            f"cursor ({cursor_x:.0f},{cursor_y:.0f}) | "
+            f"gap ({gap_x:+.0f},{gap_y:+.0f}) | "
             f"settle {self._settle}",
             flush=True,
         )
