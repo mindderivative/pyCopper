@@ -339,6 +339,16 @@ def _expand(
     return fragment
 
 
+#: The only keys whose values can hold widget-tree nodes (and therefore
+#: `source:` includes). Recursing into every key indiscriminately means any
+#: unrelated field that happens to be a dict with its own `source` entry --
+#: `EdgeSpec.source`/`.target` in a `NodeGraph`'s `edges:` list, for one --
+#: gets misread as an include and fails to resolve as a file path. Mirrors
+#: `stamp_view`'s own restriction to the same three keys, plus `styles:` for
+#: stylesheet includes.
+_TREE_KEYS: Final = ("root", "children", "overlays", "styles")
+
+
 def _walk(node: Any, base: Path, root: Path, sources: set[Path], chain: tuple[Path, ...]) -> Any:
     if isinstance(node, list):
         return [_walk(v, base, root, sources, chain) for v in node]
@@ -346,7 +356,9 @@ def _walk(node: Any, base: Path, root: Path, sources: set[Path], chain: tuple[Pa
         return node
     if SOURCE_KEY in node:
         return _expand(dict(node), base, root, sources, chain)
-    return {k: _walk(v, base, root, sources, chain) for k, v in node.items()}
+    return {
+        k: (_walk(v, base, root, sources, chain) if k in _TREE_KEYS else v) for k, v in node.items()
+    }
 
 
 def resolve_includes(

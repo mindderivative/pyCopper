@@ -1433,6 +1433,19 @@ Four things this had to get right:
   (`a.yaml -> b.yaml -> a.yaml`), not just a line number.
 - **Cycles and path confinement.** A cycle is refused with its chain, and an
   include may not escape the view directory — view files are untrusted input.
+- **The walk is scoped to actual widget-tree keys.** Found in the 2026-09
+  gallery rebuild: `_walk` used to check *every* dict in the decoded YAML for
+  a `source` key, recursing into every value regardless of what field it lived
+  under. `EdgeSpec` (`NodeGraph.edges:`) has its own `source`/`target` fields
+  — unrelated to view composition — and a `{source: "a.out", target: "b.in"}`
+  entry was misread as an include, failing with a confusing "included file not
+  found" naming the port string as a path. No existing test caught it because
+  every `NodeGraph` test builds its spec as a Python dict directly, bypassing
+  `load_view`/`resolve_includes` entirely. `_walk` now only recurses into
+  `root`, `children`, `overlays`, and `styles` — the only keys that can hold a
+  widget-tree node — mirroring the restriction `stamp_view` already applied
+  for the same reason. `style:`, `handlers:`, and any future per-widget data
+  field are now correctly opaque to the include walk.
 
 Deliberately absent: conditional includes, computed paths, and loops. This is
 where a view format starts becoming a programming language. In particular

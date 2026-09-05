@@ -229,6 +229,8 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
     import sys
     from pathlib import Path
 
+    import pyte
+
     gallery = Path(__file__).resolve().parents[2] / "examples" / "gallery"
     sys.path.insert(0, str(gallery))
     try:
@@ -236,10 +238,43 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
     finally:
         sys.path.remove(str(gallery))
 
+    # Constructing `demo.app` above already started a real PTY session for
+    # the gallery's Terminal section -- `App.__init__` calls `set_ticker()`
+    # unconditionally, which is the hook `TerminalElement` uses to lazily
+    # spawn its shell (see `test_terminal_baseline`). Left running, that is a
+    # leaked subprocess and non-deterministic terminal content in every test
+    # run that imports this module. Stop it and swap in an always-alive
+    # stand-in before the first real layout pass -- unlike
+    # `test_terminal_baseline`'s fixed-size view, the gallery's Terminal
+    # section sits in a flexible ScrollView layout, so its (cols, rows) is
+    # not known until `attach()` below actually lays it out, and only then
+    # is it safe to size the directly-fed `pyte` screen that test's own
+    # golden baseline uses.
+    term = demo.app.root.find("terminal_demo")
+    if term._session is not None:
+        term._session.stop()
+
+    class _AlwaysAlive:
+        alive = True
+
+        def drain(self) -> bytes:
+            return b""
+
+        def resize(self, cols: int, rows: int) -> None:
+            pass
+
+    term._session = _AlwaysAlive()
+
     _, engine = render_scene(
-        lambda dl: None, width=620, height=720, theme=Theme(seed=SEED, dark=True)
+        lambda dl: None, width=900, height=820, theme=Theme(seed=SEED, dark=True)
     )
     demo.app.attach(engine)
+
+    term._screen = pyte.HistoryScreen(term._cols, term._rows, history=200)
+    term._stream = pyte.ByteStream(term._screen)
+    term._feed(b"$ \x1b[32mgit status\x1b[0m\r\n")
+    term._feed(b"\x1b[41mon branch main\x1b[0m\r\n")
+
     demo.gallery.clicks.set(3)
     engine.canvas.request_draw(engine.draw_frame)
     assert_golden("gallery", np.asarray(engine.canvas.draw()))

@@ -15,6 +15,7 @@ focus.
 
 from pathlib import Path
 
+import numpy as np
 from gallery_ViewModel import SEED, Gallery
 from parts.confirm_dialog_ViewModel import ConfirmDialog
 from parts.locked_dialog_ViewModel import LockedDialog
@@ -28,8 +29,8 @@ app = App(
     theme=Theme(seed=SEED, dark=True),
     settings=Settings(
         title="pyCopper gallery",
-        width=620,
-        height=720,
+        width=900,
+        height=820,
         hot_reload=True,
         # Ask the compositor for the window frame instead of libdecor. On KDE
         # Plasma that skips libdecor entirely, including the "Failed to load
@@ -51,6 +52,34 @@ app = App(
 gallery = app.bind_view_model("gallery_View.yaml", Gallery())
 app.bind_view_model("parts/confirm_dialog_View.yaml", ConfirmDialog(gallery.confirming))
 app.bind_view_model("parts/locked_dialog_View.yaml", LockedDialog(gallery.locking))
+
+
+def _synthetic_video_frame() -> np.ndarray:
+    """`Video` has no file to decode -- an application feeds it frames
+
+    directly through `push_frame`. A live camera or stream would call this
+    repeatedly; the gallery only needs one frame to prove the widget paints
+    what it is given, so it generates a single (h, w, 4) uint8 RGBA array
+    with the same gradient technique `assets/sample.png` used for `Image`,
+    in a different palette so the two widgets read as distinct sources.
+    """
+    h, w = 160, 260
+    y, x = np.mgrid[0:h, 0:w]
+    t = (x / w + y / h) / 2.0
+    top = np.array([0x00, 0x69, 0x6B], dtype=np.float32)  # teal
+    bottom = np.array([0x6A, 0x1B, 0x9A], dtype=np.float32)  # violet
+    rgb = top[None, None, :] + (bottom - top)[None, None, :] * t[:, :, None]
+    frame = np.empty((h, w, 4), dtype=np.uint8)
+    frame[:, :, :3] = rgb.astype(np.uint8)
+    frame[:, :, 3] = 255
+    return frame
+
+
+# `mount()` is idempotent and `run()`/`attach()` call it again -- doing it
+# here just makes `app.root.find(...)` available so the composition root can
+# push a frame before the window ever opens.
+app.mount()
+app.root.find("video_demo").push_frame(_synthetic_video_frame())
 
 if __name__ == "__main__":
     app.run()

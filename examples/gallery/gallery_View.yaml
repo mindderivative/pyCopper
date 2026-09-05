@@ -2,31 +2,26 @@
 #
 # Demonstrates view composition: shared pieces live in parts/ and are pulled
 # in with `source:`, parameterised with `with:`.
+#
+# The body scrolls -- `root` is a fixed header above a `ScrollView` around
+# everything else, because a catalogue of every widget kind does not fit in
+# one screen. Each section below is a labelled group: a `text_style:
+# title-medium` heading, a thin Divider, then the widgets themselves.
 styles:
   # Shared rules live in their own file and are pulled in here. Anything after
   # this import overrides it, because ties go to document order.
   - source: theme.yaml
 
 root:
-  # pyCopper widget gallery.
-  #
-  # Doubles as the corpus for the golden-image suite, so it deliberately
-  # exercises every widget kind and most style properties.
   name: root
   widget: Column
-  style:
-    background: surface
-    padding: 20
-    spacing: 16
-    width: expand
-    height: expand
-    cross_alignment: stretch
+  style: {background: surface, width: expand, height: expand}
 
   children:
     # --- header row: title, spacer pushing the action to the far edge ---
     - name: header
       widget: Row
-      style: {height: 40, width: expand, cross_alignment: center}
+      style: {height: 40, width: expand, cross_alignment: center, padding: 20}
       children:
         - name: title
           widget: Text
@@ -46,128 +41,505 @@ root:
             corner_radius: 20
           handlers: {on_click: toggle_theme}
 
-    # --- elevated card containing wrapped body text ---
-    - name: card
-      source: parts/info_card_View.yaml
-      with:
-        body: "Shaped text with real kerning and ligatures: fi fl ffi. Shared pieces live in parts/ and are pulled in with source:."
-
-    - name: cards
-      widget: Row
-      style: {height: 56, spacing: 10, width: expand}
+    - name: body
+      widget: ScrollView
+      style: {width: expand, height: expand}
       children:
-        - {name: card_e, widget: Card, style: {width: 150, variant: elevated}}
-        - {name: card_f, widget: Card, style: {width: 150, variant: filled}}
-        - {name: card_o, widget: Card, style: {width: 150, variant: outlined}}
+        - name: sections
+          widget: Column
+          style: {width: expand, spacing: 28, padding: 20}
+          children:
+            # ============================================================
+            # Overview: elevated card, tonal swatches, icons, a stack
+            # ============================================================
+            - name: card
+              source: parts/info_card_View.yaml
+              with:
+                body: "Shaped text with real kerning and ligatures: fi fl ffi. Shared pieces live in parts/ and are pulled in with source:."
 
-    # --- tonal swatches ---
-    - name: swatches
-      widget: Row
-      style: {height: 56, spacing: 10, width: expand}
-      children:
-        - {name: sw_primary,   source: parts/swatch_View.yaml, with: {token: primary}}
-        - {name: sw_secondary, source: parts/swatch_View.yaml, with: {token: secondary}}
-        - {name: sw_tertiary,  source: parts/swatch_View.yaml, with: {token: tertiary}}
-        - {name: sw_error,     source: parts/swatch_View.yaml, with: {token: error}}
-        - {name: sw_surface,   source: parts/swatch_View.yaml, with: {token: surface_container_highest}}
+            - name: cards
+              widget: Row
+              style: {height: 56, spacing: 10, width: expand}
+              children:
+                - {name: card_e, widget: Card, style: {width: 150, variant: elevated}}
+                - {name: card_f, widget: Card, style: {width: 150, variant: filled}}
+                - {name: card_o, widget: Card, style: {width: 150, variant: outlined}}
 
-    # --- icons: Material Symbols, with the FILL axis driving selected state ---
-    - name: icons
-      widget: Row
-      style: {height: 40, spacing: 14, width: expand, cross_alignment: center}
-      children:
-        - {name: ic_home,   widget: Icon, text: home,     style: {color: on_surface, icon_size: 24}}
-        - {name: ic_search, widget: Icon, text: search,   style: {color: on_surface, icon_size: 24}}
-        - {name: ic_set,    widget: Icon, text: settings, style: {color: on_surface_variant, icon_size: 24}}
-        - name: ic_fav
-          widget: Icon
-          text: "{{ 'favorite' if clicks.get() else 'favorite_border' }}"
-          style: {color: error, icon_size: 28, icon_fill: 1.0}
-        - {name: ic_heavy,  widget: Icon, text: bolt, style: {color: tertiary, icon_size: 24, icon_weight: 700}}
-        - {name: ic_gap,    widget: Spacer, style: {width: expand}}
-        - {name: ic_check,  widget: Icon, text: check_circle, style: {color: primary, icon_size: 24, icon_fill: 1.0}}
+            - name: swatches
+              widget: Row
+              style: {height: 56, spacing: 10, width: expand}
+              children:
+                - {name: sw_primary,   source: parts/swatch_View.yaml, with: {token: primary}}
+                - {name: sw_secondary, source: parts/swatch_View.yaml, with: {token: secondary}}
+                - {name: sw_tertiary,  source: parts/swatch_View.yaml, with: {token: tertiary}}
+                - {name: sw_error,     source: parts/swatch_View.yaml, with: {token: error}}
+                - {name: sw_surface,   source: parts/swatch_View.yaml, with: {token: surface_container_highest}}
 
-    # --- stack: a badge overlaid on a surface ---
-    - name: stacked
-      widget: Stack
-      style: {height: 64, align_x: 1.0, align_y: 0.0}
-      children:
-        - name: stack_base
-          widget: Container
-          style: {width: expand, height: 64, background: surface_container, corner_radius: 12}
-        - name: stack_badge
-          widget: Container
-          style: {width: 28, height: 28, background: error, corner_radius: 14}
+            - name: icons
+              widget: Row
+              style: {height: 40, spacing: 14, width: expand, cross_alignment: center}
+              children:
+                - {name: ic_home,   widget: Icon, text: home,     style: {color: on_surface, icon_size: 24}}
+                - {name: ic_search, widget: Icon, text: search,   style: {color: on_surface, icon_size: 24}}
+                - {name: ic_set,    widget: Icon, text: settings, style: {color: on_surface_variant, icon_size: 24}}
+                - name: ic_fav
+                  widget: Icon
+                  text: "{{ 'favorite' if clicks.get() else 'favorite_border' }}"
+                  style: {color: error, icon_size: 28, icon_fill: 1.0}
+                - {name: ic_heavy,  widget: Icon, text: bolt, style: {color: tertiary, icon_size: 24, icon_weight: 700}}
+                - {name: ic_gap,    widget: Spacer, style: {width: expand}}
+                - {name: ic_check,  widget: Icon, text: check_circle, style: {color: primary, icon_size: 24, icon_fill: 1.0}}
 
-    - name: div1
-      widget: Divider
-      style: {width: expand}
+            - name: stacked
+              widget: Stack
+              style: {height: 64, align_x: 1.0, align_y: 0.0}
+              children:
+                - name: stack_base
+                  widget: Container
+                  style: {width: expand, height: 64, background: surface_container, corner_radius: 12}
+                - name: stack_badge
+                  widget: Container
+                  style: {width: 28, height: 28, background: error, corner_radius: 14}
 
-    # --- selection controls, driven by the `value:` binding ---
-    - name: controls
-      widget: Row
-      style: {height: 40, spacing: 16, width: expand, cross_alignment: center}
-      children:
-        # cb_on asks for M3's 48dp minimum target. It is still drawn at 18dp
-        # -- the hit rect grows, layout and paint do not -- so this row looks
-        # identical to one without it and is simply easier to click.
-        - {name: cb_on,  widget: Checkbox, value: "{{ clicks.get() }}", style: {min_hit_size: 48}}
-        - {name: cb_off, widget: Checkbox, value: "false"}
-        - {name: rd_on,  widget: Radio,    value: "true"}
-        - {name: rd_off, widget: Radio,    value: "false"}
-        - {name: sw,     widget: Switch,   value: "{{ dark.get() }}"}
-        - {name: chip_f, widget: Chip, text: "Filter", style: {variant: filter}, value: "{{ clicks.get() }}"}
-        - {name: chip_a, widget: Chip, text: "Assist", style: {variant: assist}}
-        - {name: ctl_gap, widget: Spacer, style: {width: expand}}
-        - {name: badge,  widget: Badge, value: "{{ clicks.get() }}"}
+            # ============================================================
+            # Buttons and links
+            # ============================================================
+            - name: buttons_head
+              widget: Text
+              text: "Buttons and links"
+              style: {text_style: title-medium, color: primary}
+            - {name: buttons_div, widget: Divider, style: {width: expand}}
+            - name: buttons_row
+              widget: Row
+              style: {height: 40, spacing: 10, width: expand, cross_alignment: center}
+              children:
+                - {name: btn_filled,  widget: Button, text: "Filled",       style: {width: 100, height: 40, variant: filled}}
+                - {name: btn_tonal,   widget: Button, text: "Tonal",        style: {width: 100, height: 40, variant: filled_tonal}}
+                - {name: btn_outline, widget: Button, text: "Outlined",     style: {width: 100, height: 40, variant: outlined}}
+                - {name: btn_text,    widget: Button, text: "Text",         style: {width: 100, height: 40, variant: text}}
+                - {name: btn_elev,    widget: Button, text: "Elevated",     style: {width: 100, height: 40, variant: elevated}}
+                - {name: gallery_link, widget: Link, text: "Documentation", style: {font_size: 16}}
 
-    # --- icon buttons and FABs ---
-    - name: fabs
-      widget: Row
-      style: {height: 56, spacing: 12, width: expand, cross_alignment: center}
-      children:
-        - {name: ib_std,   widget: IconButton, text: favorite, style: {variant: standard}}
-        - {name: ib_fill,  widget: IconButton, text: star,     style: {variant: filled}}
-        - {name: ib_tonal, widget: IconButton, text: share,    style: {variant: filled_tonal}}
-        - {name: ib_out,   widget: IconButton, text: settings, style: {variant: outlined}}
-        - {name: fab_gap,  widget: Spacer, style: {width: expand}}
-        - {name: fab_sm,   widget: Fab, text: add,  style: {variant: small}}
-        - {name: fab_std,  widget: Fab, text: edit, style: {variant: standard}}
+            - name: fabs
+              widget: Row
+              style: {height: 56, spacing: 12, width: expand, cross_alignment: center}
+              children:
+                - {name: ib_std,   widget: IconButton, text: favorite, style: {variant: standard}}
+                - {name: ib_fill,  widget: IconButton, text: star,     style: {variant: filled}}
+                - {name: ib_tonal, widget: IconButton, text: share,    style: {variant: filled_tonal}}
+                - {name: ib_out,   widget: IconButton, text: settings, style: {variant: outlined}}
+                - {name: fab_gap,  widget: Spacer, style: {width: expand}}
+                - {name: fab_sm,   widget: Fab, text: add,  style: {variant: small}}
+                - {name: fab_std,  widget: Fab, text: edit, style: {variant: standard}}
 
-    # --- action row ---
-    - name: actions
-      widget: Row
-      style: {height: 44, spacing: 12, width: expand}
-      children:
-        - name: count_label
-          widget: Text
-          text: "Clicked {{ clicks.get() }}x"
-          style: {color: on_surface_variant, font_size: 14}
-        - name: actions_gap
-          widget: Spacer
-          style: {width: expand}
-        - name: ask_btn
-          widget: Button
-          text: "Delete…"
-          style: {width: 110, height: 40, variant: text}
-          handlers: {on_click: ask}
-        # Opens the locked dialog: same component, `dismissable: false`, so a
-        # click outside does nothing and only its own button closes it.
-        - name: lock_btn
-          widget: Button
-          text: "Locked…"
-          style: {width: 110, height: 40, variant: text}
-          handlers: {on_click: lock}
-        - name: reset_btn
-          widget: Button
-          classes: action          # size and variant come from theme.yaml
-          text: "Reset"
-          handlers: {on_click: reset}
-        - name: confirm_btn
-          widget: Button
-          classes: action primary  # ...and the primary rule widens it
-          text: "Confirm"
-          handlers: {on_click: confirm}
+            # ============================================================
+            # Selection controls
+            # ============================================================
+            - name: selection_head
+              widget: Text
+              text: "Selection controls"
+              style: {text_style: title-medium, color: primary}
+            - {name: selection_div, widget: Divider, style: {width: expand}}
+            - name: controls
+              widget: Row
+              style: {height: 40, spacing: 16, width: expand, cross_alignment: center}
+              children:
+                # cb_on asks for M3's 48dp minimum target. It is still drawn at
+                # 18dp -- the hit rect grows, layout and paint do not -- so this
+                # row looks identical to one without it and is simply easier to
+                # click.
+                - {name: cb_on,  widget: Checkbox, value: "{{ clicks.get() }}", style: {min_hit_size: 48}}
+                - {name: cb_off, widget: Checkbox, value: "false"}
+                - {name: rd_on,  widget: Radio,    value: "true"}
+                - {name: rd_off, widget: Radio,    value: "false"}
+                - {name: sw,     widget: Switch,   value: "{{ dark.get() }}"}
+                - {name: chip_f, widget: Chip, text: "Filter", style: {variant: filter}, value: "{{ clicks.get() }}"}
+                - {name: chip_a, widget: Chip, text: "Assist", style: {variant: assist}}
+                - {name: ctl_gap, widget: Spacer, style: {width: expand}}
+                - {name: badge,  widget: Badge, value: "{{ clicks.get() }}"}
+
+            - name: segmented
+              widget: SegmentedButton
+              value: "{{ segment.get() }}"
+              style: {height: 40, width: 300}
+              children:
+                - {name: s0, widget: Segment, text: "Day",   handlers: {on_click: select_segment}}
+                - {name: s1, widget: Segment, text: "Week",  handlers: {on_click: select_segment}}
+                - {name: s2, widget: Segment, text: "Month", handlers: {on_click: select_segment}}
+
+            # ============================================================
+            # Progress indicators
+            # ============================================================
+            - name: progress_head
+              widget: Text
+              text: "Progress indicators"
+              style: {text_style: title-medium, color: primary}
+            - {name: progress_div, widget: Divider, style: {width: expand}}
+            - name: linear_progress_row
+              widget: Column
+              style: {spacing: 10, width: expand}
+              children:
+                - {name: lp_determinate,   widget: LinearProgress, value: "0.65", style: {width: expand}}
+                - {name: lp_indeterminate, widget: LinearProgress, style: {width: expand}}
+            - name: circular_progress_row
+              widget: Row
+              style: {height: 48, spacing: 24, width: expand, cross_alignment: center}
+              children:
+                - {name: cp_determinate,   widget: CircularProgress, value: "0.4"}
+                - {name: cp_indeterminate, widget: CircularProgress}
+                - {name: sb_demo, widget: SpinBox, value: "{{ spin_value.get() }}", style: {min: 0, max: 10, step: 1}, handlers: {on_change: change_spin}}
+                - {name: pg_demo, widget: Pagination, value: "{{ page.get() }}", style: {count: 8}, handlers: {on_change: change_page}}
+
+            # ============================================================
+            # Lists and structure
+            # ============================================================
+            - name: structure_head
+              widget: Text
+              text: "Lists and structure"
+              style: {text_style: title-medium, color: primary}
+            - {name: structure_div, widget: Divider, style: {width: expand}}
+            - name: list_items
+              widget: Column
+              style: {width: expand}
+              children:
+                - {name: li_one, widget: ListItem, text: "One-line item"}
+                - {name: li_two, widget: ListItem, text: "Two-line item", supporting_text: "With supporting text underneath"}
+            - name: accordion_demo
+              widget: Accordion
+              text: "Show details"
+              value: "{{ accordion_open.get() }}"
+              handlers: {on_click: toggle_accordion}
+              children:
+                - name: accordion_body
+                  widget: Text
+                  text: "The accordion's expand state follows the same value:/on_click: convention as every other selectable control."
+                  style: {height: 60, color: on_surface_variant}
+            - name: tree_demo
+              widget: TreeView
+              value: "{{ tree_selection.get() }}"
+              style: {width: expand}
+              children:
+                - name: src
+                  widget: TreeItem
+                  text: "src"
+                  value: "true"
+                  handlers: {on_click: select_tree}
+                  children:
+                    - {name: main, widget: TreeItem, text: "main.py", handlers: {on_click: select_tree}}
+                    - {name: widgets_dir, widget: TreeItem, text: "widgets/", handlers: {on_click: select_tree}}
+                - {name: readme, widget: TreeItem, text: "README.md", handlers: {on_click: select_tree}}
+            - name: shapes_row
+              widget: Row
+              style: {height: 64, spacing: 16, width: expand, cross_alignment: center}
+              children:
+                - {name: shape_tri, widget: Shape, style: {width: 56, height: 56, sides: 3, background: primary}}
+                - {name: shape_pent, widget: Shape, style: {width: 56, height: 56, sides: 5, background: secondary}}
+                - {name: shape_hex, widget: Shape, style: {width: 56, height: 56, sides: 6, background: tertiary}}
+                - {name: shape_circle, widget: Shape, style: {width: 56, height: 56, sides: 32, background: error}}
+
+            # ============================================================
+            # Navigation
+            # ============================================================
+            - name: navigation_head
+              widget: Text
+              text: "Navigation"
+              style: {text_style: title-medium, color: primary}
+            - {name: navigation_div, widget: Divider, style: {width: expand}}
+            - name: top_app_bar_demo
+              widget: TopAppBar
+              text: "Section title"
+              style: {variant: small, width: expand}
+            - name: tabs_demo
+              widget: Tabs
+              value: "{{ tab.get() }}"
+              style: {width: expand}
+              children:
+                - {name: t0, widget: Tab, text: "Overview", handlers: {on_click: select_tab}}
+                - {name: t1, widget: Tab, text: "Details",  handlers: {on_click: select_tab}}
+                - {name: t2, widget: Tab, text: "History",  handlers: {on_click: select_tab}}
+            - name: rail_and_drawer
+              widget: Row
+              style: {height: 220, spacing: 16, width: expand}
+              children:
+                - name: rail_demo
+                  widget: NavigationRail
+                  value: "{{ rail.get() }}"
+                  style: {height: expand}
+                  children:
+                    - {name: r0, widget: NavItem, text: home,     supporting_text: "Home",     handlers: {on_click: select_rail}}
+                    - {name: r1, widget: NavItem, text: search,   supporting_text: "Search",   handlers: {on_click: select_rail}}
+                    - {name: r2, widget: NavItem, text: settings, supporting_text: "Settings", handlers: {on_click: select_rail}}
+                - name: drawer_demo
+                  widget: NavigationDrawer
+                  value: "{{ rail.get() }}"
+                  style: {height: expand}
+                  children:
+                    - {name: d0, widget: NavItem, text: home,     supporting_text: "Home",     handlers: {on_click: select_rail}}
+                    - {name: d1, widget: NavItem, text: search,   supporting_text: "Search",   handlers: {on_click: select_rail}}
+                    - {name: d2, widget: NavItem, text: settings, supporting_text: "Settings", handlers: {on_click: select_rail}}
+                - name: status_bar_demo
+                  widget: Column
+                  style: {width: expand, height: expand}
+                  children:
+                    - name: status_bar_filler
+                      widget: Container
+                      style: {width: expand, height: expand, background: surface_container_low, corner_radius: 8}
+                    - name: status_bar
+                      widget: StatusBar
+                      style: {width: expand}
+                      children:
+                        - {name: status_lead, widget: Text, text: "Ready"}
+                        - {name: status_gap, widget: Spacer, style: {width: expand}}
+                        - {name: status_trail, widget: Text, text: "UTF-8"}
+
+            # ============================================================
+            # Text input
+            # ============================================================
+            - name: text_input_head
+              widget: Text
+              text: "Text input"
+              style: {text_style: title-medium, color: primary}
+            - {name: text_input_div, widget: Divider, style: {width: expand}}
+            - name: text_fields
+              widget: Row
+              style: {height: 64, spacing: 16, width: expand}
+              children:
+                - name: field_filled
+                  widget: TextField
+                  text: "Email"
+                  value: "{{ email.get() }}"
+                  supporting_text: "We never share it"
+                  style: {width: expand, variant: filled}
+                  handlers: {on_change: change_email}
+                - name: field_outlined
+                  widget: TextField
+                  text: "Search"
+                  style: {width: expand, variant: outlined}
+
+            # ============================================================
+            # Overlays: dialogs, popover, menu, tooltip, snackbar, sheets
+            # ============================================================
+            - name: overlays_head
+              widget: Text
+              text: "Overlays"
+              style: {text_style: title-medium, color: primary}
+            - {name: overlays_div, widget: Divider, style: {width: expand}}
+            - name: overlays_row
+              widget: Row
+              style: {height: 40, spacing: 10, width: expand}
+              children:
+                - name: ask_btn
+                  widget: Button
+                  text: "Dialog…"
+                  style: {width: 110, height: 40, variant: text}
+                  handlers: {on_click: ask}
+                - name: lock_btn
+                  widget: Button
+                  text: "Locked…"
+                  style: {width: 110, height: 40, variant: text}
+                  handlers: {on_click: lock}
+                - name: popover_btn
+                  widget: Button
+                  text: "Popover…"
+                  style: {width: 110, height: 40, variant: text}
+                  handlers: {on_click: open_popover}
+                - name: menu_btn
+                  widget: Button
+                  text: "Menu…"
+                  style: {width: 110, height: 40, variant: text}
+                  handlers: {on_click: open_menu}
+                - name: tooltip_btn
+                  widget: Button
+                  text: "Tooltip…"
+                  style: {width: 110, height: 40, variant: text}
+                  handlers: {on_click: open_tooltip}
+            - name: overlays_row2
+              widget: Row
+              style: {height: 40, spacing: 10, width: expand}
+              children:
+                - name: snackbar_btn
+                  widget: Button
+                  text: "Snackbar…"
+                  style: {width: 110, height: 40, variant: text}
+                  handlers: {on_click: open_snackbar}
+                - name: bottom_sheet_btn
+                  widget: Button
+                  text: "Bottom sheet…"
+                  style: {width: 130, height: 40, variant: text}
+                  handlers: {on_click: open_bottom_sheet}
+                - name: side_sheet_btn
+                  widget: Button
+                  text: "Side sheet…"
+                  style: {width: 130, height: 40, variant: text}
+                  handlers: {on_click: open_side_sheet}
+
+            # ============================================================
+            # Carousel
+            # ============================================================
+            - name: carousel_head
+              widget: Text
+              text: "Carousel"
+              style: {text_style: title-medium, color: primary}
+            - {name: carousel_div, widget: Divider, style: {width: expand}}
+            - name: carousel_demo
+              widget: Carousel
+              style: {variant: multi_browse, height: 140, width: expand}
+              children:
+                - {name: cr0, widget: CarouselItem, text: "Item 1"}
+                - {name: cr1, widget: CarouselItem, text: "Item 2"}
+                - {name: cr2, widget: CarouselItem, text: "Item 3"}
+                - {name: cr3, widget: CarouselItem, text: "Item 4"}
+                - {name: cr4, widget: CarouselItem, text: "Item 5"}
+
+            # ============================================================
+            # Dock layout
+            # ============================================================
+            - name: dock_head
+              widget: Text
+              text: "Dock layout"
+              style: {text_style: title-medium, color: primary}
+            - {name: dock_div, widget: Divider, style: {width: expand}}
+            - name: dock_demo
+              widget: DockSplit
+              style: {height: 220, width: expand}
+              children:
+                - name: dock_sidebar
+                  widget: DockGroup
+                  style: {width: 160}
+                  children:
+                    - name: dock_files
+                      widget: DockPanel
+                      text: "Files"
+                      children:
+                        - {name: dock_files_body, widget: Text, text: "src/\n  main.py\n  widgets/", style: {color: on_surface_variant}}
+                - name: dock_main
+                  widget: DockGroup
+                  style: {width: expand}
+                  children:
+                    - name: dock_editor
+                      widget: DockPanel
+                      text: "Editor"
+                      children:
+                        - {name: dock_editor_body, widget: Text, text: "def hello():\n    print('hi')", style: {color: on_surface}}
+                    - name: dock_output
+                      widget: DockPanel
+                      text: "Output"
+                      children:
+                        - {name: dock_output_body, widget: Text, text: "> hello\nhi", style: {color: on_surface_variant}}
+
+            # ============================================================
+            # Canvas
+            # ============================================================
+            - name: canvas_head
+              widget: Text
+              text: "Canvas"
+              style: {text_style: title-medium, color: primary}
+            - {name: canvas_div, widget: Divider, style: {width: expand}}
+            - name: canvas_demo
+              widget: Canvas
+              style: {height: 200, width: expand}
+              handlers: {on_paint: draw_canvas}
+
+            # ============================================================
+            # Image and video
+            # ============================================================
+            - name: media_head
+              widget: Text
+              text: "Image and video"
+              style: {text_style: title-medium, color: primary}
+            - {name: media_div, widget: Divider, style: {width: expand}}
+            - name: media_row
+              widget: Row
+              style: {height: 160, spacing: 16, width: expand}
+              children:
+                - name: image_demo
+                  widget: Image
+                  path: "{{ image_path }}"
+                  style: {width: 260, height: 160, fit: cover, corner_radius: 12}
+                - name: video_demo
+                  widget: Video
+                  style: {width: 260, height: 160, fit: cover, corner_radius: 12}
+
+            # ============================================================
+            # Node graph
+            # ============================================================
+            - name: nodegraph_head
+              widget: Text
+              text: "Node graph"
+              style: {text_style: title-medium, color: primary}
+            - {name: nodegraph_div, widget: Divider, style: {width: expand}}
+            - name: nodegraph_demo
+              widget: NodeGraph
+              style: {height: 200, width: expand}
+              edges:
+                - {source: "node_in.out", target: "node_proc.in"}
+                - {source: "node_proc.out", target: "node_out.in"}
+              children:
+                - {name: node_in,   widget: Node, text: "Input",   outputs: "out", style: {x: 20,  y: 70}}
+                - {name: node_proc, widget: Node, text: "Process", inputs: "in", outputs: "out", style: {x: 220, y: 20}}
+                - {name: node_out,  widget: Node, text: "Output",  inputs: "in", style: {x: 420, y: 70}}
+
+            # ============================================================
+            # Code editor
+            # ============================================================
+            - name: codeeditor_head
+              widget: Text
+              text: "Code editor"
+              style: {text_style: title-medium, color: primary}
+            - {name: codeeditor_div, widget: Divider, style: {width: expand}}
+            - name: codeeditor_demo
+              widget: CodeEditor
+              value: |
+                def fib(n: int) -> int:
+                    """Return the n-th Fibonacci number."""
+                    a, b = 0, 1
+                    for _ in range(n):
+                        a, b = b, a + b
+                    return a
+              style: {height: 200, width: expand, language: python, line_numbers: true}
+
+            # ============================================================
+            # Terminal
+            # ============================================================
+            - name: terminal_head
+              widget: Text
+              text: "Terminal"
+              style: {text_style: title-medium, color: primary}
+            - {name: terminal_div, widget: Divider, style: {width: expand}}
+            - name: terminal_demo
+              widget: Terminal
+              style: {height: 200, width: expand}
+
+            # ============================================================
+            # Actions: the running click counter and the two dialogs
+            # ============================================================
+            - name: actions_head
+              widget: Text
+              text: "Actions"
+              style: {text_style: title-medium, color: primary}
+            - {name: actions_div, widget: Divider, style: {width: expand}}
+            - name: actions
+              widget: Row
+              style: {height: 44, spacing: 12, width: expand}
+              children:
+                - name: count_label
+                  widget: Text
+                  text: "Clicked {{ clicks.get() }}x"
+                  style: {color: on_surface_variant, font_size: 14}
+                - name: actions_gap
+                  widget: Spacer
+                  style: {width: expand}
+                - name: reset_btn
+                  widget: Button
+                  classes: action          # size and variant come from theme.yaml
+                  text: "Reset"
+                  handlers: {on_click: reset}
+                - name: confirm_btn
+                  widget: Button
+                  classes: action primary  # ...and the primary rule widens it
+                  text: "Confirm"
+                  handlers: {on_click: confirm}
+
 overlays:
   # Two dialogs, one component, one property apart. The first closes when you
   # click away from it; the second refuses to.
@@ -181,3 +553,63 @@ overlays:
     with:
       title: "This one is locked"
       body: "Clicking outside does nothing. Use the button."
+
+  # The rest are declared inline: a plain widget spec with `name:`/`open:`
+  # added, needing no separate view file or ViewModel since they only read
+  # and write this view's own Gallery signals.
+  - name: popover_demo
+    widget: Popover
+    open: "{{ popover_open.get() }}"
+    text: "Rich tooltip"
+    supporting_text: "A Popover explains a control without a whole dialog."
+    style: {anchor: popover_btn}
+    handlers: {on_dismiss: close_popover}
+
+  - name: menu_demo
+    widget: Menu
+    open: "{{ menu_open.get() }}"
+    style: {anchor: menu_btn}
+    handlers: {on_dismiss: close_menu}
+    children:
+      - {name: menu_cut, widget: MenuItem, text: "Cut", supporting_text: "Ctrl+X", handlers: {on_click: close_menu}}
+      - {name: menu_copy, widget: MenuItem, text: "Copy", supporting_text: "Ctrl+C", handlers: {on_click: close_menu}}
+      - {name: menu_paste, widget: MenuItem, text: "Paste", supporting_text: "Ctrl+V", handlers: {on_click: close_menu}}
+
+  - name: tooltip_demo
+    widget: Tooltip
+    open: "{{ tooltip_open.get() }}"
+    text: "A plain tooltip"
+    style: {anchor: tooltip_btn}
+    handlers: {on_dismiss: close_tooltip}
+
+  - name: snackbar_demo
+    widget: Snackbar
+    open: "{{ snackbar_open.get() }}"
+    text: "Item archived"
+    supporting_text: "Undo"
+    handlers: {on_dismiss: close_snackbar}
+
+  - name: bottom_sheet_demo
+    widget: BottomSheet
+    open: "{{ bottom_sheet_open.get() }}"
+    style: {handle: true}
+    handlers: {on_dismiss: close_bottom_sheet}
+    children:
+      - name: bottom_sheet_body
+        widget: Column
+        style: {padding: 16, spacing: 8, width: expand}
+        children:
+          - {name: bottom_sheet_title, widget: Text, text: "Bottom sheet", style: {font_size: 18, color: on_surface}}
+          - {name: bottom_sheet_body_text, widget: Text, text: "Slides up from the bottom edge, with an optional drag handle.", style: {color: on_surface_variant}}
+
+  - name: side_sheet_demo
+    widget: SideSheet
+    open: "{{ side_sheet_open.get() }}"
+    handlers: {on_dismiss: close_side_sheet}
+    children:
+      - name: side_sheet_body
+        widget: Column
+        style: {padding: 16, spacing: 8, width: expand}
+        children:
+          - {name: side_sheet_title, widget: Text, text: "Side sheet", style: {font_size: 18, color: on_surface}}
+          - {name: side_sheet_body_text, widget: Text, text: "Anchored to the trailing edge of the window.", style: {color: on_surface_variant}}
