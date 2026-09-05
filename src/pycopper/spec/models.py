@@ -376,6 +376,14 @@ class StyleSpec(_Frozen):
     #: itself is a separate `Menu` overlay entry anchored to this item by
     #: `name`, the same way any anchored overlay is declared.
     has_submenu: bool = False
+    #: `SegmentedButton`'s single- vs multi-select mode (M3 names both).
+    #: Off by default, preserving the one-`value:`-names-one-child model
+    #: every `_SelectionContainer` already uses. On, `value:` is instead a
+    #: comma-separated set of selected names, and more than one child can be
+    #: marked selected at once. Meaningless on `Tabs`/`NavigationRail`/
+    #: `NavigationDrawer` -- M3 does not describe a multi-select form of any
+    #: of those -- though nothing stops a view from setting it there too.
+    multi_select: bool = False
     #: `name` of the ScrollView a TopAppBar collapses with. Without it a
     #: medium or large bar simply stays expanded.
     collapses_with: str | None = None

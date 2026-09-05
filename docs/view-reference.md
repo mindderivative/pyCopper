@@ -1123,7 +1123,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator. `collapsed: "{{ }}"` shrinks it to 0dp. |
 | `NavigationDrawer` | 240–360dp, 56dp items. `collapsed: "{{ }}"` shrinks it to 0dp — the pair is how a real app builds a collapsible rail, since `style.width` cannot be bound. |
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |
-| `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. |
+| `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. `style: {multi_select: true}` selects M3's multi-select form — `value:` becomes a comma-separated set instead of one name. |
 | `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |
 | `Canvas` | No M3 component. A freeform drawing surface for an `on_paint` handler — see [Canvas](#canvas) below. |
 | `NodeGraph` + `Node` | No M3 component. A pannable surface of draggable, wired nodes — see [Node graph](#node-graph) below. |
@@ -1506,6 +1506,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `scrollbar` | `ScrollView` — show the indicator when content overflows |
 | `handle` | `BottomSheet` — draw the drag handle |
 | `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
+| `multi_select` | `SegmentedButton` — M3's multi-select form (default off, single-select). On, `value:` is a comma-separated set of selected names instead of one |
 | `min`, `max`, `step` | `SpinBox`/`Slider` — bounds and increment; `min`/`max` default to unbounded for `SpinBox`, 0.0/1.0 for `Slider` |
 | `count` | `Pagination` — total number of pages |
 | `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |

@@ -267,6 +267,59 @@ def test_unknown_id_selects_nothing() -> None:
     assert not any(c.selected for c in app.root.find("c").children)
 
 
+# ------------------------------------------------------------ multi-select
+
+
+def _segments(n: int = 3) -> list[dict]:
+    return [{"name": f"s{i}", "widget": "Segment", "text": "X"} for i in range(n)]
+
+
+def test_multi_select_off_by_default() -> None:
+    """A comma-separated value in single-select mode still only matches a
+    child literally named that whole string -- proving the default really is
+    off, not silently permissive."""
+    app = app_with(_segments(), value="s0,s2", widget="SegmentedButton")
+    assert not any(c.selected for c in app.root.find("c").children)
+
+
+def test_multi_select_marks_every_named_child() -> None:
+    app = app_with(
+        _segments(), value="s0,s2", widget="SegmentedButton", style={"multi_select": True}
+    )
+    sel = {c.name for c in app.root.find("c").children if c.selected}
+    assert sel == {"s0", "s2"}
+
+
+def test_multi_select_with_no_value_selects_nothing() -> None:
+    app = app_with(_segments(), widget="SegmentedButton", style={"multi_select": True})
+    assert not any(c.selected for c in app.root.find("c").children)
+
+
+def test_multi_select_is_bindable() -> None:
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "c",
+                "widget": "SegmentedButton",
+                "value": "{{ picked.get() }}",
+                "style": {"multi_select": True},
+                "children": _segments(),
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    picked = Signal("s0")
+    a.expose(picked=picked)
+    a.mount()
+    a.update()
+    assert {c.name for c in a.root.find("c").children if c.selected} == {"s0"}
+    picked.set("s0,s1")
+    a.update()
+    assert {c.name for c in a.root.find("c").children if c.selected} == {"s0", "s1"}
+
+
 # ---------------------------------------------------------------- rendering
 
 

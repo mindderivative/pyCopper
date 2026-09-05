@@ -113,7 +113,19 @@ class _SelectionContainer(_StyledMixin, Flex):
         self._spacing = self.style.spacing
 
     def apply_selection(self) -> None:
-        """Push the selected id down to the children. Called before layout."""
+        """Push the selected id(s) down to the children. Called before layout.
+
+        `style.multi_select` (meaningful today only for `SegmentedButton`,
+        M3's one component with a named multi-select form) switches `value:`
+        from a single name to a comma-separated set -- everything else about
+        this method, and every other consumer of it, is unchanged.
+        """
+        if self.style.multi_select:
+            active_set = {name.strip() for name in self._value.split(",") if name.strip()}
+            for child in self.children:
+                if hasattr(child, "set_selected"):
+                    child.set_selected(child.name in active_set)
+            return
         active = self._value.strip()
         for child in self.children:
             if hasattr(child, "set_selected"):
@@ -789,6 +801,13 @@ class SegmentedButtonElement(_SelectionContainer):
     Internal segments share flat borders, so the outline is drawn once around
     the whole container plus a divider between each pair -- not per segment,
     which would double every internal edge.
+
+    `style.multi_select: true` (M3's own "Multi-select" variant) is
+    `_SelectionContainer.apply_selection`'s own shared switch -- see its
+    docstring. `value:` becomes a comma-separated set of selected names
+    instead of one, and more than one `Segment` shows its checkmark at
+    once. An application toggling one on `on_click:` adds or removes that
+    segment's own name from the set rather than replacing it outright.
     """
 
     HEIGHT: Final = 40.0
