@@ -1,0 +1,80 @@
+name: root
+widget: ScrollView
+style: {width: expand, height: expand}
+children:
+  - widget: Column
+    style:
+      background: surface
+      padding: 32
+      spacing: 20
+      width: expand
+      cross_alignment: stretch
+    children:
+      - name: title
+        widget: Text
+        text: "Slider"
+        style: {text_style: headline-small, color: on_surface}
+
+      - name: summary
+        widget: Text
+        text: "M3's slider, Standard variant, XS size: a 16dp track and a 4x44dp handle."
+        style: {text_style: body-large, color: on_surface_variant}
+
+      - {name: div1, widget: Divider, style: {width: expand}}
+
+      - name: explanation
+        widget: Text
+        text: |
+          16dp track, 8dp track-corner radius, a 4x44dp handle.
+          `style: {min, max, step}` bound it -- unlike SpinBox, an unset
+          min/max falls back to 0.0/1.0 rather than "unbounded", since a
+          slider needs a real range to draw a track at all. Click or drag
+          anywhere on the track to jump the handle there and keep
+          dragging; Left/Right/Up/Down step by `style.step`; Home/End jump
+          to the bounds.
+
+          Use cases: a slider is the right control when a value is best
+          understood by dragging within a bounded range -- volume,
+          brightness, a percentage -- rather than typing or stepping one
+          unit at a time the way `SpinBox` does.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - {name: div2, widget: Divider, style: {width: expand}}
+
+      - name: live_heading
+        widget: Text
+        text: "Live example"
+        style: {text_style: title-medium, color: primary}
+
+      - name: live_demo
+        widget: Row
+        style: {spacing: 16, width: expand, cross_alignment: center}
+        children:
+          - name: volume
+            widget: Slider
+            value: "{{ volume.get() }}"
+            style: {width: expand, min: 0, max: 100, step: 5}
+            handlers: {on_change: change_volume}
+          - widget: Text
+            text: "{{ volume.get() }}"
+            style: {color: on_surface_variant}
+
+      - {name: div3, widget: Divider, style: {width: expand}}
+
+      - name: code_heading
+        widget: Text
+        text: "Source"
+        style: {text_style: title-medium, color: primary}
+
+      - name: code_panels
+        widget: Row
+        style: {spacing: 16, width: expand, height: 260}
+        children:
+          - name: yaml_source
+            widget: CodeEditor
+            value: "{{ view_source }}"
+            style: {width: expand, height: expand, language: yaml, read_only: true}
+          - name: python_source
+            widget: CodeEditor
+            value: "{{ viewmodel_source }}"
+            style: {width: expand, height: expand, language: python, read_only: true}
