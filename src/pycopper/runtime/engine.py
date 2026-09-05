@@ -145,6 +145,7 @@ class Engine:
         self.context = self.canvas.get_context("wgpu")
         self.format = self.context.get_preferred_format(self.adapter)
         self.context.configure(device=self.device, format=self.format)
+        self._wrap_canvas_close()
 
         self.pipeline = UIPipeline(self.device, self.format)
         self.display_list = DisplayList()
@@ -202,6 +203,47 @@ class Engine:
         if not clipboard.system_backed:
             clipboard.install(GlfwClipboard())
         return canvas
+
+    def _wrap_canvas_close(self) -> None:
+        """Drop this Engine's OWN reference to the wgpu context before the
+        canvas destroys its native window, not after.
+
+        `RenderCanvas.close()` -- called automatically the instant the user
+        clicks the window's close button, from `_maybe_close()` inside
+        `loop.run()`'s own polling, well before `run()`'s
+        `finally: self.close()` ever gets a chance to run -- already drops
+        the CANVAS's own reference to the wgpu context in the right order
+        (context released, then `glfw.destroy_window()`). But `__init__`
+        above also keeps its OWN, independent reference (`self.context`),
+        and nothing dropped THAT one until `Engine.close()` ran -- by which
+        point the native window was already gone. CPython only calls a
+        `__del__` once an object's refcount reaches zero, so as long as this
+        Engine's reference survived, so did the underlying wgpu surface --
+        and releasing a surface whose native window no longer exists is a
+        segfault deep in the platform's own windowing/graphics libraries,
+        not something Python-level error handling can catch or recover
+        from. Confirmed with `faulthandler` on a real crash: `Garbage-
+        collecting` at interpreter shutdown, into `wgpu`'s `__del__`, into
+        `wgpuSurfaceRelease`, into `libwayland-client`/the Vulkan driver.
+
+        Patched on the canvas INSTANCE, not the class: unlike
+        `_coalesce_resize_paints`, there is one canvas per Engine and no
+        `weakbind`-style early capture to race, so patching the class would
+        buy nothing -- and per-instance means an offscreen canvas, which
+        owns no native window and so cannot hit this, is untouched if it
+        never calls `close()` at all.
+        """
+        canvas = self.canvas
+        original_close = canvas.close
+
+        def _close() -> None:
+            context = getattr(self, "context", None)
+            if context is not None:
+                context.unconfigure()
+                del self.context
+            original_close()
+
+        canvas.close = _close
 
     @property
     def pixel_ratio(self) -> float:
