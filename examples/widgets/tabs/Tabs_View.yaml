@@ -1,0 +1,88 @@
+name: root
+widget: ScrollView
+style: {width: expand, height: expand}
+children:
+  - widget: Column
+    style:
+      background: surface
+      padding: 32
+      spacing: 20
+      width: expand
+      cross_alignment: stretch
+    children:
+      - name: title
+        widget: Text
+        text: "Tabs"
+        style: {text_style: headline-small, color: on_surface}
+
+      - name: summary
+        widget: Text
+        text: "M3's tabs: 48dp high, a 3dp active indicator, for switching between related content at the same level of hierarchy."
+        style: {text_style: body-large, color: on_surface_variant}
+
+      - {name: div1, widget: Divider, style: {width: expand}}
+
+      - name: explanation
+        widget: Text
+        text: |
+          48dp tall. Primary tabs anchor the indicator to the bottom edge with
+          rounded top corners; secondary tabs use a flat, full-width stroke.
+          `value:` on the container names the selected tab by id -- the same
+          "one shared value, one click handler that writes the clicked
+          child's name back into it" convention every selection container in
+          pyCopper uses.
+
+          Use cases, from the spec: tabs organize groups of related content
+          that are at the same level of hierarchy. Tab labels can include
+          icons and text; text labels should be short.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - {name: div2, widget: Divider, style: {width: expand}}
+
+      - name: live_heading
+        widget: Text
+        text: "Live example"
+        style: {text_style: title-medium, color: primary}
+
+      - name: live_demo
+        widget: Column
+        style: {spacing: 16, width: expand}
+        children:
+          - {widget: Text, text: "Primary", style: {color: on_surface_variant}}
+          - name: tabs_primary
+            widget: Tabs
+            value: "{{ tab.get() }}"
+            style: {width: expand}
+            children:
+              - {name: t0, widget: Tab, text: "Video", handlers: {on_click: select_tab}}
+              - {name: t1, widget: Tab, text: "Photos", handlers: {on_click: select_tab}}
+              - {name: t2, widget: Tab, text: "Audio", handlers: {on_click: select_tab}}
+          - {widget: Text, text: "Secondary", style: {color: on_surface_variant}}
+          - name: tabs_secondary
+            widget: Tabs
+            value: "{{ tab2.get() }}"
+            style: {width: expand, variant: secondary}
+            children:
+              - {name: s0, widget: Tab, text: "Overview", handlers: {on_click: select_tab2}}
+              - {name: s1, widget: Tab, text: "Specs", handlers: {on_click: select_tab2}}
+              - {name: s2, widget: Tab, text: "Reviews", handlers: {on_click: select_tab2}}
+
+      - {name: div3, widget: Divider, style: {width: expand}}
+
+      - name: code_heading
+        widget: Text
+        text: "Source"
+        style: {text_style: title-medium, color: primary}
+
+      - name: code_panels
+        widget: Row
+        style: {spacing: 16, width: expand, height: 260}
+        children:
+          - name: yaml_source
+            widget: CodeEditor
+            value: "{{ view_source }}"
+            style: {width: expand, height: expand, language: yaml, read_only: true}
+          - name: python_source
+            widget: CodeEditor
+            value: "{{ viewmodel_source }}"
+            style: {width: expand, height: expand, language: python, read_only: true}
