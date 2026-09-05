@@ -102,6 +102,30 @@ def test_with_no_value_starts_on_the_current_month() -> None:
     assert (dp._view_year, dp._view_month) == (today.year, today.month)
 
 
+def test_a_live_bound_value_also_starts_on_its_own_month() -> None:
+    """`value: "{{ ... }}"` is a template, not a literal -- `spec.value` at
+    construction time is the raw source string, not the rendered date, so
+    `__init__` alone cannot derive the right month for a bound value the
+    way it can for a static literal. `configure()` must run once after the
+    binding's first render for this to work at all (`bind()` in
+    `tree/element.py`) -- every other test in this file uses a literal
+    value and would not catch a regression here."""
+    from pycopper import App, Signal, Theme
+
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [{"name": "dp", "widget": "DatePicker", "value": "{{ chosen.get() }}"}],
+    }
+    app = App(view, theme=Theme(dark=True))
+    chosen = Signal("2025-11-20", name="chosen")
+    app.expose(chosen=chosen)
+    app.mount()
+    app.update()
+    dp = app.root.find("dp")
+    assert (dp._view_year, dp._view_month) == (2025, 11)
+
+
 # ----------------------------------------------------------------- selection
 
 

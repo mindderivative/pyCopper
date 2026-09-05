@@ -649,6 +649,23 @@ class ElementMixin:
                 self.mark_needs_layout()
 
         self._effect = Effect(refresh)
+        # `Effect(refresh)` already ran `refresh()` once, synchronously, above
+        # -- so any bound attribute (`_value`, `_text`, ...) now holds its
+        # first real, rendered value rather than raw template source. A
+        # widget whose `configure()` derives extra state from one of those
+        # (`DatePicker`'s displayed month, `TimePicker`'s displayed hour) was
+        # never given a chance to compute it correctly on first mount: only
+        # `update_spec` (a later reconcile) called `configure()`, so a widget
+        # built with e.g. `value: "{{ selected.get() }}"` derived its initial
+        # state from the literal, unrendered template string instead -- caught
+        # by a demo that actually binds `value:` to a Signal rather than a
+        # static literal, which every existing test for these widgets used.
+        # Calling it once here, right after the first render, closes that gap
+        # without affecting later updates: only `refresh` above runs again
+        # when a bound Signal changes, so a widget that intentionally holds
+        # extra state independent of `_value` (DatePicker's month navigation
+        # away from the selected date) is not reset by an unrelated change.
+        self.configure()
 
     def dispose(self) -> None:
         """Release subscriptions and running animations. Called when

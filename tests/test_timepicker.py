@@ -94,6 +94,30 @@ def test_with_no_value_starts_from_the_current_time() -> None:
     assert (tp._view.hour, tp._view.minute) == (now.hour, now.minute)
 
 
+def test_a_live_bound_value_also_starts_from_its_own_time() -> None:
+    """`value: "{{ ... }}"` is a template, not a literal -- `spec.value` at
+    construction time is the raw source string, not the rendered time, so
+    `__init__` alone cannot derive the right hour/minute for a bound value
+    the way it can for a static literal. `configure()` must run once after
+    the binding's first render for this to work at all (`bind()` in
+    `tree/element.py`) -- every other test in this file uses a literal
+    value and would not catch a regression here."""
+    from pycopper import App, Signal, Theme
+
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [{"name": "tp", "widget": "TimePicker", "value": "{{ chosen.get() }}"}],
+    }
+    app = App(view, theme=Theme(dark=True))
+    chosen = Signal("14:05", name="chosen")
+    app.expose(chosen=chosen)
+    app.mount()
+    app.update()
+    tp = app.root.find("tp")
+    assert (tp._view.hour, tp._view.minute) == (14, 5)
+
+
 # ---------------------------------------------------------------- stepping
 
 
