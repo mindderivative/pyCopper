@@ -759,6 +759,14 @@ Tab does not move focus while a `CodeEditor` is focused — press **Escape**
 first (which always defocuses, for any widget) to reach the next control by
 keyboard.
 
+**`style.read_only: true`** makes the buffer selectable but not editable —
+for showing a fixed code sample with real syntax highlighting rather than a
+plain `Text` block. It blocks typing and every mutating key (Tab, Enter,
+Backspace, Delete, paste, undo/redo) while leaving caret motion, keyboard
+and mouse selection, Ctrl+A, and copy fully working. `disabled:` is the
+wrong tool for this — it also blocks pointer selection, which a read-only
+sample still needs.
+
 **Not implemented**: auto-closing or matching brackets, multiple cursors,
 code folding, a minimap, a draggable scrollbar thumb (the wheel and the
 keyboard both scroll; there is no visible, grabbable indicator yet), and
@@ -1502,6 +1510,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `language` | `CodeEditor` — a Pygments lexer name/alias; unset or unrecognised means no highlighting |
 | `line_numbers` | `CodeEditor` — show the gutter (default on) |
 | `tab_size` | `CodeEditor` — spaces the Tab key inserts (default 4) |
+| `read_only` | `CodeEditor` — blocks typing and every mutating key (Tab, Enter, Backspace, Delete, paste, undo/redo); caret motion, selection, Ctrl+A, and copy still work |
 | `font_family` | `CodeEditor`, `Terminal` — request a face by name; see [Code editor](#code-editor) |
 | `shell` | `Terminal` — the command line to run; unset resolves `$SHELL`, else `/bin/sh` |
 | `placement`, `anchor`, `modal`, `scrim`, `dismissable`, `offset` | overlays |

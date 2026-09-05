@@ -512,6 +512,12 @@ class StyleSpec(_Frozen):
     line_numbers: bool = True
     #: How many spaces a `CodeEditor`'s Tab key inserts.
     tab_size: int = Field(default=4, ge=1)
+    #: `CodeEditor` only: blocks every mutating key/text path (typing, Tab/
+    #: Enter/Backspace/Delete/paste, undo/redo, and the delete half of
+    #: Ctrl+X) while leaving caret motion, keyboard and mouse selection,
+    #: Ctrl+A, and copy fully working -- `disabled` is the wrong tool for
+    #: this, since `effective_disabled` also gates pointer selection.
+    read_only: bool = False
     #: A font family to request by name (`FontRequest.family`), resolved
     #: through the same `FontDB` every widget already uses. `CodeEditor` and
     #: `Terminal` read this -- see either one's own docstring for why a

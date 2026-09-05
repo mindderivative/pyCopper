@@ -585,7 +585,7 @@ class CodeEditorElement(_StyledMixin, Padding):
     # --------------------------------------------------------------- typing
 
     def on_text(self, event: Any) -> None:
-        if self.effective_disabled:
+        if self.effective_disabled or self.style.read_only:
             return
         text = str(getattr(event, "text", ""))
         if not text or text < " ":
@@ -634,6 +634,7 @@ class CodeEditorElement(_StyledMixin, Padding):
         accel = is_accelerator(mods)
         shift = "shift" in mods
         word = "ctrl" in mods or "alt" in mods
+        read_only = self.style.read_only
         editor = self.editor
         state = editor.state
         handled = True
@@ -654,14 +655,14 @@ class CodeEditorElement(_StyledMixin, Padding):
                 state.selecting(state.anchor, target) if shift else state.collapsed(target)
             )
             self._commit(False)
-        elif key == "tab" and shift:
+        elif key == "tab" and not read_only and shift:
             self._commit(self._indent(dedent=True))
-        elif key == "tab":
+        elif key == "tab" and not read_only:
             if state.has_selection:
                 self._commit(self._indent(dedent=False))
             else:
                 self._commit(editor.edit(insert(state, " " * self.style.tab_size), "type"))
-        elif key == "enter":
+        elif key == "enter" and not read_only:
             text = state.text
             caret = state.caret
             line_start = text.rfind("\n", 0, caret) + 1
@@ -671,24 +672,24 @@ class CodeEditorElement(_StyledMixin, Padding):
             full_line = text[line_start:line_end]
             indent = full_line[: len(full_line) - len(full_line.lstrip(" "))]
             self._commit(editor.edit(insert(state, "\n" + indent), "type"))
-        elif key == "backspace":
+        elif key == "backspace" and not read_only:
             self._commit(editor.edit(delete_backward(state, word=word), "delete"))
-        elif key == "delete":
+        elif key == "delete" and not read_only:
             self._commit(editor.edit(delete_forward(state, word=word), "delete"))
         elif accel and key == "a":
             editor.state = state.select_all()
             self._commit(False)
         elif accel and key in ("c", "x") and state.has_selection:
             clipboard.set_text(state.selected_text)
-            if key == "x":
+            if key == "x" and not read_only:
                 self._commit(editor.edit(delete_backward(state), "delete"))
-        elif accel and key == "v":
+        elif accel and key == "v" and not read_only:
             pasted = clipboard.get_text()
             if pasted:
                 self._commit(editor.edit(insert(state, pasted), "paste"))
-        elif accel and key == "z" and not shift:
+        elif accel and key == "z" and not shift and not read_only:
             self._commit(editor.undo())
-        elif accel and (key == "y" or (key == "z" and shift)):
+        elif accel and (key == "y" or (key == "z" and shift)) and not read_only:
             self._commit(editor.redo())
         else:
             handled = False

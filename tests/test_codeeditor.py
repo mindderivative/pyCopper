@@ -16,14 +16,17 @@ import pytest
 
 from pycopper.layout import INF, Constraints, Offset, Size
 from pycopper.paint import DisplayList
+from pycopper.runtime.clipboard import clipboard
 from pycopper.runtime.events import (
     FOCUSABLE_KINDS,
     EventDispatcher,
     EventType,
     KeyEvent,
+    PointerEvent,
     WheelEvent,
 )
 from pycopper.spec import WidgetKind, parse_view
+from pycopper.text.editing import insert
 from pycopper.theme import Palette, Theme
 from pycopper.tree.element import PaintContext
 from pycopper.widgets import build_element
@@ -138,6 +141,99 @@ def test_a_disabled_editor_ignores_typing() -> None:
     dispatcher = driver(element)
     type_text(dispatcher, "y")
     assert element.content == "x"
+
+
+# --------------------------------------------------------------- read-only
+
+
+def test_read_only_blocks_typing() -> None:
+    element = editor(value="x", style={"read_only": True})
+    dispatcher = driver(element)
+    type_text(dispatcher, "y")
+    assert element.content == "x"
+
+
+def test_read_only_blocks_backspace_and_delete() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "Backspace")
+    press(dispatcher, "Delete")
+    assert element.content == "abc"
+
+
+def test_read_only_blocks_tab_and_shift_tab() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "Tab")
+    press(dispatcher, "Tab", SHIFT)
+    assert element.content == "abc"
+
+
+def test_read_only_blocks_enter() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "Enter")
+    assert element.content == "abc"
+
+
+def test_read_only_blocks_paste() -> None:
+    clipboard.set_text("pasted")
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "v", CTRL)
+    assert element.content == "abc"
+
+
+def test_read_only_blocks_the_delete_half_of_cut_but_not_the_copy_half() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    element.editor.state = element.editor.state.select_all()
+    press(dispatcher, "x", CTRL)
+    assert clipboard.get_text() == "abc", "the copy half of Cut must still work"
+    assert element.content == "abc", "but the delete half must not"
+
+
+def test_read_only_blocks_undo_and_redo() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    element.editor.edit(insert(element.editor.state, "x"), "type")
+    assert element.content == "abcx"
+    dispatcher = driver(element)
+    press(dispatcher, "z", CTRL)
+    assert element.content == "abcx", "undo must be blocked too, not only forward edits"
+
+
+def test_read_only_still_allows_select_all_and_copy() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "a", CTRL)
+    press(dispatcher, "c", CTRL)
+    assert clipboard.get_text() == "abc"
+
+
+def test_read_only_still_allows_keyboard_selection() -> None:
+    """The initial caret sits at the end of the text (`EditState`'s own
+    default), so Left, not Right, is what actually moves it here."""
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "Left", SHIFT)
+    assert element.editor.state.has_selection
+    assert element.editor.state.selected_text == "c"
+
+
+def test_read_only_still_allows_caret_motion() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element)
+    press(dispatcher, "Left")
+    assert element.editor.state.caret == 2
+
+
+def test_read_only_still_allows_mouse_selection() -> None:
+    element = editor(value="abc", style={"read_only": True})
+    dispatcher = driver(element, focus=False)
+    dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=1.0, y=1.0))
+    dispatcher.post(PointerEvent(EventType.POINTER_MOVE, x=390.0, y=1.0, button=1))
+    dispatcher.drain()
+    assert element.editor.state.has_selection
 
 
 # ---------------------------------------------------------- never wraps
