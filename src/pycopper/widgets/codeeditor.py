@@ -73,6 +73,7 @@ widget should hard-depend on.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any, Final
 
 import numpy as np
@@ -470,6 +471,32 @@ class CodeEditorElement(_StyledMixin, Padding):
                 )
             y += line.height
 
+    def _visible_lines(self, para: Any, absolute: Offset) -> list[Any]:
+        """*para*'s lines whose row actually falls in the widget's own rect.
+
+        `TextEngine.emit()` has no notion of off-screen -- it emits every
+        placement it is given -- so without this, a long file paid for every
+        one of its glyphs' atlas lookups every single frame regardless of
+        how much of it had scrolled out of view: real waste always, and
+        under a live resize specifically the dominant cost, since each
+        glyph's shifting screen position changes the subpixel bucket its
+        atlas lookup keys on, forcing a fresh rasterise+upload for the
+        WHOLE buffer rather than only the handful of lines actually drawn.
+        `_paint_gutter` already skips an off-screen line NUMBER this way;
+        each `TextLine`'s own `.baseline` is absolute within the paragraph
+        (baked in once, over every line, during the original layout), so
+        handing `TextEngine.emit()` a paragraph with only a slice of
+        `.lines` still places the kept ones correctly.
+        """
+        h = self.size.height
+        y = absolute.y + self.CONTENT_PAD_Y - self._scroll_y
+        visible = []
+        for line in para.lines:
+            if y + line.height >= absolute.y and y <= absolute.y + h:
+                visible.append(line)
+            y += line.height
+        return visible
+
     def _paint_content(self, ctx: PaintContext, absolute: Offset, para: Any, gutter: float) -> None:
         inner = self._inner_context(ctx, absolute, gutter)
         x = absolute.x + self.CONTENT_PAD_X + gutter - self._scroll_x
@@ -492,9 +519,10 @@ class CodeEditorElement(_StyledMixin, Padding):
                 )
 
         if self.content:
+            visible = dataclasses.replace(para, lines=self._visible_lines(para, absolute))
             inner.text.emit(
                 inner.display_list,
-                para,
+                visible,
                 x=x,
                 y=y,
                 pixel_ratio=inner.pixel_ratio,

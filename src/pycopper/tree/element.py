@@ -984,14 +984,29 @@ class ElementMixin:
         With no *origin* the ancestor chain is walked, so the result really is
         absolute. Passing an origin is the fast path for callers that already
         know it -- paint and hit testing both thread it down the tree.
+
+        The walk must apply each ancestor's `child_origin()`, not just sum
+        raw `.offset`s: a `ScrollView` ancestor's is `absolute - scroll`
+        (paint-time-only, no relayout), and `hit_test` already threads it
+        exactly this way (`child_origin`'s own docstring: "hit testing
+        threads the same origin, so the pointer follows the pixels"). Without
+        it, this reports a scrolled descendant's PRE-SCROLL position, so the
+        widget that receives a click (found via the correctly-threaded
+        `hit_test`) and the position it thinks it's at disagree by the scroll
+        offset -- e.g. a `CodeEditor` computing a click's caret position from
+        its own `absolute_rect()`.
         """
         if origin is None:
-            offset = self.offset
-            node = self.parent
+            chain: list[Any] = []
+            node: Any = self
             while node is not None:
-                offset = offset + node.offset
+                chain.append(node)
                 node = node.parent
-            return Rect.from_offset_size(offset, self.size)
+            chain.reverse()  # root first, self last
+            origin = OFFSET_ZERO
+            for ancestor in chain[:-1]:
+                origin = ancestor.child_origin(origin + ancestor.offset)
+            return Rect.from_offset_size(origin + self.offset, self.size)
         return Rect.from_offset_size(origin + self.offset, self.size)
 
     #: Whether this element confines its children to its own rect. A widget

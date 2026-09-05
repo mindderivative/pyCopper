@@ -367,6 +367,40 @@ def test_hit_testing_follows_the_scrolled_content() -> None:
     assert after[0] == "r3"
 
 
+def test_absolute_rect_follows_the_scrolled_content() -> None:
+    """`absolute_rect()` must agree with `hit_test` about where a scrolled
+    descendant actually is. It used to sum raw `.offset`s and ignore
+    `child_origin()`, so a widget inside a scrolled ScrollView -- every one
+    of the widget demos' own root -- reported its PRE-SCROLL position from
+    `absolute_rect()` while `hit_test` (which does thread `child_origin`
+    correctly) still found it at its true, scrolled one: a `CodeEditor`
+    computing a click's caret position from its own `absolute_rect()` put
+    the caret several lines away from the actual click.
+    """
+    app = app_with(
+        {
+            "name": "sv",
+            "widget": "ScrollView",
+            "style": {"height": 200, "width": "expand"},
+            "children": [
+                {
+                    "name": "col",
+                    "widget": "Column",
+                    "style": {"width": "expand"},
+                    "children": rows(12),
+                }
+            ],
+        }
+    )
+    sv = app.root.find("sv")
+    r3 = app.root.find("r3")
+    before = r3.absolute_rect().y
+    sv.set_scroll(ROW_HEIGHT * 3)
+    app.update()
+    after = r3.absolute_rect().y
+    assert before - after == pytest.approx(ROW_HEIGHT * 3)
+
+
 def test_the_wheel_chains_to_an_outer_view_once_the_inner_one_is_done() -> None:
     """Swallowing the wheel unconditionally would trap the pointer inside a
     fully-scrolled pane -- the one thing every desktop toolkit avoids."""

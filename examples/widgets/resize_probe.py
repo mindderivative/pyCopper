@@ -54,7 +54,10 @@ LOG_PATH = DEMO_DIR / "resize_probe_log.csv"
 
 sys.path.insert(0, str(DEMO_DIR))
 
+from pycopper.app import App  # noqa: E402
+from pycopper.layout import OFFSET_ZERO, Constraints  # noqa: E402
 from pycopper.runtime.engine import Engine  # noqa: E402
+from pycopper.tree.element import PaintContext  # noqa: E402
 
 _rows: list[dict[str, float | int]] = []
 _report_window: list[float] = []
@@ -195,6 +198,64 @@ def _draw_frame(self: Engine) -> None:
 
 
 Engine.draw_frame = _draw_frame
+
+# --- break down App.update()/App.paint() themselves: paint_ms above wraps
+# the WHOLE of App.paint(), which was found to cost ~10ms/frame live while
+# an identical headless call to the same method cost <1ms -- so whatever is
+# expensive must be something that is a no-op or trivial when `self.engine`
+# is None (as it is headless) but does real work once a real engine/canvas
+# is attached. This isolates which specific sub-step that is. ---
+_app_stage_ms: dict[str, float] = {}
+_app_stage_totals: dict[str, float] = {}
+_app_stage_count = 0
+
+
+def _timed(label: str, fn, *a, **kw):
+    t0 = time.perf_counter()
+    result = fn(*a, **kw)
+    _app_stage_ms[label] = (time.perf_counter() - t0) * 1000.0
+    return result
+
+
+def _update(self) -> None:
+    _timed("poll_reload", self.poll_reload)
+    _timed("dispatch_drain", self.dispatcher.drain)
+    _timed("motion_tick", self.motion.tick, self._frame_delta())
+    _timed("layout_flush", self.layout_owner.flush)
+    _timed("drain_a11y", self._drain_accessibility)
+    size = _timed("logical_size", self.logical_size)
+    _timed("root_layout", self.root.layout, Constraints.tight(size))
+    _timed("overlays_layout", self.overlays.layout, size, self.root)
+    _timed("sync_cursor", self._sync_cursor)
+
+
+def _paint(self, display_list) -> None:
+    global _app_stage_count
+    _app_stage_ms.clear()
+    _timed("update", _update, self)
+    ctx = PaintContext(
+        display_list=display_list,
+        palette=self.palette,
+        text=self.text,
+        images=self.images,
+        pixel_ratio=self.engine.pixel_ratio if self.engine else 1.0,
+    )
+    _timed("root_paint", self.root.paint, ctx, OFFSET_ZERO)
+    _timed("overlays_paint", self.overlays.paint, ctx, self.palette, self.logical_size())
+    if self._a11y is not None:
+        _timed("a11y_update", lambda: self._a11y.update(self.accessibility_tree()))
+    if self.motion.active and self.engine is not None:
+        self.engine.request_draw()
+    _app_stage_count += 1
+    for k, v in _app_stage_ms.items():
+        _app_stage_totals[k] = _app_stage_totals.get(k, 0.0) + v
+    if _app_stage_count % 60 == 0:
+        ranked = sorted(_app_stage_totals.items(), key=lambda kv: -kv[1])
+        breakdown = " | ".join(f"{k}={v / _app_stage_count:.3f}ms" for k, v in ranked)
+        print(f"[App stages, {_app_stage_count} frames avg] {breakdown}", flush=True)
+
+
+App.paint = _paint
 
 
 def _flush() -> None:
