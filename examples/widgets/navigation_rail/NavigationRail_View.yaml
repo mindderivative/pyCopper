@@ -1,0 +1,84 @@
+name: root
+widget: ScrollView
+style: {width: expand, height: expand}
+children:
+  - widget: Column
+    style:
+      background: surface
+      padding: 32
+      spacing: 20
+      width: expand
+      cross_alignment: stretch
+    children:
+      - name: title
+        widget: Text
+        text: "Navigation Rail"
+        style: {text_style: headline-small, color: on_surface}
+
+      - name: summary
+        widget: Text
+        text: "M3's navigation rail: an 80dp-wide vertical strip of destinations, collapsible into an icon-only column."
+        style: {text_style: body-large, color: on_surface_variant}
+
+      - {name: div1, widget: Divider, style: {width: expand}}
+
+      - name: explanation
+        widget: Text
+        text: |
+          80dp wide, a 56x32dp active indicator. `text:` on each `NavItem`
+          is the icon glyph, `supporting_text:` the label. `collapsed:`
+          shrinks the rail without changing which item is selected.
+
+          Use cases, from the spec: the navigation rail can display
+          navigation items, a menu, and a FAB in a vertical orientation.
+          There are two variants, collapsed and expanded, which can
+          transform into each other when the menu button is selected.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - {name: div2, widget: Divider, style: {width: expand}}
+
+      - name: live_heading
+        widget: Text
+        text: "Live example"
+        style: {text_style: title-medium, color: primary}
+
+      - name: live_demo
+        widget: Row
+        style: {spacing: 16}
+        children:
+          - name: rail
+            widget: NavigationRail
+            value: "{{ selected.get() }}"
+            collapsed: "{{ collapsed.get() }}"
+            style: {height: 260}
+            children:
+              - {name: home, widget: NavItem, text: "home", supporting_text: "Home", handlers: {on_click: select}}
+              - {name: search, widget: NavItem, text: "search", supporting_text: "Search", handlers: {on_click: select}}
+              - {name: settings, widget: NavItem, text: "settings", supporting_text: "Settings", handlers: {on_click: select}}
+          - widget: Column
+            style: {spacing: 8}
+            children:
+              - {widget: Button, text: "Toggle collapsed", style: {variant: outlined}, handlers: {on_click: toggle_collapsed}}
+              - widget: Text
+                text: "Selected: {{ selected.get() }}"
+                style: {color: on_surface_variant}
+
+      - {name: div3, widget: Divider, style: {width: expand}}
+
+      - name: code_heading
+        widget: Text
+        text: "Source"
+        style: {text_style: title-medium, color: primary}
+
+      - name: code_panels
+        widget: Row
+        style: {spacing: 16, width: expand, height: 260}
+        children:
+          - name: yaml_source
+            widget: CodeEditor
+            value: "{{ view_source }}"
+            style: {width: expand, height: expand, language: yaml, read_only: true}
+          - name: python_source
+            widget: CodeEditor
+            value: "{{ viewmodel_source }}"
+            style: {width: expand, height: expand, language: python, read_only: true}
