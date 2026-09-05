@@ -3491,6 +3491,60 @@ width and 40dp cells already have.
 No dedicated ARIA "timepicker" role exists either; the widget uses `"group"`,
 the same fieldset-like grouping ARIA offers for independent adjacent controls.
 
+### 5.33 Button Group — `widgets/buttongroup.py`
+
+Not in `M3_COMPONENT_INDEX.md` at all -- `COMPONENT_BUTTON_GROUPS.md` is a
+real, separately-scraped M3 Expressive component with no index entry.
+Quoted directly: "Button groups are invisible containers that add padding
+between buttons and modify button shape. They don't contain any buttons by
+default." That sentence is this widget's entire scope: a `Flex` row that
+spaces `Button` children and, for the connected variant, overrides their
+corner radii -- nothing paints its own container.
+
+**Spacing.** The source's "between-space" table has one row per size (XS
+18dp, S 12dp, M/L/XL 8dp); `Button` has only one size today, so the M/L/XL
+row (8dp) is the value used for `variant: standard`. Connected groups use a
+flat 2dp "at every size", quoted directly.
+
+**Connected shape.** "the outer shape is fully round, and the inner shape
+remains square with the following corner sizes" (4dp at XS rising to 20dp
+at XL) -- read here as: the group's two outward-facing ends stay fully
+round, every corner where two buttons meet squares to the M-size figure
+(8dp). The source describes this in prose with no anatomy diagram for the
+shape itself, so the exact reading is pyCopper's own, not a quoted layout.
+
+**Deliberately not built**: the width/shape *morph* animation M3's own
+demo videos show on press and selection (a standard group additionally
+resizes the buttons *adjacent* to the one pressed) -- real, motion-driven
+behaviour with no analogue anywhere else in the framework yet, and the
+XS/S/M/L/XL size ladder button groups are meant to span, which has nowhere
+to attach until `Button` itself grows a size axis the way `Fab` already
+has. Both are flagged rather than silently approximated.
+
+`ButtonElement` gained a `_group_radii` instance attribute for this: `None`
+by default, so every button with no `ButtonGroup` parent is unaffected;
+`effective_radii` checks it before falling back to `style.corner_radius`.
+`IconButtonElement`'s own `effective_radii` is hardcoded to full-round and
+does not consult an equivalent override, so a connected group's shape
+merging currently applies only to `Button` children, not `IconButton` ones
+M3 also allows in a group -- a small, explicitly deferred follow-up.
+
+**Also flagged in the same plan, not built as separate widgets**:
+
+- **FAB Menu** -- `COMPONENT_FAB_MENU.md` states directly, for the target
+  platform: "On web, the FAB menu opens from the FAB, and inherits its
+  states and specs from the baseline menu component." That is pyCopper's
+  existing `Menu` overlay, already anchorable above its trigger
+  (`style: {placement: top, anchor: <fab-name>, offset: 4}`, the spec's own
+  quoted 4dp gap) -- a view composes this today with zero new widget code,
+  which is more faithful to M3's own stated web behaviour than a bespoke
+  expand/collapse widget would be.
+- **Loading Indicator** -- M3 Expressive's shape-morphing replacement for
+  indeterminate `CircularProgress`. Deferred: the existing indeterminate
+  `CircularProgress` already serves the same functional need, and the
+  morphing-shape animation is a materially separate build for a purely
+  cosmetic upgrade.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -3635,7 +3689,8 @@ pyCopper/
 │           ├── search.py        # SearchBar: M3 search bar (§5.29)
 │           ├── splitbutton.py   # SplitButton: primary action + menu trigger (§5.30)
 │           ├── datepicker.py    # DatePicker: modal calendar month grid (§5.31)
-│           └── timepicker.py    # TimePicker: hour/minute steppers + AM/PM (§5.32)
+│           ├── timepicker.py    # TimePicker: hour/minute steppers + AM/PM (§5.32)
+│           └── buttongroup.py   # ButtonGroup: standard/connected spacing + shape (§5.33)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers

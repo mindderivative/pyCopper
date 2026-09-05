@@ -105,6 +105,7 @@ class WidgetKind(StrEnum):
     SPLIT_BUTTON = "SplitButton"
     DATE_PICKER = "DatePicker"
     TIME_PICKER = "TimePicker"
+    BUTTON_GROUP = "ButtonGroup"
 
 
 class SizeSpec:
@@ -262,12 +263,14 @@ Variant = Literal[
     "outlined",
     "elevated",
     "text",
-    # sizes (FAB, icon button)
+    # sizes (FAB, icon button); "standard" is shared with button groups
     "standard",
     "small",
     "medium",
     "large",
     "extended",
+    # button groups
+    "connected",
     # chips
     "assist",
     "filter",

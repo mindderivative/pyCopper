@@ -32,6 +32,7 @@ LOOSE = Constraints(0.0, 400.0, 0.0, 300.0)
 EMPTY_IS_HONEST = {
     "Container": "a box around nothing",
     "Row": "as wide as its children, and it has none",
+    "ButtonGroup": "an invisible container hugging its buttons, and it has none",
     "Column": "as tall as its children, and it has none",
     "TreeView": "as wide as its items, and it has none",
     "Spacer": "space is all it is; with no flex or size there is none to take",

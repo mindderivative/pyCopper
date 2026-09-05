@@ -171,6 +171,11 @@ SILENT: Final[frozenset[str]] = frozenset(
         "Icon",
         "NavigationRail",
         "NavigationDrawer",
+        # "Button groups are invisible containers" (COMPONENT_BUTTON_GROUPS.md)
+        # and "the button group container is not a focusable element" -- its
+        # buttons carry the meaning, the same reasoning as the nav container
+        # kinds above.
+        "ButtonGroup",
         # A Shape is decoration. It has no label and nothing to do, so a reader
         # stopping on it would announce "group" and waste the user's time. An
         # application that means a shape to be meaningful should give it a Text

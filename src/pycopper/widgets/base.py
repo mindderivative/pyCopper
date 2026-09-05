@@ -335,6 +335,14 @@ class ButtonElement(ContainerElement):
     #: weight and tracking cannot arrive at measure and paint separately.
     LABEL_ROLE: Final = TYPE_SCALE["label-large"]
 
+    #: Set by a `ButtonGroup` parent (`buttongroup.py`) to merge this
+    #: button's shape into the group's connected pill -- `None` (the
+    #: default, for a button with no such parent) leaves `effective_radii`
+    #: reading `style.corner_radius` exactly as before. Not a spec field:
+    #: it is computed from the button's position among its siblings, which
+    #: a frozen `StyleSpec` cannot express.
+    _group_radii: tuple[float, float, float, float] | None = None
+
     def perform_layout(self, constraints: Constraints) -> Size:
         """Size to the label, floored at M3's minimum.
 
@@ -368,6 +376,8 @@ class ButtonElement(ContainerElement):
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
+        if self._group_radii is not None:
+            return self._group_radii
         radii = self.style.corner_radius
         return radii if any(radii) else (self.size.height / 2,) * 4
 
@@ -379,9 +389,7 @@ class ButtonElement(ContainerElement):
         container, content, outlined, elevated = self._variant()
         size = self.size
         dpr = ctx.pixel_ratio
-        radii = style.corner_radius
-        if not any(radii):
-            radii = (size.height / 2,) * 4
+        radii = self.effective_radii
         token = content_token(ctx, style, content)
 
         if elevated:
@@ -787,6 +795,7 @@ class SpacerElement(_StyledMixin, Padding):
 
 def _material_registry() -> dict[WidgetKind, type]:
     """Imported lazily: material.py imports helpers from this module."""
+    from . import buttongroup as bg
     from . import canvas as cv
     from . import carousel as ca
     from . import codeeditor as ce
@@ -863,6 +872,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.SPLIT_BUTTON: sb.SplitButtonElement,
         WidgetKind.DATE_PICKER: dp.DatePickerElement,
         WidgetKind.TIME_PICKER: tp.TimePickerElement,
+        WidgetKind.BUTTON_GROUP: bg.ButtonGroupElement,
     }
 
 

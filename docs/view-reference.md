@@ -1128,6 +1128,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | Widget | M3 spec |
 |---|---|
 | `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
+| `ButtonGroup` | An invisible container spacing `Button` children: `standard` (default, 8dp gaps, each button stays fully rounded) or `connected` (2dp gaps, only the group's two outer ends stay fully rounded, every touching corner squares to 8dp). M size only; the press/selection shape-morph animation and the XS/S/L/XL size ladder are real M3 behaviour not built here. |
 | `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. |
 | `Fab` | 56dp standard, 40 small, 80 medium, 96 large, plus `extended` — same 56dp height, a dynamic width (80dp floor) fitting an icon and a `supporting_text:` label side by side. |
 | `Checkbox` | 18dp box, 2dp radius. `indeterminate:` shows a dash instead of a checkmark, M3's third state for a partly-checked group. |
