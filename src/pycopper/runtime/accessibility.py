@@ -68,6 +68,9 @@ ROLES: Final[dict[str, str]] = {
     # clickable regions as one compound control -- treated the same opaque
     # way `Pagination`'s own two internal buttons are, above.
     "SplitButton": "button",
+    # ARIA convention for a calendar grid -- no M3-stated role, and no
+    # dedicated ARIA "datepicker" role exists either.
+    "DatePicker": "grid",
     "Link": "link",
     # ARIA's own name for exactly this control -- no M3 page to quote a role
     # from, since SpinBox has no M3 component at all (see its docstring).

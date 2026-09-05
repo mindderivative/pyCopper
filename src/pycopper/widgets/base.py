@@ -790,6 +790,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import canvas as cv
     from . import carousel as ca
     from . import codeeditor as ce
+    from . import datepicker as dp
     from . import dock as dk
     from . import image as im
     from . import material as m
@@ -859,6 +860,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.PAGE_HOST: ph.PageHostElement,
         WidgetKind.SEARCH_BAR: se.SearchBarElement,
         WidgetKind.SPLIT_BUTTON: sb.SplitButtonElement,
+        WidgetKind.DATE_PICKER: dp.DatePickerElement,
     }
 
 

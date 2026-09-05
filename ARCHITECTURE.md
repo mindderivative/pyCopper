@@ -3420,6 +3420,41 @@ already uses for its own submenu.
 ARIA has no dedicated role for a compound two-region control; treated the
 same opaque way `Pagination`'s own two internal buttons already are.
 
+### 5.31 Date Picker — `widgets/datepicker.py`
+
+M3's modal date picker, single-date selection only -- Modal Input (typed
+date with validation) and Date Range (two handles across the grid) are real
+M3 variants, each a materially separate piece of work rather than a style
+tweak, deferred the same way `Slider`'s own Discrete/Range variants were.
+
+**A plain widget, not a second overlay type.** M3 anatomy calls this
+"modal", but the modality itself is `Dialog`'s job -- a view places this as
+`Dialog`'s child exactly the way `parts/confirm_dialog_View.yaml` places
+`Text`/`Button` inside one, rather than teaching `runtime/overlay.py` a new
+overlay shape for what is really just different content.
+
+**Commits immediately on click, with no separate OK/Cancel step.** M3's own
+anatomy lists "Text buttons" (OK/Cancel) as part of this widget, implying a
+staged "pick, then confirm" flow this pass does not build -- clicking a day
+commits `value:` (a `YYYY-MM-DD` string) and fires `on_change` right away, a
+stated simplification rather than a silent one. An application wanting a
+staged flow gets one for free regardless: `Dialog` is already dismissable,
+so "OK" is just closing it once a date has been picked.
+
+**Measurements are not fully sourced** -- `COMPONENT_DATE_PICKERS.md`'s
+modal size tables are images, the same gap `CircularProgress`'s default
+diameter and `Carousel`'s medium item width already have. 320dp width and
+40dp day cells are pyCopper's own reasonable choice, tiling seven 40dp
+columns with a little margin either side, not a quoted figure.
+
+The calendar grid itself is computed with the standard library's
+`calendar` module (leap years, month lengths, weekday offsets) rather than
+by hand -- the one part of this widget with a genuinely correct, boring
+answer already available, cited rather than reimplemented.
+
+ARIA has no dedicated "datepicker" role; the grid itself uses ARIA's own
+`"grid"` role, the closest real anatomy.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -3562,7 +3597,8 @@ pyCopper/
 │           ├── pagehost.py      # PageHost: single-active-child container (§5.27)
 │           ├── slider.py        # Slider: drag/click/keyboard value picker (§5.28)
 │           ├── search.py        # SearchBar: M3 search bar (§5.29)
-│           └── splitbutton.py   # SplitButton: primary action + menu trigger (§5.30)
+│           ├── splitbutton.py   # SplitButton: primary action + menu trigger (§5.30)
+│           └── datepicker.py    # DatePicker: modal calendar month grid (§5.31)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers

@@ -103,6 +103,7 @@ class WidgetKind(StrEnum):
     PAGE_HOST = "PageHost"
     SEARCH_BAR = "SearchBar"
     SPLIT_BUTTON = "SplitButton"
+    DATE_PICKER = "DatePicker"
 
 
 class SizeSpec:
