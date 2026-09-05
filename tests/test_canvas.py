@@ -6,6 +6,7 @@ No M3 grounding exists for this either -- checked directly against
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from pycopper import App, Theme
@@ -164,6 +165,38 @@ def test_a_literal_colour_bypasses_the_palette() -> None:
     fill_color = tuple(float(v) for v in last["fill"])
     assert fill_token == NO_TOKEN
     assert fill_color == (1.0, 0.0, 0.0, 1.0)
+
+
+def test_a_literal_colour_is_converted_from_srgb_to_linear() -> None:
+    """The render target is `rgba8unorm-srgb` and encodes on write
+    (ARCHITECTURE.md 5.6.1) -- a handler's literal colour is the sRGB value
+    it looks like, so it must reach the display list already converted, or
+    it renders lighter than intended. 1.0/0.0 are fixed points of the sRGB
+    curve (see the test above), which is why this needs a mid-range value
+    to actually exercise the conversion -- 0.5 sRGB is well below 0.5
+    linear."""
+    from pycopper.theme import srgb_to_linear
+
+    def draw(canvas):
+        canvas.rect(0, 0, 10, 10, color=(0.5, 0.5, 0.5, 1.0))
+
+    app = canvas_app(draw)
+    dl = paint(app)
+    fill_color = tuple(float(v) for v in dl.view[-1]["fill"])
+    expected = float(srgb_to_linear(np.array([0.5]))[0])
+    assert fill_color[0] == pytest.approx(expected)
+    assert fill_color[0] < 0.3
+    assert fill_color[3] == 1.0
+
+
+def test_a_literal_colour_in_text_spans_is_also_converted() -> None:
+    def draw(canvas):
+        canvas.text(0, 0, "x", color=(0.5, 0.5, 0.5, 1.0))
+
+    app = canvas_app(draw)
+    dl = paint(app)
+    glyph = next(s for s in dl.view if int(s["flags"][0]) == Kind.GLYPH)
+    assert float(glyph["fill"][0]) < 0.3
 
 
 def test_circle_is_a_fully_rounded_box() -> None:

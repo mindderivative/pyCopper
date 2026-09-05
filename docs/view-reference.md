@@ -1250,9 +1250,13 @@ with `on_`. It receives one argument, a drawing context, with these methods:
 
 `color` on every method takes a palette token name (`"primary"`, themed like
 everything else) or a literal `(r, g, b, a)` tuple for data-driven colour that
-has no semantic role to name. All coordinates are logical px relative to the
-canvas's own top-left; `canvas.size` is its current laid-out size. Drawing
-outside that size is clipped.
+has no semantic role to name. A literal tuple is the ordinary sRGB value it
+looks like — `(0.2, 0.2, 0.2, 1.0)` for a dark grey, the same numbers a
+colour picker would show — pyCopper converts it to the linear RGBA the GPU
+target actually wants; a handler never has to do that conversion itself. All
+coordinates are logical px relative to the canvas's own top-left;
+`canvas.size` is its current laid-out size. Drawing outside that size is
+clipped.
 
 **The application drives its own repaints.** The handler is an opaque Python
 closure, so the framework only calls it again when this element itself

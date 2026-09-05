@@ -2636,6 +2636,26 @@ every element already has.
 ARIA has a role for exactly this shape: `Canvas` reports `img`, HTML5's own
 convention for opaque raster content with no structure of its own to expose.
 
+**A literal `color` tuple is converted from sRGB to linear before it reaches
+the display list.** Found while building `Terminal` (§5.26): the render
+target is `rgba8unorm-srgb`, which applies sRGB encoding on write, so an
+unconverted literal read back lighter than intended — verified empirically
+that `color=(0.5, 0.5, 0.5, 1.0)` produced pixel `(188, 188, 188)`, not
+`(128, 128, 128)`. The same double-encoding mistake §5.6.1 already
+documents for the palette upload path, recurring here on an application's
+own literal colour rather than a token. `CanvasContext._fill` and `.text`'s
+literal-colour branch both now route through a small `_linear()` helper
+(`theme.srgb_to_linear`, the same conversion the palette itself already
+uses) before the colour reaches `add_box`/`add_segment`/`add_arc`/
+`add_polygon`/`emit`, so a handler passes the ordinary sRGB value a colour
+picker would show and gets what it asked for — the conversion is the
+widget's problem, not the application's. `1.0`/`0.0` are fixed points of
+the sRGB curve, which is why the original literal-colour test
+(`color=(1.0, 0.0, 0.0, 1.0)`) never caught this; a second test using a
+genuine mid-range value (`0.5`) does. `test_canvas_baseline`'s hexagon
+(`color=(0.9, 0.4, 0.2, 1.0)`) rendered visibly richer after the fix and
+its golden baseline was regenerated.
+
 ### 5.22 Image — `widgets/image.py`
 
 No M3 component either — images only ever appear as content *inside* other

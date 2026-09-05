@@ -32,9 +32,12 @@ from __future__ import annotations
 
 from typing import Final
 
+import numpy as np
+
 from ..layout import Constraints, EdgeInsets, Offset, Padding, Rect, Size
 from ..paint import NO_TOKEN
 from ..spec import WidgetSpec
+from ..theme import srgb_to_linear
 from ..tree.element import PaintContext
 from .base import _StyledMixin, measure_text, paint_text
 
@@ -46,8 +49,22 @@ _TRANSPARENT: Final = (0.0, 0.0, 0.0, 0.0)
 #: A str names a palette token, resolved through `ctx.palette` so themed
 #: content re-tints on a theme switch the same way every other widget's does.
 #: A literal RGBA tuple opts out of theming -- for data-driven colour (a
-#: chart bar tinted by its value) that has no semantic role to name.
+#: chart bar tinted by its value) that has no semantic role to name. Given as
+#: the ordinary sRGB values they are meant to look like (`(0.2, 0.2, 0.2,
+#: 1.0)` for a dark grey, the same numbers a colour picker would show) --
+#: `_linear()` converts every one before it reaches the display list, which
+#: wants linear RGBA because the render target is `rgba8unorm-srgb` and
+#: encodes on write (ARCHITECTURE.md 5.6.1). Verified empirically, not
+#: assumed: an unconverted `color=(0.5, 0.5, 0.5, 1.0)` read back as pixel
+#: `(188, 188, 188)`, not `(128, 128, 128)`, before this was caught -- the
+#: same double-encoding mistake 5.6.1 already documents for the palette
+#: upload path, recurring here on an application's own literal colour.
 _Color = str | tuple[float, float, float, float]
+
+
+def _linear(color: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    r, g, b = srgb_to_linear(np.array(color[:3], dtype=np.float64))
+    return (float(r), float(g), float(b), color[3])
 
 
 class CanvasContext:
@@ -70,7 +87,7 @@ class CanvasContext:
     def _fill(self, color: _Color) -> tuple[tuple[float, float, float, float], int]:
         if isinstance(color, str):
             return _WHITE, self._ctx.palette.index(color)
-        return color, NO_TOKEN
+        return _linear(color), NO_TOKEN
 
     def line(
         self,
@@ -238,7 +255,7 @@ class CanvasContext:
             spans = None
         else:
             token = NO_TOKEN
-            spans = [(0, len(text), color)]
+            spans = [(0, len(text), _linear(color))]
         paint_text(
             self._ctx,
             self._ox + x,
