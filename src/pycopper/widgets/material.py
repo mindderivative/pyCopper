@@ -750,6 +750,32 @@ class SwitchElement(_StyledMixin, Padding):
     Position and size animate on separate curves-in-name-only (both are the
     same token) but as separate values, because they travel different
     distances and interrupting one must not disturb the other.
+
+    **Tap already worked; drag did not.** M3's own interaction table names
+    both explicitly ("Touch: Tap, Drag"; `COMPONENT_SWITCH.md`). Tap needed
+    no change: `EventDispatcher._dispatch_pointer`'s own generic rule ("a
+    click is press and release over the same element") already synthesises
+    `on_click` for any widget a view gives one to, whether or not the widget
+    class defines its own pointer methods -- confirmed directly, not assumed,
+    since it is easy to mistake "this class defines no `on_click`" for "this
+    widget cannot be clicked" (checked here specifically because that
+    mistake would have led to reimplementing, and then double-firing, a tap
+    that already worked). What was genuinely missing was recognising a real
+    drag as a *distinct* gesture: `on_pointer_down`/`_up` add exactly that,
+    without touching the tap path at all. A release still inside the track
+    is left alone -- the dispatcher's own click rule already covers it, and
+    firing again here would toggle it twice, right back to where it started
+    (this was tried and caught by testing, not spotted by inspection). Only
+    a release that lands *outside* the track -- a real drag past the far
+    edge, the same distance a physical toggle's thumb would have to travel
+    -- is decided here, from which side of the press point it ended up on,
+    and only invokes `on_click:` when that actually disagrees with the
+    current value (dragging further toward the side already showing fires
+    nothing, since the view's own `on_click:` is a blind toggle with no way
+    to say "set to left" versus "set to right"). No visual live-follow
+    during the drag is attempted -- the thumb only moves once the value
+    actually changes, the same interaction-recognition-without-full-motion
+    line `Carousel`'s snap-only physics already draws.
     """
 
     TRACK_W: Final = 52.0
@@ -770,6 +796,42 @@ class SwitchElement(_StyledMixin, Padding):
 
     def perform_layout(self, constraints: Constraints) -> Size:
         return self.sized(constraints, self.style).constrain(Size(self.TRACK_W, self.TRACK_H))
+
+    # ------------------------------------------------------------- pointer
+
+    def on_pointer_down(self, event: Any) -> None:
+        if self.effective_disabled:
+            return
+        self.state.data["switch_press_x"] = event.x
+        # Capture is what lets `on_pointer_up` see a release past the far
+        # edge of the track at all -- without it, a release outside this
+        # element's own bounds would hit-test to whatever is under the
+        # pointer instead, the same reason a drag anywhere else in this
+        # codebase (`BottomSheet`, `SideSheet`) claims capture on press.
+        event.capture()
+
+    def on_pointer_up(self, event: Any) -> None:
+        if self.effective_disabled:
+            return
+        start_x = self.state.data.pop("switch_press_x", None)
+        if start_x is None:
+            return
+        rect = self.absolute_rect()
+        if rect.x <= event.x <= rect.x + rect.width:
+            # Still over the track: `_dispatch_pointer`'s own generic click
+            # rule already fires `on_click` for this release (press and
+            # release over the same element), so this is a tap or a small
+            # in-track drag either way -- nothing further to do here.
+            return
+        # A real drag past the track's edge: which side of the press point
+        # the release ended up on decides the target, and only invoking
+        # `on_click:` when that disagrees with the current value is what
+        # keeps a blind-toggle handler correct for a drag as well as a tap.
+        target = event.x > start_x
+        if target != self.checked:
+            handler = self.handlers.get("on_click")
+            if handler is not None:
+                handler(event)
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         on = self.checked

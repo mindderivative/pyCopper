@@ -7,6 +7,7 @@ import pytest
 from pycopper import App, Signal, Theme
 from pycopper.layout import Constraints, Size
 from pycopper.paint import NO_TOKEN, DisplayList, Kind
+from pycopper.runtime.events import EventType, PointerEvent
 from pycopper.spec import SpecError, WidgetKind, parse_view
 from pycopper.widgets import build_element
 from pycopper.widgets.base import measure_text
@@ -469,6 +470,106 @@ def test_hover_does_not_trigger_layout() -> None:
     w.state.hovered = True
     w.mark_needs_paint()
     assert w.needs_paint and not w.needs_layout
+
+
+# ------------------------------------------------------------ switch drag
+
+
+def _switch_app(checked: bool = False):
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "sw",
+                "widget": "Switch",
+                "value": "{{ on.get() }}",
+                "handlers": {"on_click": "toggle"},
+            }
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    on = Signal(checked)
+    calls: list[int] = []
+
+    def toggle(event) -> None:
+        calls.append(1)
+        on.update(lambda v: not v)
+
+    app.handler(toggle)
+    app.expose(on=on)
+    app.mount()
+    app.update()
+    return app, app.root.find("sw"), on, calls
+
+
+def _tap(app, element, x: float, y: float) -> None:
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=x, y=y))
+    app.dispatcher.drain()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=x, y=y))
+    app.dispatcher.drain()
+
+
+def test_a_plain_tap_toggles_once() -> None:
+    """The dispatcher's own generic click rule already does this -- no
+    `on_click`/`on_pointer_down` method is defined on the class for it, and
+    none should be added, or a tap would fire twice (caught by testing)."""
+    app, sw, _on, calls = _switch_app(checked=False)
+    rect = sw.absolute_rect()
+    _tap(app, sw, rect.x + 10, rect.y + 16)
+    assert sw.checked is True
+    assert calls == [1]
+
+
+def test_a_drag_that_stays_on_the_track_also_toggles_exactly_once() -> None:
+    app, sw, _on, calls = _switch_app(checked=False)
+    rect = sw.absolute_rect()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=rect.x + 5, y=rect.y + 16))
+    app.dispatcher.drain()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=rect.x + 45, y=rect.y + 16))
+    app.dispatcher.drain()
+    assert sw.checked is True
+    assert calls == [1]
+
+
+def test_dragging_off_the_far_edge_commits_to_that_side() -> None:
+    """M3: "Touch: Tap, Drag" -- COMPONENT_SWITCH.md."""
+    app, sw, _on, calls = _switch_app(checked=False)
+    rect = sw.absolute_rect()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=rect.x + 5, y=rect.y + 16))
+    app.dispatcher.drain()
+    app.dispatcher.post(
+        PointerEvent(EventType.POINTER_UP, x=rect.x + rect.width + 30, y=rect.y + 16)
+    )
+    app.dispatcher.drain()
+    assert sw.checked is True
+    assert calls == [1]
+
+
+def test_dragging_toward_the_side_already_showing_is_a_no_op() -> None:
+    """A blind-toggle `on_click:` handler has no way to say "set to right"
+    -- this is what keeps a redundant drag from flipping it the wrong way."""
+    app, sw, _on, calls = _switch_app(checked=True)
+    rect = sw.absolute_rect()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=rect.x + 45, y=rect.y + 16))
+    app.dispatcher.drain()
+    app.dispatcher.post(
+        PointerEvent(EventType.POINTER_UP, x=rect.x + rect.width + 30, y=rect.y + 16)
+    )
+    app.dispatcher.drain()
+    assert sw.checked is True
+    assert calls == []
+
+
+def test_dragging_off_the_opposite_edge_commits_the_other_way() -> None:
+    app, sw, _on, calls = _switch_app(checked=True)
+    rect = sw.absolute_rect()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=rect.x + 45, y=rect.y + 16))
+    app.dispatcher.drain()
+    app.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=rect.x - 30, y=rect.y + 16))
+    app.dispatcher.drain()
+    assert sw.checked is False
+    assert calls == [1]
 
 
 # ---------------------------------------------------------- button variants

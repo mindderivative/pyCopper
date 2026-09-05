@@ -1708,7 +1708,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `Divider` | 1dp, `outline_variant` | `full_bleed` / `inset` |
 | `Checkbox` | 18dp box, 2dp radius | checkmark glyph when selected; `indeterminate:` (M3's third state) swaps it for a dash, taking precedence over `value:` for which glyph paints but not changing `value:` itself |
 | `Radio` | 20dp outer, 10dp dot | a circle is a rounded box at radius = side/2 |
-| `Switch` | 52×32dp track, 16/24dp thumb | thumb grows when selected |
+| `Switch` | 52×32dp track, 16/24dp thumb | thumb grows when selected. M3's own interaction table names both "Tap" and "Drag"; tap already worked for free (the dispatcher's own generic click rule needs no widget-specific `on_click`), but dragging past the track's far edge needed `on_pointer_down`/`_up` added to recognise it as a distinct gesture and commit to that side |
 | `Chip` | 32dp high, 8dp radius, 18dp icon | filter variant shows a leading checkmark |
 | `IconButton` | 40dp container, 24dp icon | `standard` / `filled` / `filled_tonal` / `outlined` |
 | `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3. `variant: extended` (`COMPONENT_EXTENDED_FABS.md`) is the fifth size: 56dp tall like `standard` but a dynamic width (80dp floor) fitting an icon plus a `supporting_text:` label, 16dp padding, 8dp gap between them |
