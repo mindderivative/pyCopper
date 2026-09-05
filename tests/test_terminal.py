@@ -132,15 +132,52 @@ def test_the_grid_follows_the_pixel_size() -> None:
     assert large._rows > small._rows
 
 
-def test_resizing_updates_an_attached_screens_dimensions() -> None:
+def test_resizing_an_attached_screen_is_debounced_then_applied() -> None:
+    """`_apply_grid`'s trade, mirroring `Engine._pin_surface`: an already-live
+    screen does not reflow on every intermediate size during a drag (see the
+    2026-09 resize investigation -- a reflow forces the whole grid's text to
+    re-shape, since every run's text changes), only once the target has sat
+    still for `GRID_SETTLE_SECONDS`."""
     element = terminal(width=300.0, height=150.0)
     _attach_screen(element, cols=element._cols, rows=element._rows)
     before = (element._screen.columns, element._screen.lines)
     element.layout(Constraints(0.0, 900.0, 0.0, 450.0))
+    assert (element._screen.columns, element._screen.lines) == before, "not yet, still debounced"
+    assert element._pending_grid is not None and element._pending_grid != before
+
+    element._pending_grid_since -= TerminalElement.GRID_SETTLE_SECONDS + 0.01
+    element._maybe_apply_pending_grid()
+
     after = (element._screen.columns, element._screen.lines)
     assert after != before
     assert element._screen.columns == element._cols
     assert element._screen.lines == element._rows
+    assert element._pending_grid is None
+
+
+def test_a_resize_during_the_settle_window_re_arms_it() -> None:
+    """A drag is not one clean jump from old size to new -- a second, still
+    different, target mid-window must not let the first one sneak through."""
+    element = terminal(width=300.0, height=150.0)
+    _attach_screen(element, cols=element._cols, rows=element._rows)
+    before = (element._cols, element._rows)
+
+    element.layout(Constraints(0.0, 900.0, 0.0, 450.0))
+    first_target = element._pending_grid
+    element._pending_grid_since -= TerminalElement.GRID_SETTLE_SECONDS - 0.02
+    element._maybe_apply_pending_grid()
+    assert (element._cols, element._rows) == before, "settle window not elapsed yet"
+
+    element.layout(Constraints(0.0, 700.0, 0.0, 350.0))
+    second_target = element._pending_grid
+    assert second_target != first_target, "the second target replaced the first"
+    element._maybe_apply_pending_grid()
+    assert (element._cols, element._rows) == before, "re-armed, not counting down from before"
+
+    element._pending_grid_since -= TerminalElement.GRID_SETTLE_SECONDS + 0.01
+    element._maybe_apply_pending_grid()
+    assert (element._cols, element._rows) == second_target
+    assert element._pending_grid is None
 
 
 # ------------------------------------------------------------------ command

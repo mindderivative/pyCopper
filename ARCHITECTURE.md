@@ -858,6 +858,44 @@ drawing when the drag does and would stay pinned indefinitely.
 Nothing here skips or throttles a frame. Every frame is still drawn and
 committed, which the reverted throttle above proved is not optional.
 
+**The same trailing symptom came back in 2026-09, from a different cause,
+and the fix here is not the one that removed it.** Adding `Terminal` to the
+example gallery reintroduced periodic stutter during a live resize drag —
+measured with a purpose-built per-stage instrumentation harness
+(`examples/gallery/resize_probe.py`, kept in the repo for the next time this
+needs re-diagnosing) rather than assumed from the symptom. `acquire`
+(the swapchain rebuild this section fixes) stayed at its post-fix ~0.03–0.1
+ms throughout the drag — **not a swapchain regression**. Instead, `paint`
+spiked 8–22 ms roughly every 12 px of width change, matching a monospace
+cell width to the pixel. `TerminalElement.perform_layout` reflows `pyte`'s
+buffer (`screen.resize`) every time the computed (cols, rows) changes, and a
+reflow changes exactly which characters land in which row — so the next
+paint's per-run `text_engine.layout()` calls see brand-new text the shape
+cache has never seen, forcing a full HarfBuzz re-shape of the whole visible
+grid once per column crossed. Benchmarked directly: `screen.resize()` and
+`pexpect`'s `setwinsize()` are both sub-millisecond on their own: the cost is
+entirely the forced re-shape that follows, not the reflow call itself.
+
+**Fixed the same way as the swapchain, adapted for a real difference.**
+`TerminalElement` now defers reflowing an *already-settled* grid until the
+target (cols, rows) has sat unchanged for `GRID_SETTLE_SECONDS` (0.1s) — a
+fast drag never reflows at all until it pauses. Two things make this not a
+literal copy of `_pin_surface`: the very first sizing (tracked by
+`_grid_settled_once`, not "a screen exists" — `set_ticker()` creates the
+real screen before the first `perform_layout` call an `App`-managed
+Terminal ever gets, so a screen already existing does not mean a prior grid
+to protect) applies immediately, since there is no prior content to keep
+stable against; and the countdown is wall-clock, checked from `paint_self`
+rather than `perform_layout`, because layout is not guaranteed to run again
+after a drag stops the way `draw_frame` runs every frame regardless — a
+frame-count settle counter here would get stuck forever on a window that is
+never resized again. The terminal's own `terminal_poll` heartbeat (already
+running for the cursor blink) is what guarantees a check happens soon after
+the drag ends. Verified with the same offscreen-drag technique: a 300-pixel
+continuous shrink was 0–22 ms/frame before this fix and 5.4 ms mean / 7.5 ms
+max after it, with the deferred grid confirmed to catch up correctly a few
+frames after the drag stops.
+
 `wp_viewporter` appears nowhere in wgpu-py, and `xdg_surface` geometry is not
 reachable either — `glfw.get_wayland_window` does expose the raw `wl_surface`,
 but GLFW owns the `xdg_surface` and fighting it for geometry is unnecessary now

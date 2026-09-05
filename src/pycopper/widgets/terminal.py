@@ -75,6 +75,7 @@ import os
 import shlex
 import sys
 import threading
+import time
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -306,6 +307,15 @@ class TerminalElement(_StyledMixin, Padding):
     #: property -- one more knob a v1 does not need.
     SCROLLBACK: Final = 2000
     CURSOR_BLINK_PERIOD: Final = 1.0
+    #: How long a candidate (cols, rows) must sit unchanged before an
+    #: already-live grid actually reflows to it -- the same trade
+    #: `Engine._pin_surface` makes for the swapchain (ARCHITECTURE.md
+    #: 5.8.1), applied here to the pyte reflow instead. Wall-clock, not a
+    #: frame count: `perform_layout` only runs when something actually
+    #: re-lays-out, which a static (non-resizing) window may never do again
+    #: after this fires, so the countdown cannot depend on layout being
+    #: called again. See `perform_layout`/`_maybe_apply_pending_grid`.
+    GRID_SETTLE_SECONDS: Final = 0.1
     CAPTURES_TAB = True
     CURSOR = "text"
 
@@ -317,6 +327,19 @@ class TerminalElement(_StyledMixin, Padding):
         self._stream: Any = None
         self._cols = self.DEFAULT_COLS
         self._rows = self.DEFAULT_ROWS
+        #: The debounced target and when it was last (re)armed -- see
+        #: `perform_layout`/`_maybe_apply_pending_grid`.
+        self._pending_grid: tuple[int, int] | None = None
+        self._pending_grid_since = 0.0
+        #: Whether this element has ever completed one grid sizing. NOT the
+        #: same as "a screen exists" -- `set_ticker()` creates the real
+        #: screen (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very first
+        #: `perform_layout` call ever runs, so `self._screen is not None` is
+        #: already true on that first call for any `App`-managed Terminal.
+        #: Debouncing that first sizing too would leave a freshly mounted
+        #: terminal showing the wrong grid for `GRID_SETTLE_SECONDS`, for no
+        #: benefit -- there is no prior content to protect from thrashing.
+        self._grid_settled_once = False
 
     # ------------------------------------------------------------- lifecycle
 
@@ -397,6 +420,32 @@ class TerminalElement(_StyledMixin, Padding):
         return Size(width if width > 0 else one.width, one.height)
 
     def perform_layout(self, constraints: Constraints) -> Size:
+        """Sizing is exact every frame; reflowing an already-live grid is not.
+
+        `screen.resize()` reflows `pyte`'s buffer, which changes exactly
+        which characters land in which row -- so the very next paint's
+        per-run `text_engine.layout()` calls see brand-new text the shape
+        cache has never seen, forcing a full re-shape of the whole visible
+        grid. Applying that on every (cols, rows) change during a live
+        resize drag means doing it roughly once per cell of width crossed,
+        which measured 8-22ms per occurrence against this widget's ordinary
+        ~2ms paint -- a real, confirmed stutter (see the 2026-09 resize
+        investigation). `Engine._pin_surface` already accepts the identical
+        trade for the swapchain: stay coarse while the drag is in flight,
+        catch up once it stops.
+
+        Debouncing only kicks in once a grid has already been sized once --
+        the very first sizing applies immediately, since there is no prior
+        content to keep stable against and nothing else would ever advance
+        a deferred target for a window that never resizes again. That is
+        `_grid_settled_once`, not "a screen exists": `set_ticker()` creates
+        the real screen (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very
+        first `perform_layout` call an `App`-managed Terminal ever gets, so
+        a screen is already there on that first call too. See
+        `_maybe_apply_pending_grid` for why the countdown lives there and
+        not here. The returned `size` is never debounced; only the reflow
+        of an already-settled grid is, so surrounding layout stays exact.
+        """
         outer = self.sized(constraints, self.style)
         cell = self._cell_size()
         width = (
@@ -412,17 +461,47 @@ class TerminalElement(_StyledMixin, Padding):
         size = outer.constrain(Size(width, height))
         cols = max(1, int((size.width - 2 * self.PAD_X) / cell.width))
         rows = max(1, int((size.height - 2 * self.PAD_Y) / cell.height))
-        if (cols, rows) != (self._cols, self._rows):
-            self._cols, self._rows = cols, rows
-            if self._screen is not None:
-                self._screen.resize(lines=rows, columns=cols)
-            if self._session is not None:
-                self._session.resize(cols, rows)
+        target = (cols, rows)
+        if target == (self._cols, self._rows):
+            self._pending_grid = None
+        elif not self._grid_settled_once:
+            self._apply_grid(target)
+        elif target != self._pending_grid:
+            self._pending_grid = target
+            self._pending_grid_since = time.monotonic()
         return size
+
+    def _apply_grid(self, target: tuple[int, int]) -> None:
+        cols, rows = target
+        self._cols, self._rows = cols, rows
+        if self._screen is not None:
+            self._screen.resize(lines=rows, columns=cols)
+        if self._session is not None:
+            self._session.resize(cols, rows)
+        self._pending_grid = None
+        self._grid_settled_once = True
+
+    def _maybe_apply_pending_grid(self) -> None:
+        """Catch up a deferred reflow once it has sat still long enough.
+
+        Checked from `paint_self`, not `perform_layout`: `perform_layout`
+        only runs when something actually re-lays-out, which is not
+        guaranteed to happen again once a drag stops. `paint_self` is --
+        while a session is alive, the `terminal_poll` animation below
+        guarantees a repaint roughly twice a second forever, which is what
+        lets a deferred reflow catch up even if the window is never resized
+        again after the drag that deferred it.
+        """
+        if self._pending_grid is None:
+            return
+        if time.monotonic() - self._pending_grid_since < self.GRID_SETTLE_SECONDS:
+            return
+        self._apply_grid(self._pending_grid)
 
     # ----------------------------------------------------------------- paint
 
     def paint_self(self, ctx: PaintContext, absolute: Offset) -> None:
+        self._maybe_apply_pending_grid()
         self._drain_pty()
         if self.size.is_empty:
             return
