@@ -113,11 +113,11 @@ root:
               widget: Row
               style: {height: 40, spacing: 10, width: expand, cross_alignment: center}
               children:
-                - {name: btn_filled,  widget: Button, text: "Filled",       style: {width: 100, height: 40, variant: filled}}
-                - {name: btn_tonal,   widget: Button, text: "Tonal",        style: {width: 100, height: 40, variant: filled_tonal}}
-                - {name: btn_outline, widget: Button, text: "Outlined",     style: {width: 100, height: 40, variant: outlined}}
-                - {name: btn_text,    widget: Button, text: "Text",         style: {width: 100, height: 40, variant: text}}
-                - {name: btn_elev,    widget: Button, text: "Elevated",     style: {width: 100, height: 40, variant: elevated}}
+                - {name: btn_filled,  widget: Button, text: "Filled",       style: {height: 40, variant: filled}}
+                - {name: btn_tonal,   widget: Button, text: "Tonal",        style: {height: 40, variant: filled_tonal}}
+                - {name: btn_outline, widget: Button, text: "Outlined",     style: {height: 40, variant: outlined}}
+                - {name: btn_text,    widget: Button, text: "Text",         style: {height: 40, variant: text}}
+                - {name: btn_elev,    widget: Button, text: "Elevated",     style: {height: 40, variant: elevated}}
                 - {name: gallery_link, widget: Link, text: "Documentation", style: {font_size: 16}}
 
             - name: fabs
@@ -331,27 +331,27 @@ root:
                 - name: ask_btn
                   widget: Button
                   text: "Dialog…"
-                  style: {width: 110, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: ask}
                 - name: lock_btn
                   widget: Button
                   text: "Locked…"
-                  style: {width: 110, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: lock}
                 - name: popover_btn
                   widget: Button
                   text: "Popover…"
-                  style: {width: 110, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: open_popover}
                 - name: menu_btn
                   widget: Button
                   text: "Menu…"
-                  style: {width: 110, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: open_menu}
                 - name: tooltip_btn
                   widget: Button
                   text: "Tooltip…"
-                  style: {width: 110, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: open_tooltip}
             - name: overlays_row2
               widget: Row
@@ -360,17 +360,17 @@ root:
                 - name: snackbar_btn
                   widget: Button
                   text: "Snackbar…"
-                  style: {width: 110, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: open_snackbar}
                 - name: bottom_sheet_btn
                   widget: Button
                   text: "Bottom sheet…"
-                  style: {width: 130, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: open_bottom_sheet}
                 - name: side_sheet_btn
                   widget: Button
                   text: "Side sheet…"
-                  style: {width: 130, height: 40, variant: text}
+                  style: {height: 40, variant: text}
                   handlers: {on_click: open_side_sheet}
 
             # ============================================================
