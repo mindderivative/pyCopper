@@ -272,7 +272,15 @@ class NavigationRailElement(_SelectionContainer):
     axis = Axis.VERTICAL
 
     def perform_layout(self, constraints: Constraints) -> Size:
-        inner = constraints.copy_with(min_width=self.WIDTH, max_width=self.WIDTH)
+        #: `constrain_width` is not optional here -- a layout node must
+        #: return a size its constraints permit (`layout/node.py` asserts
+        #: this). Found the hard way: squeezing a `Row` containing this
+        #: widget below 80dp raised instead of shrinking, since the old
+        #: code built `inner` from the unclamped M3 width outright. See
+        #: `_resolved_width`'s sibling docstring in `overlays.py` for the
+        #: same reasoning applied to Menu/Dialog/Popover/the sheets.
+        w = constraints.constrain_width(self.WIDTH)
+        inner = constraints.copy_with(min_width=w, max_width=w)
         return super().perform_layout(inner)
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
@@ -297,6 +305,15 @@ class NavigationDrawerElement(_SelectionContainer):
     def perform_layout(self, constraints: Constraints) -> Size:
         width = min(self.MAX_W, self.DEFAULT_W)
         w = _resolved_width(self.style, constraints, width)
+        #: `constrain_width` is not optional here -- a layout node must
+        #: return a size its constraints permit (`layout/node.py` asserts
+        #: this). `_resolved_width`'s own "no explicit width" fallback
+        #: returns the flat M3 default with no regard for how much room
+        #: was actually offered, so a `Row` squeezed narrower than 300dp
+        #: raised instead of shrinking. See `overlays.py`'s sibling
+        #: `_resolved_width` for the same reasoning applied to
+        #: Menu/Dialog/Popover/the sheets.
+        w = constraints.constrain_width(w)
         inner = constraints.copy_with(min_width=w, max_width=w)
         return super().perform_layout(inner)
 

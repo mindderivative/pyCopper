@@ -152,6 +152,24 @@ def test_drawer_width_is_within_the_m3_range() -> None:
     assert 240.0 <= e.size.width <= 360.0
 
 
+def test_drawer_shrinks_below_its_m3_minimum_rather_than_raising() -> None:
+    """A layout node must return a size its own constraints permit
+    (`layout/node.py` asserts this) -- M3's 240dp minimum is an aspiration,
+    not something a narrower parent has to honour. Real crash this session:
+    squeezing a Row containing this widget below 300dp raised instead of
+    shrinking, because the old code built its inner constraints from the
+    unclamped M3 width outright."""
+    e = laid_out({"name": "w", "widget": "NavigationDrawer", "children": RAIL}, width=143.0)
+    assert e.size.width == 143.0
+
+
+def test_rail_shrinks_below_its_fixed_width_rather_than_raising() -> None:
+    """The same crash, one widget over: `NavigationRailElement` had the
+    identical unclamped-width bug."""
+    e = laid_out({"name": "w", "widget": "NavigationRail", "children": RAIL}, width=40.0)
+    assert e.size.width == 40.0
+
+
 # ---------------------------------------------------------------- selection
 
 
