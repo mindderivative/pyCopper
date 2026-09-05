@@ -804,6 +804,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import splitbutton as sb
     from . import terminal as tm
     from . import textfield as tf
+    from . import timepicker as tp
     from . import video as vd
 
     return {
@@ -861,6 +862,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.SEARCH_BAR: se.SearchBarElement,
         WidgetKind.SPLIT_BUTTON: sb.SplitButtonElement,
         WidgetKind.DATE_PICKER: dp.DatePickerElement,
+        WidgetKind.TIME_PICKER: tp.TimePickerElement,
     }
 
 

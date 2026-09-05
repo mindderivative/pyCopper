@@ -104,6 +104,7 @@ class WidgetKind(StrEnum):
     SEARCH_BAR = "SearchBar"
     SPLIT_BUTTON = "SplitButton"
     DATE_PICKER = "DatePicker"
+    TIME_PICKER = "TimePicker"
 
 
 class SizeSpec:

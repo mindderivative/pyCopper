@@ -71,6 +71,9 @@ ROLES: Final[dict[str, str]] = {
     # ARIA convention for a calendar grid -- no M3-stated role, and no
     # dedicated ARIA "datepicker" role exists either.
     "DatePicker": "grid",
+    # No dedicated ARIA "timepicker" role either; a fieldset-like grouping of
+    # independent hour/minute/period controls is what "group" is for.
+    "TimePicker": "group",
     "Link": "link",
     # ARIA's own name for exactly this control -- no M3 page to quote a role
     # from, since SpinBox has no M3 component at all (see its docstring).

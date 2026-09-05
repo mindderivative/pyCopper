@@ -3455,6 +3455,42 @@ answer already available, cited rather than reimplemented.
 ARIA has no dedicated "datepicker" role; the grid itself uses ARIA's own
 `"grid"` role, the closest real anatomy.
 
+### 5.32 Time Picker — `widgets/timepicker.py`
+
+M3's Input variant only. The Dial variant -- dragging a clock hand around a
+256dp analog face -- is a real M3 variant but an entirely different
+interaction and paint model, deferred the same way `DatePicker`'s own Modal
+Input and Date Range were.
+
+**A plain widget, not a second overlay type**, for the same reason as
+`DatePicker`: M3 calls this a "Modal time picker", but the modality is
+`Dialog`'s job. A view places this as `Dialog`'s own child.
+
+**Stepping, not typing.** M3's own anatomy for the Input variant puts a
+keyboard caret inside each field -- the entire point of "Input" versus
+"Dial". Real digit entry needs `TextField`'s whole caret/selection/IME
+machinery for what would otherwise be a half-built text field wearing this
+widget's paint; `SpinBox` already made and stated this exact trade for the
+same reason. Each field is instead a stepper: click its top half to
+increment, its bottom half to decrement, wrapping (hour 1-12, minute 0-59)
+independently of each other -- like two separate `SpinBox`-style fields
+rather than one clock with a borrow between them, so decrementing past 12
+o'clock does not flip AM/PM on its own.
+
+**Commits immediately, with no separate OK/Cancel step** -- the same stated
+simplification `DatePicker` makes. `value:` is a 24-hour `"HH:MM"` string;
+clicking any control commits it and fires `on_change` right away.
+
+**Measurements**: the 96×72dp field containers and the 52dp period selector
+are `COMPONENT_TIME_PICKERS.md`'s own quoted Input figures. The gaps between
+elements and the 8dp field corner radius are not quoted -- the source's
+tables give component sizes, not the space between them -- and are
+pyCopper's own reasonable choice, the same kind of gap `DatePicker`'s 320dp
+width and 40dp cells already have.
+
+No dedicated ARIA "timepicker" role exists either; the widget uses `"group"`,
+the same fieldset-like grouping ARIA offers for independent adjacent controls.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -3598,7 +3634,8 @@ pyCopper/
 │           ├── slider.py        # Slider: drag/click/keyboard value picker (§5.28)
 │           ├── search.py        # SearchBar: M3 search bar (§5.29)
 │           ├── splitbutton.py   # SplitButton: primary action + menu trigger (§5.30)
-│           └── datepicker.py    # DatePicker: modal calendar month grid (§5.31)
+│           ├── datepicker.py    # DatePicker: modal calendar month grid (§5.31)
+│           └── timepicker.py    # TimePicker: hour/minute steppers + AM/PM (§5.32)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers
