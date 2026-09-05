@@ -46,6 +46,7 @@ Every node accepts these. Only `widget` is required.
 | `style` | mapping | See [Style properties](#style-properties). |
 | `text` | string | Label, or an icon name for `Icon`/`IconButton`/`Fab`/`NavItem`. |
 | `value` | string | State binding — what a control *is*. See [Bindings](#bindings). |
+| `default` | string | `PageHost`'s fallback child name when `value:` matches none. **Not templated.** Meaningless outside `PageHost`. See [Page host](#page-host). |
 | `supporting_text` | string | Second line, trailing text, or action label, per widget. |
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
@@ -809,6 +810,50 @@ taken from Ctrl+C to make room for one.
 **Not implemented**: mouse text selection and copy, underline and
 strikethrough rendering, function keys beyond F1–F4, and Windows support.
 
+## Page host
+
+`PageHost` mounts exactly one child at a time, chosen by name — the piece
+this format is missing for a single-page-application shell: a navigation
+rail switching between per-destination pages, none of which should exist
+(or, for a `Terminal` page, keep a shell process running) while some other
+page is showing. No M3 component; nothing in the reference library names
+this shape.
+
+```yaml
+- name: content
+  widget: PageHost
+  value: "{{ current_page.get() }}"   # names the active child, by `name`
+  default: home                        # shown if value: matches nothing
+  children:
+    - {name: home, widget: Column, source: pages/home_View.yaml}
+    - {name: terminal, widget: Terminal}
+```
+
+`value:` follows the exact convention `Tabs` / `NavigationRail` /
+`SegmentedButton` already use: the `name` of the active child. `default:` is
+plain, **not templated** — it names a fixed fallback page chosen at design
+time, shown whenever `value:` doesn't resolve to any declared child (unset,
+a typo, a signal not yet initialised), not something a binding should move
+around.
+
+**Every declared child is built up front**, the same eager recursion every
+other widget's children go through — but only the active one is ever
+*alive*. A hidden page never ticks an animation, never paints, and a hidden
+`Terminal` page holds no shell process, because `PageHost` exposes only the
+active child through its own `children`, and every propagating mechanism in
+the tree (`find()`, ticker/text-engine/image-atlas assignment, painting,
+`dispose()`) reaches children through exactly that.
+
+**Switching disposes the outgoing page and re-arms the incoming one.**
+Local state that isn't tied to being alive — a `SpinBox`'s number, a
+`Checkbox`'s value — survives a round trip, because the object itself is
+never rebuilt. State that *is* tied to being alive does not: a `Terminal`
+page's shell is stopped when its page goes dormant, and a fresh one starts
+if that page is visited again; a scroll position or a dragged `NodeGraph`
+node's transient state is not preserved either. This matches "loaded on
+event" literally and is the standard behaviour of page-based navigation
+elsewhere (WPF's `Frame`, for one).
+
 ## Text selection
 
 A `Text` widget with `selectable: true` can be selected with the mouse:
@@ -1071,6 +1116,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |
 | `Canvas` | No M3 component. A freeform drawing surface for an `on_paint` handler — see [Canvas](#canvas) below. |
 | `NodeGraph` + `Node` | No M3 component. A pannable surface of draggable, wired nodes — see [Node graph](#node-graph) below. |
+| `PageHost` | No M3 component. A single-active-child container, switched by name — see [Page host](#page-host) below. |
 
 A selection container carries `value:` naming the selected child by `name`.
 

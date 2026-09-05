@@ -796,6 +796,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import navigation as n
     from . import nodegraph as ng
     from . import overlays as o
+    from . import pagehost as ph
     from . import scroll as sc
     from . import terminal as tm
     from . import textfield as tf
@@ -851,6 +852,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.NODE: ng.NodeElement,
         WidgetKind.CODE_EDITOR: ce.CodeEditorElement,
         WidgetKind.TERMINAL: tm.TerminalElement,
+        WidgetKind.PAGE_HOST: ph.PageHostElement,
     }
 
 

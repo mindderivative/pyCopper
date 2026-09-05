@@ -99,6 +99,7 @@ class WidgetKind(StrEnum):
     NODE = "Node"
     CODE_EDITOR = "CodeEditor"
     TERMINAL = "Terminal"
+    PAGE_HOST = "PageHost"
 
 
 class SizeSpec:
@@ -564,6 +565,12 @@ class WidgetSpec(_Frozen):
     value: str | None = None
     #: A ListItem's second line. Content, not style, and templated like `text`.
     supporting_text: str | None = None
+    #: `PageHost`'s fallback child name, used whenever `value:` resolves to a
+    #: name that doesn't match any declared child (unset, a typo, a Signal
+    #: not yet initialised). **Not templated** -- unlike `value:`, this names
+    #: a fixed page the author chose at design time, not something a signal
+    #: should be able to move around. Meaningless outside `PageHost`.
+    default: str | None = None
     #: Whether an overlay is showing. Templated: `open: "{{ show.get() }}"`.
     #: Meaningless outside the `overlays:` list.
     open: str | None = None

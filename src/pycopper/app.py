@@ -162,7 +162,39 @@ class App:
         for element in self.root.walk_elements():
             element.bind(self._context_for(element.spec.view))
         self.overlays.bind(self.context, context_for=self._context_for)
+        self.root.set_mounter(self._mount_subtree)
         self._mounted = True
+
+    def _mount_subtree(self, subtree_root: Any) -> None:
+        """`mount()`'s own per-element work, scoped to one subtree built
+        after the initial mount -- see `ElementMixin.mounter`'s docstring for
+        why `PageHost` needs this rather than being reachable by `mount()`'s
+        own one-time walk. Re-resolves `scoped` freshly each call rather than
+        caching it from `mount()`, since a `bind_view_model` call after
+        `mount()` (not something this codebase does today, but nothing
+        forbids it) would otherwise go stale here silently. Missing handlers
+        fail loudly, the same contract `bind_handlers` already has -- a typo
+        surfaces the moment the page is first activated, not as a silent
+        no-op click.
+        """
+        scoped = {view: vm.handlers() for view, vm in self._view_models.items()}
+        missing: list[str] = []
+        for element in subtree_root.walk_elements():
+            local = scoped.get(element.spec.view or "", {})
+            handlers: dict[str, Callable[[Any], None]] = {}
+            for event_key, name in element.spec.handlers.items():
+                fn = local.get(name) or self._handlers.get(name)
+                if fn is None:
+                    label = element.spec.name or element.spec.id
+                    missing.append(f"{label}.{event_key} -> {name!r}")
+                else:
+                    handlers[event_key] = fn
+            element.handlers = handlers
+            element.bind(self._context_for(element.spec.view))
+        if missing:
+            raise SpecError(
+                "page references handlers that are not registered:\n  " + "\n  ".join(missing)
+            )
 
     # ------------------------------------------------------------ hot reload
 

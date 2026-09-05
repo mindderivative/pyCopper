@@ -135,6 +135,12 @@ ROLES: Final[dict[str, str]] = {
     "Row": "group",
     "Column": "group",
     "Stack": "group",
+    # No M3 component -- see PageHostElement's own docstring. Structurally a
+    # plain box holding one child at a time, the same shape as Container/Row/
+    # Column/Stack above, not a navigation container with a stated "not
+    # announced" role like NavigationRail/Drawer below -- so it gets the same
+    # generic "group" those get, rather than being silenced.
+    "PageHost": "group",
 }
 
 #: Kinds a screen reader should never hear about. A navigation *container's*

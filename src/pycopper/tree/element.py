@@ -226,6 +226,7 @@ class ElementMixin:
     _text_engine: TextEngine | None
     _image_atlas: ImageAtlas | None
     _ticker: Ticker | None
+    _mounter: Callable[[Any], None] | None
     _animations: dict[str, Animation]
     _hit_overflow: float
     _hit_insets: EdgeInsets | None
@@ -271,6 +272,7 @@ class ElementMixin:
         self._text_engine = None
         self._image_atlas = None
         self._ticker = None
+        self._mounter = None
         #: Named animations owned by this element. They survive `update_spec`
         #: with the rest of the runtime state, so a hot reload does not restart
         #: a transition that is mid-flight.
@@ -354,6 +356,37 @@ class ElementMixin:
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.set_ticker(ticker)
+
+    # ------------------------------------------------------------- context
+
+    @property
+    def mounter(self) -> Callable[[Any], None]:
+        """A closure over `App.mount()`'s own per-element work -- resolving
+        `{{ }}` bindings against the right view's ViewModel, and resolving
+        `handlers:` names against that view's handlers then the app's --
+        propagated the same way as `ticker`/`text_engine`/`image_atlas`.
+
+        This is the seam a widget that builds its own children well after
+        the initial mount (`PageHost`) needs: `App.mount()`'s one-time walk
+        (`root.walk_elements()`) only ever reaches elements that were already
+        attached when it ran, and `PageHost.children` deliberately exposes
+        only the active page, so a page built later is invisible to that
+        walk by construction. Calling `self.mounter(new_subtree_root)` runs
+        the identical bind-and-resolve-handlers work `App.mount()` did for
+        everything else, scoped to just the new subtree.
+
+        Defaults to a no-op rather than `None` so code that calls it
+        unconditionally never needs a None-check for the common case: never
+        inside an `App` at all (a unit test building a bare element with
+        `build_element(...)`).
+        """
+        return self._mounter if self._mounter is not None else (lambda _subtree: None)
+
+    def set_mounter(self, mounter: Callable[[Any], None]) -> None:
+        self._mounter = mounter
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.set_mounter(mounter)
 
     def animated(
         self,
