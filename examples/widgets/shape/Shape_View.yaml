@@ -1,0 +1,77 @@
+name: root
+widget: ScrollView
+style: {width: expand, height: expand}
+children:
+  - widget: Column
+    style:
+      background: surface
+      padding: 32
+      spacing: 20
+      width: expand
+      cross_alignment: stretch
+    children:
+      - name: title
+        widget: Text
+        text: "Shape"
+        style: {text_style: headline-small, color: on_surface}
+
+      - name: summary
+        widget: Text
+        text: "Not an M3 component: a regular polygon, drawn as an analytic distance field, borrowing M3's shape system rather than a spec."
+        style: {text_style: body-large, color: on_surface_variant}
+
+      - {name: div1, widget: Divider, style: {width: expand}}
+
+      - name: explanation
+        widget: Text
+        text: |
+          M3 has no shape *component*, but it does have a shape
+          *system*: "the Material shape library contains many types of
+          shapes that can all morph seamlessly into each other" -- the
+          system is what's borrowed here, not a spec table. `sides`,
+          `rotation`, and `corner_radius` are plain instance floats,
+          drawn with a shader branch rather than a rasterised path
+          specifically so a shape that morphs, spins, or scales doesn't
+          thrash the glyph atlas the way animating a cached shape would.
+
+          Use cases: a Shape is the right tool for a decorative or
+          data-driven mark that needs to change continuously at
+          runtime -- a status dot, a data-viz glyph, an icon-adjacent
+          accent -- rather than a fixed vector asset.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - {name: div2, widget: Divider, style: {width: expand}}
+
+      - name: live_heading
+        widget: Text
+        text: "Live example"
+        style: {text_style: title-medium, color: primary}
+
+      - name: live_demo
+        widget: Row
+        style: {height: 64, spacing: 16, cross_alignment: center}
+        children:
+          - {name: shape_tri, widget: Shape, style: {width: 56, height: 56, sides: 3, background: primary}}
+          - {name: shape_pent, widget: Shape, style: {width: 56, height: 56, sides: 5, background: secondary}}
+          - {name: shape_hex, widget: Shape, style: {width: 56, height: 56, sides: 6, background: tertiary}}
+          - {name: shape_circle, widget: Shape, style: {width: 56, height: 56, sides: 32, background: error}}
+
+      - {name: div3, widget: Divider, style: {width: expand}}
+
+      - name: code_heading
+        widget: Text
+        text: "Source"
+        style: {text_style: title-medium, color: primary}
+
+      - name: code_panels
+        widget: Row
+        style: {spacing: 16, width: expand, height: 260}
+        children:
+          - name: yaml_source
+            widget: CodeEditor
+            value: "{{ view_source }}"
+            style: {width: expand, height: expand, language: yaml, read_only: true}
+          - name: python_source
+            widget: CodeEditor
+            value: "{{ viewmodel_source }}"
+            style: {width: expand, height: expand, language: python, read_only: true}
