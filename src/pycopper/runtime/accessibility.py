@@ -34,6 +34,11 @@ __all__ = ["AccessibleNode", "Bridge", "accessibility_tree", "role_for"]
 ROLES: Final[dict[str, str]] = {
     # --- stated by M3
     "TextField": "textbox",  # "The role is 'textbox'"
+    # ARIA's own dedicated role for exactly this control, distinct from a
+    # plain "textbox" -- COMPONENT_SEARCH.md gives no role of its own, but
+    # ARIA's real, standard "searchbox" role is the closest anatomy and is
+    # used directly rather than approximated with "textbox".
+    "SearchBar": "searchbox",
     # No M3 component -- see CodeEditorElement's own docstring. ARIA's
     # "textbox" (with aria-multiline) is the same role a multi-line HTML
     # <textarea> reports, which is the closest real anatomy this has.

@@ -705,6 +705,38 @@ Home and End become line-relative, and End stops before the newline.
 
 Copy and paste use the system clipboard — see [The clipboard](#the-clipboard).
 
+## Search bar
+
+`SearchBar` is M3's search bar — a 56dp pill (never square, never floating a
+label) with a fixed leading search icon. Built on the same underlying
+editing model `TextField`/`CodeEditor` use, not by subclassing `TextField`
+itself, since the anatomy is different enough (always single-line, always a
+pill, no floating label) that subclassing would mean overriding nearly
+everything.
+
+```yaml
+- name: search
+  widget: SearchBar
+  value: "{{ query.get() }}"
+  supporting_text: "Search"
+  handlers: {on_change: set_query}
+```
+
+`value:` is the typed query, the same convention `TextField` uses.
+`supporting_text:` is a placeholder shown only while the field is empty and
+unfocused — M3's own "Supporting text" anatomy element, not a caption below
+the field the way `TextField`'s `supporting_text:` is. `text:` is unused for
+the query itself and instead names an optional trailing icon (M3: "A search
+bar should have one or two trailing icons"); leaving it unset means no
+trailing icon, just the leading search glyph. Width is clamped to M3's own
+360–720dp range regardless of what a view asks for.
+
+**The expanded "Search View" — a results list shown below the bar — is not
+a second widget.** It is the same shape `Menu`/`MenuItem` already solve: an
+application composes it from a `Menu` overlay anchored to the search bar's
+own `name`, opened and closed from its own state, exactly the way a
+`MenuItem` with `style.has_submenu` anchors its own submenu.
+
 ## Code editor
 
 `CodeEditor` is a multi-line, syntax-highlighted, line-numbered text editor.
@@ -1072,6 +1104,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | `Spacer` | Empty space. `width: expand` pushes siblings apart. |
 | `ScrollView` | A clipped viewport. **Must** have a bounded size on its scroll axis. |
 | `TextField` | The editable one. 56dp, `filled` or `outlined`. See [Text fields](#text-fields). |
+| `SearchBar` | M3's search bar: a 56dp pill, 360–720dp wide, a fixed leading search icon. `value:` is the typed query, `supporting_text:` a placeholder shown while empty, `text:` an optional trailing icon. See [Search bar](#search-bar). |
 | `CodeEditor` | Multi-line, line-numbered, optionally syntax-highlighted. No M3 component. See [Code editor](#code-editor). |
 | `Terminal` | A real shell, spawned and parsed internally. No M3 component. See [Terminal](#terminal). |
 

@@ -798,6 +798,7 @@ def _material_registry() -> dict[WidgetKind, type]:
     from . import overlays as o
     from . import pagehost as ph
     from . import scroll as sc
+    from . import search as se
     from . import slider as sl
     from . import terminal as tm
     from . import textfield as tf
@@ -855,6 +856,7 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.CODE_EDITOR: ce.CodeEditorElement,
         WidgetKind.TERMINAL: tm.TerminalElement,
         WidgetKind.PAGE_HOST: ph.PageHostElement,
+        WidgetKind.SEARCH_BAR: se.SearchBarElement,
     }
 
 

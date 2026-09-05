@@ -3343,6 +3343,44 @@ than approximated.
 value indicator (a label above the handle while dragging), stop indicators,
 the inset icon, and vertical orientation.
 
+### 5.29 Search — `widgets/search.py`
+
+M3's search bar, built new on the shared editing model `TextField`/
+`CodeEditor` already use rather than by subclassing `TextField` -- the same
+reasoning `CodeEditor`'s own docstring gives: `TextField`'s layout and paint
+are saturated with its own chrome (a floating label, an indicator stroke
+that thickens on focus, filled/outlined containers) a search bar has none
+of. It is always a 56dp pill with a fixed leading icon, always single-line,
+different enough anatomy that subclassing would mean overriding nearly
+every method.
+
+**Search Bar only -- the expanded "Search View" is deliberately not a
+second widget kind.** It is the same shape `Menu`/`MenuItem` already solve:
+a results list anchored to a trigger, opened and closed by the
+application's own state, composed the same way a `MenuItem` with
+`style.has_submenu` anchors its own submenu overlay. No new framework
+capability was needed for it.
+
+**Anatomy** (`COMPONENT_SEARCH.md`'s own docked-style measurement table):
+56dp height, 16dp leading/trailing padding, a full-pill radius, 360-720dp
+width clamped regardless of what a view asks for. Icon size (24dp) and
+container colour (`surface_container_high`) follow the same M3 defaults
+`IconButton`/`TextField` already use; the exact token is not in the scraped
+tokens table (an interactive image, the same gap `CircularProgress`'s own
+default diameter has). The floating bar's separate unfocused/focused
+padding values are collapsed to one fixed figure -- a stated simplification,
+not an oversight.
+
+`value:` is the typed query, `TextField`'s own convention. `supporting_text:`
+is a placeholder shown only while empty and unfocused (M3's own anatomy
+names this "Supporting text"), not a caption below the field the way
+`TextField`'s is. `text:`, unused for the query, names an optional trailing
+icon -- M3: "A search bar should have one or two trailing icons" -- unset
+means the leading search glyph alone, M3's own stated baseline.
+
+ARIA has a real, dedicated `"searchbox"` role, distinct from `TextField`'s
+plain `"textbox"`, used directly rather than approximated.
+
 ---
 
 ## 6. Frame Lifecycle
@@ -3483,7 +3521,8 @@ pyCopper/
 │           ├── codeeditor.py    # CodeEditor (§5.25)
 │           ├── terminal.py      # Terminal: real PTY spawning (§5.26)
 │           ├── pagehost.py      # PageHost: single-active-child container (§5.27)
-│           └── slider.py        # Slider: drag/click/keyboard value picker (§5.28)
+│           ├── slider.py        # Slider: drag/click/keyboard value picker (§5.28)
+│           └── search.py        # SearchBar: M3 search bar (§5.29)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers

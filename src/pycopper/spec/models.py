@@ -101,6 +101,7 @@ class WidgetKind(StrEnum):
     CODE_EDITOR = "CodeEditor"
     TERMINAL = "Terminal"
     PAGE_HOST = "PageHost"
+    SEARCH_BAR = "SearchBar"
 
 
 class SizeSpec:
