@@ -41,6 +41,11 @@ class Gallery(ViewModel):
         self.confirming = Signal(False, name="confirming")
         self.locking = Signal(False, name="locking")
 
+        # --- the navigation shell: which page PageHost shows, and whether
+        # the rail is expanded into a full drawer. ---
+        self.current_page = Signal("home", name="current_page")
+        self.nav_expanded = Signal(False, name="nav_expanded")
+
         # --- selection-container state: `value:` only *reads* a signal, so
         # every Tabs/SegmentedButton/NavigationRail/TreeView needs a click
         # handler that writes the clicked child's name back into one. ---
@@ -97,6 +102,24 @@ class Gallery(ViewModel):
         """
         self.dark.update(lambda on: not on)
         self.app.set_theme(Theme(seed=SEED, dark=self.dark.peek()))
+
+    # -------------------------------------------------------- navigation
+
+    def select_nav(self, event: Any) -> None:
+        """One handler for every rail *and* drawer destination.
+
+        The rail's and drawer's own copies of each destination are named
+        with `r_`/`d_` prefixes (see gallery_View.yaml) -- distinct from
+        each other AND from PageHost's own bare page names -- because all
+        three sets of names live in the same view file and this file has
+        one name-uniqueness requirement. Both still drive the same
+        `current_page`; stripping whichever prefix is present is what lets
+        one handler serve both without knowing which one fired.
+        """
+        self.current_page.set(event.target.name.removeprefix("r_").removeprefix("d_"))
+
+    def toggle_nav(self, event: Any) -> None:
+        self.nav_expanded.update(lambda on: not on)
 
     # ------------------------------------------------ selection containers
 

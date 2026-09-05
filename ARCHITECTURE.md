@@ -1720,8 +1720,8 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 
 | Widget | M3 spec | Notes |
 |---|---|---|
-| `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination |
-| `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem` |
+| `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination. `collapsed:` (`WidgetSpec`, not `style` — `style.width` is a load-time value, confirmed not `{{ }}`-bindable) shrinks it to 0dp; `perform_layout` clamps to it and `paint` is skipped outright rather than clipped to it, since a zero-size *clip* rect is this codebase's own sentinel for "unclipped" |
+| `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem`; same `collapsed:` mechanism as `NavigationRail` — together they are how a real application builds one collapsible rail/drawer pair (`examples/gallery`'s own nav shell) rather than animating a width |
 | `TopAppBar` | 64dp small, 112dp medium, 152dp large | medium and large collapse on scroll (§5.19) |
 | `StatusBar` | 24dp, `surface_container`, 16dp horizontal padding | no M3 component, and the phrase does not appear anywhere in M3's own vocabulary either; the docked *toolbar* is a different thing (action buttons, not information). Fixes a real gap `TopAppBar` shares: extending `Flex` directly, not `_FlexElement`, means a `Spacer` styled `width: expand` is invisible to the base `flex_of` and starves whatever comes after it — `StatusBar` overrides `flex_of` to recognise it, the same way `_FlexElement` already does for `Row`/`Column` |
 | `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
@@ -3106,6 +3106,17 @@ ARIA has no dedicated role either. `"textbox"` -- the same role `TextField`
 multi-line `<textarea>` would add -- is the closest real anatomy, used
 directly rather than invented.
 
+**`style.read_only`: selectable, not editable, for showing a real code
+sample without letting a viewer change it.** `disabled:` was the wrong
+tool -- `effective_disabled` also gates `on_pointer_down`/`on_pointer_move`,
+which would block selection entirely, not just editing. `read_only`
+(`StyleSpec`, since it is a display choice rather than a validity state the
+way `disabled`/`error` are) gates only the mutating branches of
+`on_key_down` (Tab/Enter/Backspace/Delete/paste/undo/redo, and the delete
+half of Ctrl+X) and blocks `on_text` outright, leaving caret motion,
+keyboard and mouse selection, Ctrl+A, and copy fully functional. Built for
+`examples/gallery`'s per-page code samples (§5.27).
+
 **Deliberately out of scope for this pass**: auto-closing/matching
 brackets, multi-cursor editing, code folding, a minimap, a draggable
 scrollbar thumb (wheel and keyboard scrolling both work; only the visible,
@@ -3216,6 +3227,68 @@ copy shortcut -- there is no selection to copy without one), underline and
 strikethrough rendering, function keys beyond F1-F4, true-colour-aware
 theme adaptation (the ANSI palette is fixed, not part of the M3 theme), and
 Windows support.
+
+### 5.27 Page host — `widgets/pagehost.py`
+
+No M3 component -- a pyCopper-only navigation primitive closing a real gap
+in the view format: no way to say "mount exactly one of these children,
+chosen by a signal" (`spec/include.py`'s own docstring calls the absence of
+a conditional include out deliberately). Built for a real single-page-
+application shell (`examples/gallery`'s navigation rail), not a toy: a
+`Stack` with every candidate alive and hidden would have kept every
+inactive page's animations ticking and, worse, kept an inactive `Terminal`
+page's real shell process running in the background forever.
+
+`value:` follows the exact name-of-the-selected-child convention
+`Tabs`/`NavigationRail`/`SegmentedButton` already use (§5.12) rather than
+inventing a second selection idiom; `default:` (`WidgetSpec`, deliberately
+**not** templated, unlike `value:`) names a fixed fallback page chosen at
+design time for when `value:` matches nothing.
+
+**Every declared child is built eagerly, by the ordinary `build_element`
+recursion, but only the active one is ever alive.** Construction alone has
+no side effects for any widget in the catalogue -- checked directly:
+`TerminalElement`'s PTY spawns from `set_ticker()`, never `__init__` -- so
+building every page up front costs only memory. `PageHostElement` overrides
+the public `children` property to expose only the active child; every
+mechanism that already propagates by walking `self.children`
+(`set_ticker`/`set_text_engine`/`set_image_atlas`, the generic `paint()`,
+`walk_elements()` and therefore `find()`/`dispose()`) therefore reaches only
+the active page automatically, with no changes to any of those methods. A
+dormant page never animates, never paints, and a dormant `Terminal` holds no
+shell process.
+
+**Switching disposes the outgoing page and reactivates the incoming one.**
+The object itself is never rebuilt -- state not tied to being alive (a
+`SpinBox`'s number, a `Checkbox`'s value) survives a round trip; state that
+is tied to being alive does not (`Terminal`'s shell stops and a fresh one
+starts on return, confirmed against `_ensure_started()`'s only guard being
+`self._session is not None`, which `dispose()` clears).
+
+**A new propagation mechanism, `ElementMixin.mounter`/`set_mounter`, was a
+necessary consequence of the design, not part of the original plan.**
+`App.mount()`'s own bind-and-resolve-handlers walk runs exactly once, over
+`root.walk_elements()` -- which, like everything else, sees only whichever
+page is active *at mount time*. A page built later and switched into is
+therefore structurally invisible to that one-time pass, so its own
+`{{ }}` bindings and `handlers:` would never resolve. `mounter` mirrors
+`ticker`/`text_engine`/`image_atlas` exactly (a propagated attribute with a
+no-op default, threaded down via `set_mounter`); `App._mount_subtree` is
+`mount()`'s own per-element bind-and-resolve work, extracted so `PageHost`
+can call it on just the newly active subtree.
+
+**Cost accepted deliberately**: switching away from a page and back does
+not preserve local UI state -- scroll position, a dragged `NodeGraph` node,
+an open `Terminal` session -- the new instance starts fresh. This matches
+"loaded on event" literally and is standard behaviour for page-based
+navigation elsewhere (WPF's `Frame`, for one).
+
+No M3-sourced role exists (no M3 component to source one from); ARIA
+convention has no single role for "a container that shows one of several
+things," so it is treated as a plain `"group"`, the same as `Container`/
+`Row`/`Column`/`Stack` -- not silenced the way `NavigationRail`/
+`NavigationDrawer` are, since those have a stated "role is not announced"
+in M3 itself and `PageHost` has no such statement to point to.
 
 ---
 
@@ -3355,7 +3428,8 @@ pyCopper/
 │           ├── video.py         # Video: frame-sink widget (§5.23)
 │           ├── nodegraph.py     # NodeGraph + Node (§5.24)
 │           ├── codeeditor.py    # CodeEditor (§5.25)
-│           └── terminal.py      # Terminal: real PTY spawning (§5.26)
+│           ├── terminal.py      # Terminal: real PTY spawning (§5.26)
+│           └── pagehost.py      # PageHost: single-active-child container (§5.27)
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers
@@ -3537,6 +3611,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M10** ✅ `1.4.0`–`1.5.0` | Accessibility: `runtime/accessibility.py` (the semantic tree, `1.4.0`) and `runtime/accesskit_bridge.py` (AT-SPI through AccessKit, `1.5.0`) | **Done.** 1392 tests green, and verified against a live screen reader rather than only against the tree it would be handed. Windows and macOS need their own AccessKit platform wheels and say so instead of pretending |
 | **M11** ✅ | Correctness and latency: intrinsic widget sizes locked in by golden and by assertion, the quadratic line wrap closed (§5.7.1), and the swapchain pinned during a resize (§5.8.1) | **Done.** The pointer trailing on Wayland is gone — the swapchain rebuild it came from is amortised, after the note saying that was impossible turned out to be wrong. Did not touch the view format or `__all__`, so no version moved for it |
 | **M12** ✅ `1.6.0` | The desktop widget catalogue: sixteen widgets with no M3 catalogue entry of their own — `Popover`, `Accordion`, `TreeView`/`TreeItem`, submenu support for `Menu`/`MenuItem`, `Link`, `SpinBox`, `Pagination`, `StatusBar`, `DockSplit`/`DockGroup`/`DockPanel` (§5.20), `Canvas` (§5.21), `Image` (§5.22), `Video` (§5.23), `NodeGraph`/`Node` (§5.24), `CodeEditor` (§5.25), and `Terminal` (§5.26) — plus SVG icon compilation. Two new optional extras, neither a hard dependency: `pycopper[code]` (Pygments syntax highlighting) and `pycopper[terminal]` (`pyte`/`pexpect`, POSIX only). A full-codebase review (60 subagents, four phases, `docs/CODE_REVIEW_2026-09.md`) ran alongside it | **Done.** 1917 tests collected. Genuinely cross-cutting bugs found and fixed along the way, not scoped to one widget: a `repeat=True` `Ticker` animation leak, `PaintContext` clones silently dropping `images` at nine clip sites, three hot-reload no-ops (overlays never rebuilt, `image_atlas` never threaded to them, a `watchfiles` enum-casing miss), a `Signal.set` ordering race, and literal (non-token) display-list colours being written as sRGB when the render target treats them as linear, washing out every one that was not re-derived from a palette token |
+| **M13** ✅ | A real navigation-shell redesign of `examples/gallery`: `PageHost` (§5.27, a genuine single-active-child container, not a workaround), `CodeEditor.read_only` (§5.25), and a `NavigationRail`/`NavigationDrawer` `collapsed:` field, all built for it rather than speculatively. The gallery itself became seven pages behind a collapsible rail/drawer, each with real M3-grounded documentation prose and a read-only Python code sample. Alongside it, the resize-trailing report was traced past two real-but-tangential fixes to its actual cause: `rendercanvas.glfw`'s uncoalesced per-native-event synchronous repaint, fixed by rate-limiting `RenderCanvas._on_size_change` at the class level before any canvas is constructed | **Done.** 1944 tests collected. Two things assumed from the plan and found wrong by testing rather than by reading: `style.width` cannot be `{{ }}`-bound (state fields like `disabled:`/`collapsed:` can; style fields are load-time only), and a zero-size *clip* rect is this codebase's own sentinel for "unclipped," not "clip away everything" — a collapsed rail's children needed `paint()` skipped outright, not clipped to nothing |
 
 ---
 

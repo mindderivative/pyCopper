@@ -214,6 +214,8 @@ class ElementMixin:
     _disabled: str
     _error_template: Template | None
     _error: str
+    _collapsed_template: Template | None
+    _collapsed: str
     _path_template: Template | None
     _path: str
     _cached: np.ndarray | None
@@ -250,6 +252,8 @@ class ElementMixin:
         self._disabled = spec.disabled or ""
         self._error_template = spec.error_template()
         self._error = spec.error or ""
+        self._collapsed_template = spec.collapsed_template()
+        self._collapsed = spec.collapsed or ""
         self._path_template = spec.path_template()
         self._path = spec.path or ""
         self._cached = None
@@ -306,6 +310,9 @@ class ElementMixin:
         self._error_template = spec.error_template()
         if self._error_template is None or self._error_template.is_static:
             self._error = spec.error or ""
+        self._collapsed_template = spec.collapsed_template()
+        if self._collapsed_template is None or self._collapsed_template.is_static:
+            self._collapsed = spec.collapsed or ""
         self._path_template = spec.path_template()
         if self._path_template is None or self._path_template.is_static:
             self._path = spec.path or ""
@@ -498,6 +505,12 @@ class ElementMixin:
         return self._error.strip().lower() in ("true", "1", "yes")
 
     @property
+    def collapsed(self) -> bool:
+        """Whether `NavigationRail`/`NavigationDrawer` collapses to zero
+        width. Meaningless on anything else -- only those two read it."""
+        return self._collapsed.strip().lower() in ("true", "1", "yes")
+
+    @property
     def _ancestor_disabled(self) -> bool:
         node = self.parent
         while node is not None:
@@ -596,6 +609,7 @@ class ElementMixin:
                 ("_open", self._open_template),
                 ("_disabled", self._disabled_template),
                 ("_error", self._error_template),
+                ("_collapsed", self._collapsed_template),
                 ("_path", self._path_template),
             )
             if tpl is not None and not tpl.is_static

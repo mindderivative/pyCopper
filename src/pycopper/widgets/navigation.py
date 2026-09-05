@@ -271,6 +271,23 @@ class NavigationRailElement(_SelectionContainer):
     WIDTH: Final = 80.0
     axis = Axis.VERTICAL
 
+    def paint(self, ctx: PaintContext, origin: Offset) -> None:
+        #: Needed for `collapsed:` to actually collapse anything visually --
+        #: a zero-size *clip* rect is this codebase's own sentinel for "no
+        #: clip at all" (`tree/element.py`'s `_NO_CLIP = (0, 0, 0, 0)`), so
+        #: clipping to this element's own now-zero-width rect would have
+        #: clipped to *nothing being clipped*, not to nothing being visible
+        #: -- tried first, confirmed wrong by looking at the actual pixels. A
+        #: `NavItem`'s text/icon shrink-wrap to their natural ink size
+        #: regardless of the 0-width constraint `perform_layout` gives them,
+        #: so they would otherwise paint right past this element's own rect.
+        #: Skipping the paint outright, the same way `_culled` already does
+        #: for anything off-screen, is what actually makes it disappear.
+        if self.collapsed:
+            self._skipped = True
+            return
+        super().paint(ctx, origin)
+
     def perform_layout(self, constraints: Constraints) -> Size:
         #: `constrain_width` is not optional here -- a layout node must
         #: return a size its constraints permit (`layout/node.py` asserts
@@ -279,7 +296,11 @@ class NavigationRailElement(_SelectionContainer):
         #: code built `inner` from the unclamped M3 width outright. See
         #: `_resolved_width`'s sibling docstring in `overlays.py` for the
         #: same reasoning applied to Menu/Dialog/Popover/the sheets.
-        w = constraints.constrain_width(self.WIDTH)
+        #:
+        #: `collapsed:` (WidgetSpec, not style -- `style.width` cannot be
+        #: `{{ }}`-bound) asks for exactly 0 instead, for an application
+        #: swapping a rail for a drawer as a signal flips.
+        w = constraints.constrain_width(0.0 if self.collapsed else self.WIDTH)
         inner = constraints.copy_with(min_width=w, max_width=w)
         return super().perform_layout(inner)
 
@@ -302,6 +323,16 @@ class NavigationDrawerElement(_SelectionContainer):
     MAX_W: Final = 360.0
     axis = Axis.VERTICAL
 
+    def paint(self, ctx: PaintContext, origin: Offset) -> None:
+        #: See `NavigationRailElement`'s identical override -- same reason
+        #: (a zero-size *clip* rect means "unclipped" in this codebase, not
+        #: "clip away everything"), same fix, needed by the same
+        #: `collapsed:` field.
+        if self.collapsed:
+            self._skipped = True
+            return
+        super().paint(ctx, origin)
+
     def perform_layout(self, constraints: Constraints) -> Size:
         width = min(self.MAX_W, self.DEFAULT_W)
         w = _resolved_width(self.style, constraints, width)
@@ -313,7 +344,10 @@ class NavigationDrawerElement(_SelectionContainer):
         #: raised instead of shrinking. See `overlays.py`'s sibling
         #: `_resolved_width` for the same reasoning applied to
         #: Menu/Dialog/Popover/the sheets.
-        w = constraints.constrain_width(w)
+        #:
+        #: `collapsed:` (WidgetSpec, not style -- see `NavigationRailElement`'s
+        #: own comment) overrides all of that to exactly 0.
+        w = constraints.constrain_width(0.0 if self.collapsed else w)
         inner = constraints.copy_with(min_width=w, max_width=w)
         return super().perform_layout(inner)
 

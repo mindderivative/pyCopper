@@ -89,6 +89,14 @@ def test_an_unmatched_value_falls_back_to_default() -> None:
     assert [c.name for c in host.children] == ["home"]
 
 
+def test_page_reaches_a_dormant_page_that_find_cannot_see() -> None:
+    app, _, _ = _app(page="home")
+    host = app.root.find("host")
+    assert app.root.find("other") is None, "find() must not reach a dormant page"
+    other = host.page("other")
+    assert other is not None and other.name == "other"
+
+
 def test_a_dormant_page_has_no_ticker_until_activated() -> None:
     app, page, _ = _app(page="home")
     host = app.root.find("host")

@@ -91,6 +91,19 @@ class PageHostElement(_StyledMixin, LayoutNode):
     def _find_page(self, name: str) -> Any | None:
         return next((c for c in self._children if getattr(c, "name", None) == name), None)
 
+    def page(self, name: str) -> Any | None:
+        """A built page's own root element, by name, whether or not it is
+        currently active.
+
+        `find()` cannot reach a dormant page -- `children` filters it out on
+        purpose (see the module docstring) -- but every page is still built
+        eagerly at mount time, so application code that needs to reach into
+        one before it is ever navigated to (pushing an initial `Video` frame,
+        for instance) can start its own `find()` from here instead of from
+        `app.root`.
+        """
+        return self._find_page(name)
+
     def _activate(self, name: str) -> None:
         if self._active is not None:
             self._active.dispose()

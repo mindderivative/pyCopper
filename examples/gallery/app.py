@@ -53,6 +53,25 @@ gallery = app.bind_view_model("gallery_View.yaml", Gallery())
 app.bind_view_model("parts/confirm_dialog_View.yaml", ConfirmDialog(gallery.confirming))
 app.bind_view_model("parts/locked_dialog_View.yaml", LockedDialog(gallery.locking))
 
+#: Every page and every shared nav fragment is really the same gallery,
+#: split across files for navigation, not a separate feature with its own
+#: state -- `stamp_view` gives each included file its own view id
+#: (spec/include.py), so a handler declared in gallery_ViewModel.py is only
+#: visible to nodes from files THIS ViewModel is bound to. Rebinding the same
+#: instance to each one keeps every page reading and writing the identical
+#: signals (current_page, clicks, dark, ...) rather than scattering copies.
+for _page in (
+    "pages/home_View.yaml",
+    "pages/foundations_View.yaml",
+    "pages/structure_View.yaml",
+    "pages/input_View.yaml",
+    "pages/media_View.yaml",
+    "pages/advanced_View.yaml",
+    "pages/settings_View.yaml",
+    "parts/nav_item_View.yaml",
+):
+    app.bind_view_model(_page, gallery)
+
 
 def _synthetic_video_frame() -> np.ndarray:
     """`Video` has no file to decode -- an application feeds it frames
@@ -78,8 +97,14 @@ def _synthetic_video_frame() -> np.ndarray:
 # `mount()` is idempotent and `run()`/`attach()` call it again -- doing it
 # here just makes `app.root.find(...)` available so the composition root can
 # push a frame before the window ever opens.
+#
+# `video_demo` lives on the "media" page, which is not the one PageHost shows
+# first (that's "home") -- `find()` only reaches the currently active page,
+# so this goes through `content`'s own `page()` instead, which reaches any
+# page's built subtree regardless of activation (every page is built eagerly
+# at mount time; only *aliveness* -- a ticker, a live PTY -- is gated).
 app.mount()
-app.root.find("video_demo").push_frame(_synthetic_video_frame())
+app.root.find("content").page("media").find("video_demo").push_frame(_synthetic_video_frame())
 
 if __name__ == "__main__":
     app.run()

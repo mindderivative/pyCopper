@@ -170,6 +170,66 @@ def test_rail_shrinks_below_its_fixed_width_rather_than_raising() -> None:
     assert e.size.width == 40.0
 
 
+# ----------------------------------------------------------------- collapsed
+
+
+def test_a_collapsed_rail_is_zero_wide() -> None:
+    """`collapsed:` is what a real app swaps a rail for a drawer with --
+    `style.width` cannot be bound, so this is a WidgetSpec field, not style."""
+    e = laid_out({"name": "w", "widget": "NavigationRail", "collapsed": "true", "children": RAIL})
+    assert e.size.width == 0.0
+
+
+def test_a_collapsed_drawer_is_zero_wide() -> None:
+    e = laid_out({"name": "w", "widget": "NavigationDrawer", "collapsed": "true", "children": RAIL})
+    assert e.size.width == 0.0
+
+
+def test_collapsed_is_bindable() -> None:
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {
+                "name": "c",
+                "widget": "NavigationRail",
+                "collapsed": "{{ hide.get() }}",
+                "children": RAIL,
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    hide = Signal(False)
+    a.expose(hide=hide)
+    a.mount()
+    a.update()
+    assert a.root.find("c").size.width == 80.0
+    hide.set(True)
+    a.update()
+    assert a.root.find("c").size.width == 0.0
+
+
+@pytest.mark.parametrize("widget", ["NavigationRail", "NavigationDrawer"])
+def test_a_collapsed_rail_or_drawer_paints_nothing(widget: str) -> None:
+    """The actual point of `collapsed:`, proven at the pixel level, not just
+    the layout level: a zero-size *clip* rect is this codebase's own
+    sentinel for "no clip" (`tree/element.py`'s `_NO_CLIP`), so clipping a
+    collapsed rail/drawer to its own now-zero-width rect would clip to
+    *nothing being clipped* -- a real mistake made and caught in this
+    session. Skipping the paint outright is what actually removes it."""
+    view = {
+        "name": "root",
+        "widget": "Column",
+        "children": [
+            {"name": "c", "widget": widget, "value": "r1", "collapsed": "true", "children": RAIL}
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    a.mount()
+    a.update()
+    assert paint(a).view.shape[0] == 0
+
+
 # ---------------------------------------------------------------- selection
 
 

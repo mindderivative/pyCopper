@@ -7,6 +7,8 @@ committed; see conftest.py for how to regenerate them.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -219,38 +221,74 @@ def test_light_theme_baseline(render_scene, assert_golden) -> None:
     assert_golden("light_theme", np.asarray(engine.canvas.draw()))
 
 
-def test_gallery_baseline(render_scene, assert_golden) -> None:
-    """The full gallery example -- every widget kind in one frame.
-
-    This is the corpus test: it exercises Container, Row, Column, Stack, Text,
-    Button and Spacer together, so a regression anywhere in the four-tree
-    pipeline shows up here.
-    """
+def _import_gallery_app() -> Any:
+    """Import `examples/gallery/app.py` as a module, restoring `sys.path`."""
     import sys
     from pathlib import Path
-
-    import pyte
 
     gallery = Path(__file__).resolve().parents[2] / "examples" / "gallery"
     sys.path.insert(0, str(gallery))
     try:
         import app as demo
+
+        return demo
     finally:
         sys.path.remove(str(gallery))
 
-    # Constructing `demo.app` above already started a real PTY session for
-    # the gallery's Terminal section -- `App.__init__` calls `set_ticker()`
-    # unconditionally, which is the hook `TerminalElement` uses to lazily
-    # spawn its shell (see `test_terminal_baseline`). Left running, that is a
-    # leaked subprocess and non-deterministic terminal content in every test
-    # run that imports this module. Stop it and swap in an always-alive
-    # stand-in before the first real layout pass -- unlike
-    # `test_terminal_baseline`'s fixed-size view, the gallery's Terminal
-    # section sits in a flexible ScrollView layout, so its (cols, rows) is
-    # not known until `attach()` below actually lays it out, and only then
-    # is it safe to size the directly-fed `pyte` screen that test's own
-    # golden baseline uses.
+
+def test_gallery_baseline(render_scene, assert_golden) -> None:
+    """The gallery's default shell: Home page active, rail collapsed.
+
+    A `PageHost`-driven shell shows one page at a time by design, so no
+    single frame exercises every widget kind the way the old one-scroll
+    gallery did -- that breadth now lives in each widget's own unit tests
+    and in `test_gallery_advanced_page_baseline` below for the one page
+    (Terminal) that needs a real running `App` to render deterministically.
+    This is still the corpus test for the shell itself: Container, Row,
+    Column, Stack, Text, Button, Spacer, PageHost, and the nav rail together,
+    so a regression anywhere in the four-tree pipeline shows up here.
+    """
+    demo = _import_gallery_app()
+
+    _, engine = render_scene(
+        lambda dl: None, width=900, height=820, theme=Theme(seed=SEED, dark=True)
+    )
+    demo.app.attach(engine)
+
+    demo.gallery.clicks.set(3)
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("gallery", np.asarray(engine.canvas.draw()))
+
+
+def test_gallery_advanced_page_baseline(render_scene, assert_golden) -> None:
+    """The Advanced page: NodeGraph, CodeEditor, and a real Terminal.
+
+    Terminal only spawns its shell once its page is actually active
+    (`PageHost`'s whole reason for existing -- see `pagehost.py`), so unlike
+    the old single-scroll gallery this needs an explicit navigation before
+    the swapped-in `pyte` stand-in below has anything to attach to.
+    """
+    import pyte
+
+    demo = _import_gallery_app()
+    demo.gallery.current_page.set("advanced")
+
+    _, engine = render_scene(
+        lambda dl: None, width=900, height=820, theme=Theme(seed=SEED, dark=True)
+    )
+    demo.app.attach(engine)
+    # `attach()` does not itself lay anything out -- that happens on the next
+    # `draw_frame` -- so force one now, or `find("terminal_demo")` below would
+    # still see whatever page was active before `current_page` changed.
+    demo.app.update()
+
+    # The `update()` above already laid the page out for real, so
+    # `terminal_demo` has a genuine live PTY session by now -- stop it and
+    # swap in an always-alive stand-in before painting, the same determinism
+    # fix `test_terminal_baseline` uses, needed here because `(cols, rows)`
+    # isn't known until this page's own flexible layout actually ran.
     term = demo.app.root.find("terminal_demo")
+    assert term is not None, "the advanced page must be the one PageHost is showing"
     if term._session is not None:
         term._session.stop()
 
@@ -264,20 +302,13 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
             pass
 
     term._session = _AlwaysAlive()
-
-    _, engine = render_scene(
-        lambda dl: None, width=900, height=820, theme=Theme(seed=SEED, dark=True)
-    )
-    demo.app.attach(engine)
-
     term._screen = pyte.HistoryScreen(term._cols, term._rows, history=200)
     term._stream = pyte.ByteStream(term._screen)
     term._feed(b"$ \x1b[32mgit status\x1b[0m\r\n")
     term._feed(b"\x1b[41mon branch main\x1b[0m\r\n")
 
-    demo.gallery.clicks.set(3)
     engine.canvas.request_draw(engine.draw_frame)
-    assert_golden("gallery", np.asarray(engine.canvas.draw()))
+    assert_golden("gallery_advanced", np.asarray(engine.canvas.draw()))
 
 
 def test_icons_baseline(render_scene, assert_golden) -> None:

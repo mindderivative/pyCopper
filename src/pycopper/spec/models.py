@@ -592,6 +592,13 @@ class WidgetSpec(_Frozen):
     #: colours and a view should be able to drive it from validation rather
     #: than restyle it. Only `TextField` reads it.
     error: str | None = None
+    #: Whether `NavigationRail`/`NavigationDrawer` collapses to zero width.
+    #: Templated like `disabled:`, for the same reason it lives here rather
+    #: than on `StyleSpec`: `style.width` is a load-time value (confirmed by
+    #: trying it), not something a `{{ }}` binding can drive, so swapping a
+    #: rail for a drawer as a signal flips needs a **state** field, not a
+    #: style one. Meaningless on anything else.
+    collapsed: str | None = None
     #: An `Image`'s file to decode and display. Templated like `value:`, so
     #: `path: "{{ avatar.get() }}"` swaps the picture when a signal changes.
     #: **Not** `source:` -- that key is already view-*composition* syntax
@@ -639,6 +646,9 @@ class WidgetSpec(_Frozen):
 
     def error_template(self) -> Template | None:
         return Template(self.error) if self.error is not None else None
+
+    def collapsed_template(self) -> Template | None:
+        return Template(self.collapsed) if self.collapsed is not None else None
 
     def supporting_template(self) -> Template | None:
         return Template(self.supporting_text) if self.supporting_text is not None else None
