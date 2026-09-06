@@ -209,7 +209,20 @@ class Face:
         zero-filled array -- the atlas must not allocate space for them.
         """
         self._activate(px, subpixel, coords)
-        self._ft.load_glyph(gid, freetype.FT_LOAD_RENDER)
+        # FT_LOAD_NO_HINTING: default (hinted) rendering grid-fits a glyph's
+        # own outline to the pixel grid before rasterising it, which for a
+        # curve tangent to the baseline -- `d`/`p`/`g`'s rounded bowl bottom
+        # -- snaps away the last, faint row of real antialiasing coverage
+        # and visibly flattens the curve itself, worse the smaller the size
+        # (confirmed directly: at 14/24/32px, FT_LOAD_NO_HINTING recovers
+        # one additional row of genuine, non-noise coverage at every size,
+        # and a live side-by-side render of "d" showed the hinted bowl
+        # measurably flatter than the unhinted one at the same size).
+        # pyCopper lays out and positions text in fractional logical units
+        # already (ARCHITECTURE.md 7), never snapping to the pixel grid
+        # elsewhere, so grid-fitting individual glyphs here fights the rest
+        # of the pipeline rather than complementing it.
+        self._ft.load_glyph(gid, freetype.FT_LOAD_RENDER | freetype.FT_LOAD_NO_HINTING)
         slot = self._ft.glyph
         bitmap = slot.bitmap
         if bitmap.rows == 0 or bitmap.width == 0:
