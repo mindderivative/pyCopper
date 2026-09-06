@@ -415,6 +415,85 @@ def test_list_item_renders_both_lines() -> None:
     assert two.size.height > one.size.height
 
 
+def _list_item_with_icon(**spec):
+    return laid_out(
+        {
+            "name": "w",
+            "widget": "ListItem",
+            "text": "Item",
+            "children": [{"widget": "Icon", "text": "inbox", "style": {"icon_size": 24}}],
+            **spec,
+        }
+    )
+
+
+def test_a_leading_icon_is_actually_laid_out() -> None:
+    """`ListItemElement` fully overrides `Padding.perform_layout`, the only
+    thing that would otherwise lay out and offset a single child -- a
+    leading icon was never laid out at all, staying at its default zero
+    size and (0, 0) offset regardless of the row's own height. Found live
+    via a real render: the icon painted pinned to the row's exact top-left
+    corner in every variant, visibly misaligned with the (correctly
+    centred) headline text next to it."""
+    e = _list_item_with_icon()
+    icon = e.child
+    assert icon.size.width == 24.0
+    assert icon.size.height == 24.0
+    assert icon.offset.x == e.PAD_X
+
+
+@pytest.mark.parametrize(
+    ("spec", "expected_top"),
+    [
+        ({}, 8.0),
+        ({"supporting_text": "Sub"}, 8.0),
+        ({"style": {"variant": "three_line"}}, 12.0),
+    ],
+)
+def test_a_leading_icon_is_top_aligned_with_the_right_padding(spec, expected_top) -> None:
+    """ "Leading icon top padding: 8dp; ...when height is 88dp or taller:
+    12dp" (COMPONENT_LISTS.md) -- a leading icon is always top-aligned,
+    unlike a generic leading element (e.g. an avatar), which centres below
+    88dp."""
+    e = _list_item_with_icon(**spec)
+    assert e.child.offset.y == expected_top
+
+
+def test_the_label_clears_a_leading_icon() -> None:
+    """The label used to start at a fixed PAD_X regardless of a leading
+    icon's presence, overlapping it (icon spans [PAD_X, PAD_X+24], well past
+    where the label started). ICON_GAP lands the label at PAD_X + 24 + 16 =
+    56 -- the same inset this widget's own demo already uses for its
+    Dividers, chosen to align under the label rather than the icon."""
+    view = {
+        "name": "root",
+        "widget": "Vertical",
+        "style": {"background": "surface", "width": "expand"},
+        "children": [
+            {
+                "name": "li",
+                "widget": "ListItem",
+                "text": "Item",
+                "children": [{"widget": "Icon", "text": "inbox", "style": {"icon_size": 24}}],
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    a.mount()
+    a.update()
+    dl = paint(a)
+    item = a.root.find("li")
+    # Excludes the icon's own glyph(s), which paint somewhere inside its
+    # [PAD_X, PAD_X + 24] box -- only the label glyphs are expected past it.
+    label_glyphs = [
+        s
+        for s in dl.view
+        if int(s["flags"][0]) == Kind.GLYPH and float(s["rect"][0]) >= item.PAD_X + 24.0
+    ]
+    assert label_glyphs, "the label should have painted glyphs past the icon"
+    assert min(float(s["rect"][0]) for s in label_glyphs) >= item.PAD_X + 24.0 + item.ICON_GAP
+
+
 def test_supporting_text_is_bindable() -> None:
     view = {
         "name": "root",

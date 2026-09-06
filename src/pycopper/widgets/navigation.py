@@ -896,6 +896,17 @@ class ListItemElement(_StyledMixin, Padding):
     PAD_X: Final = 16.0
     HEADLINE: Final = 16.0
     SUPPORTING: Final = 14.0
+    #: "Leading icon top padding: 8dp; ...when height is 88dp or taller: 12dp"
+    #: -- a leading icon is always TOP-aligned (unlike a generic leading
+    #: element, e.g. an avatar, which centres below 88dp), so this is the
+    #: only vertical adjustment it ever needs.
+    ICON_TOP: Final = 8.0
+    ICON_TOP_TALL: Final = 12.0
+    #: Not itself an M3-quoted figure, but self-consistent with one: 16dp
+    #: icon left padding + a 24dp icon + this gap lands the label at x=56,
+    #: matching the inset: 56 this demo's own Dividers already use to align
+    #: under the label rather than the icon.
+    ICON_GAP: Final = 16.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -910,7 +921,16 @@ class ListItemElement(_StyledMixin, Padding):
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
         width = outer.max_width if outer.has_bounded_width else 320.0
-        return outer.constrain(Size(width, self._height()))
+        height = self._height()
+        if self.child is not None:
+            # `Padding`'s own perform_layout (which would otherwise lay out
+            # and offset a single child) is fully overridden here, so the
+            # leading icon has to be laid out and positioned explicitly --
+            # left unfixed, it never gets a real size or offset at all.
+            self.child.layout(Constraints(0.0, INF, 0.0, INF))
+            top = self.ICON_TOP_TALL if height >= 88.0 else self.ICON_TOP
+            self.child.offset = Offset(self.PAD_X, top)
+        return outer.constrain(Size(width, height))
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         style = self.style
@@ -930,6 +950,8 @@ class ListItemElement(_StyledMixin, Padding):
 
         second = (self._supporting).strip()
         x = absolute.x + self.PAD_X
+        if self.child is not None:
+            x += self.child.size.width + self.ICON_GAP
         if second:
             top = measure_text(self._text, self.HEADLINE, engine=self.text_engine)
             bottom = measure_text(second, self.SUPPORTING, engine=self.text_engine)
