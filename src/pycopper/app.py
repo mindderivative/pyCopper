@@ -471,6 +471,28 @@ class App:
             if close is not None:
                 close()
 
+    def close(self) -> None:
+        """Request a graceful shutdown -- safe to wire to a Quit button, an
+        Escape handler, or call from any code holding this App, including
+        from inside a click handler.
+
+        Delegates to `Engine.request_close()`, which only flags the request
+        and schedules a frame rather than closing the canvas on the spot --
+        see that method's docstring for why closing synchronously from a
+        handler segfaults the process. The actual close happens from
+        `Engine.draw_frame()` on a later, safe call, which is what makes
+        rendercanvas's loop notice every canvas is closed and let the
+        blocking `loop.run()` inside `Engine.run()` return; from there
+        `Engine.run()`'s own `finally` releases GPU resources in the order
+        the surface requires, and `run()` above returns normally -- the same
+        graceful path a real window-close event already takes.
+
+        A no-op before `run()` has attached an `Engine` -- there is nothing
+        to close yet.
+        """
+        if self.engine is not None:
+            self.engine.request_close()
+
 
 def run(app: App) -> None:
     """Run *app* until its window closes."""

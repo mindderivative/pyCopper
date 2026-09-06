@@ -162,6 +162,7 @@ class Engine:
 
         self._frame_count = 0
         self._instance_count = 0
+        self._close_requested = False
 
         #: Configures the swapchain. Public wgpu-py API ("External code needs
         #: to set the framebuffer size"), reached through rendercanvas's
@@ -321,6 +322,25 @@ class Engine:
         if target != tuple(self.context._wgpu_context.physical_size):
             self._set_surface_size(*target)
 
+    def request_close(self) -> None:
+        """Ask for a graceful shutdown from anywhere, including a click handler.
+
+        Only sets a flag and schedules a frame -- it must NOT close the
+        canvas synchronously. A click handler runs from deep inside
+        rendercanvas's own event-dispatch call stack, and destroying the
+        GLFW window (freeing the native handle the wgpu surface is bound
+        to) while that stack is still live segfaults the process outright
+        (confirmed: exit code 139, not a clean exit). GLFW's own native
+        close button avoids the exact same trap the exact same way -- its
+        callback only sets a "should close" flag; the actual
+        `glfw.destroy_window()` happens later, from the polling loop, once
+        that stack has already unwound. `draw_frame()` below is this
+        engine's equivalent safe point: reached fresh from the scheduler on
+        a later iteration, never nested inside a handler's own call.
+        """
+        self._close_requested = True
+        self.request_draw()
+
     def draw_frame(self) -> None:
         """One frame. Steps 6-9 of ARCHITECTURE.md 6; 1-5 arrive in M3.
 
@@ -331,6 +351,9 @@ class Engine:
         Measured on KDE Plasma, a throttle that skipped frames dropped a live
         resize from 466 redraws a second to 12 -- see ARCHITECTURE.md 5.8.1.
         """
+        if self._close_requested:
+            self.canvas.close()
+            return
         self._pin_surface()
         self.display_list.clear()
         if self.painter is not None:

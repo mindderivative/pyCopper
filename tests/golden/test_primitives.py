@@ -78,6 +78,20 @@ def test_each_corner_radius_is_independent(render_scene) -> None:
     assert frame[76, 23, 0] > 200, "bottom-left should be square"
 
 
+def test_an_oversized_corner_radius_clamps_to_a_pill_not_nothing(render_scene) -> None:
+    """`sd_rounded_box`'s formula assumes radius never exceeds the box's own
+    half-extent -- a caller passing a larger one (found live via the
+    Container widget demo's corner_radius: 999 stress-test step) made it
+    return a large positive ("fully outside") distance even at dead centre,
+    so the whole box vanished instead of clamping to a circle/stadium."""
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_box(20, 20, 60, 60, color=RED, radii=(999, 999, 999, 999))
+
+    frame, _ = render_scene(paint)
+    assert frame[50, 50, 0] > 200, "an oversized radius must not erase the box"
+
+
 def test_antialiasing_produces_intermediate_coverage(render_scene) -> None:
     """The whole point of an SDF: coverage is analytic, so edges are smooth
     without MSAA. A hard-edged rasteriser would give only 0 and 255 here."""
