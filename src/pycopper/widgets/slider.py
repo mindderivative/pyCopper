@@ -71,10 +71,14 @@ class SliderElement(_StyledMixin, Padding):
     """M3 Slider, Standard variant, XS size. See the module docstring."""
 
     TRACK_HEIGHT: Final = 16.0
-    TRACK_RADIUS: Final = 8.0
     HANDLE_WIDTH: Final = 4.0
     HANDLE_HEIGHT: Final = 44.0
     HANDLE_RADIUS: Final = 2.0
+    #: M2's circular handle, opt-in via `style.handle_shape: circle`. Not a
+    #: scraped M3 figure -- the current spec documents only the line handle
+    #: that replaced it, so this is a reasoned approximation of M2's own
+    #: historical thumb size, not sourced from `COMPONENT_SLIDERS.md`.
+    HANDLE_CIRCLE_DIAMETER: Final = 20.0
     #: The halo a hover/press/focus state layer draws around the handle --
     #: not an M3-quoted figure (the state-layer table gives opacities, not a
     #: size), chosen generously enough to read as a real affordance without
@@ -178,34 +182,79 @@ class SliderElement(_StyledMixin, Padding):
 
     # --------------------------------------------------------------- paint
 
+    def _handle_half_extent(self) -> float:
+        """Half the current handle shape's own width, line or circle."""
+        if self.style.handle_shape == "circle":
+            return self.HANDLE_CIRCLE_DIAMETER / 2
+        return self.HANDLE_WIDTH / 2
+
+    def _track_segment(
+        self,
+        ctx: PaintContext,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        token: int,
+        radii: tuple[float, float, float, float],
+    ) -> None:
+        """Like `_box`, but with independent per-corner radii -- `_box`
+        itself only takes one radius applied to all four corners, which
+        can't express the cradle/outer asymmetry each track segment needs.
+        """
+        dpr = ctx.pixel_ratio
+        ctx.display_list.add_box(
+            x * dpr,
+            y * dpr,
+            w * dpr,
+            h * dpr,
+            token=token,
+            color=(1.0, 1.0, 1.0, 1.0),
+            radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+        )
+
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         style = self.style
         active = ctx.palette.index(style.background or "primary")
         inactive = ctx.palette.index("secondary_container")
         track_y = absolute.y + (self.size.height - self.TRACK_HEIGHT) / 2
         handle_x = absolute.x + self._handle_x()
+        handle_center = handle_x + self.HANDLE_WIDTH / 2
+        clearance = self._handle_half_extent() + style.cradle_gap
 
-        # Inactive track first, full width, so the active segment painted
-        # over it never has to account for what it's covering.
-        _box(
-            ctx,
-            absolute.x,
-            track_y,
-            self.size.width,
-            self.TRACK_HEIGHT,
-            token=inactive,
-            radius=self.TRACK_RADIUS,
-        )
-        active_width = handle_x + self.HANDLE_WIDTH / 2 - absolute.x
+        # Active and inactive are two independently-sized segments, each
+        # stopping short of the handle by `clearance` -- not a full-width
+        # inactive track with the active colour painted over it, which left
+        # the accent colour touching the handle with no gap at all, unlike
+        # a real M3 slider.
+        cradle = style.cradle_radius
+        outer = style.track_radius
+
+        inactive_start = handle_center + clearance
+        inactive_width = absolute.x + self.size.width - inactive_start
+        if inactive_width > 0.0:
+            # Left corners face the handle (cradle), right corners are the
+            # segment's own outer end.
+            self._track_segment(
+                ctx,
+                inactive_start,
+                track_y,
+                inactive_width,
+                self.TRACK_HEIGHT,
+                inactive,
+                (cradle, outer, outer, cradle),
+            )
+        active_width = handle_center - clearance - absolute.x
         if active_width > 0.0:
-            _box(
+            # Left corners are the outer end, right corners face the handle.
+            self._track_segment(
                 ctx,
                 absolute.x,
                 track_y,
                 active_width,
                 self.TRACK_HEIGHT,
-                token=active,
-                radius=self.TRACK_RADIUS,
+                active,
+                (outer, cradle, cradle, outer),
             )
 
         alpha = _state_alpha(self)
@@ -222,12 +271,24 @@ class SliderElement(_StyledMixin, Padding):
                 alpha=alpha,
             )
 
-        _box(
-            ctx,
-            handle_x,
-            absolute.y + (self.size.height - self.HANDLE_HEIGHT) / 2,
-            self.HANDLE_WIDTH,
-            self.HANDLE_HEIGHT,
-            token=active,
-            radius=self.HANDLE_RADIUS,
-        )
+        if style.handle_shape == "circle":
+            diameter = self.HANDLE_CIRCLE_DIAMETER
+            _box(
+                ctx,
+                handle_x + self.HANDLE_WIDTH / 2 - diameter / 2,
+                absolute.y + (self.size.height - diameter) / 2,
+                diameter,
+                diameter,
+                token=active,
+                radius=diameter / 2,
+            )
+        else:
+            _box(
+                ctx,
+                handle_x,
+                absolute.y + (self.size.height - self.HANDLE_HEIGHT) / 2,
+                self.HANDLE_WIDTH,
+                self.HANDLE_HEIGHT,
+                token=active,
+                radius=self.HANDLE_RADIUS,
+            )

@@ -1545,6 +1545,10 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
 | `multi_select` | `SegmentedButton` — M3's multi-select form (default off, single-select). On, `value:` is a comma-separated set of selected names instead of one |
 | `min`, `max`, `step` | `SpinBox`/`Slider` — bounds and increment; `min`/`max` default to unbounded for `SpinBox`, 0.0/1.0 for `Slider` |
+| `handle_shape` | `Slider` — `line` (default, current M3: a narrow vertical bar) or `circle` (an opt-in back to M2's round handle) |
+| `cradle_gap` | `Slider` — gap between the handle and each track segment, logical px (default 6) |
+| `cradle_radius` | `Slider` — corner radius on each track segment's handle-facing end, more square than `track_radius` (default 2) |
+| `track_radius` | `Slider` — corner radius on each track segment's outer end (default 8, `COMPONENT_SLIDERS.md`'s XS-size figure) |
 | `count` | `Pagination` — total number of pages |
 | `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |
 | `x`, `y` | `Node` — initial world position in its `NodeGraph`; see [Node graph](#node-graph) |

@@ -236,3 +236,89 @@ def test_the_handle_is_drawn_taller_than_the_track() -> None:
     heights = {round(float(s["rect"][3]), 3) for s in dl.view if s["flags"][0] == Kind.BOX}
     assert round(SliderElement.HANDLE_HEIGHT, 3) in heights
     assert round(SliderElement.TRACK_HEIGHT, 3) in heights
+
+
+# ------------------------------------------------------------ style opt-ins
+
+
+def test_default_cradle_and_track_style_values() -> None:
+    e = slider()
+    assert e.style.handle_shape == "line"
+    assert e.style.cradle_gap == 6.0
+    assert e.style.cradle_radius == 2.0
+    assert e.style.track_radius == 8.0
+
+
+def test_a_gap_separates_the_track_from_the_handle() -> None:
+    """The accent colour must not touch the handle -- both segments stop
+    short of it by `handle_half_extent + cradle_gap`, not a full-width
+    inactive track with the active colour painted over it."""
+    e = slider(value="50", style={"min": 0, "max": 100, "cradle_gap": 10.0})
+    dl = painted(e)
+    rect = e.absolute_rect()
+    handle_center = rect.x + 0.5 * (e.size.width - e.HANDLE_WIDTH) + e.HANDLE_WIDTH / 2
+    clearance = e.HANDLE_WIDTH / 2 + 10.0
+
+    tracks = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX
+        and round(float(s["rect"][3]), 3) == round(SliderElement.TRACK_HEIGHT, 3)
+    ]
+    assert len(tracks) == 2
+    for s in tracks:
+        token = int(s["flags"][2])
+        x, w = float(s["rect"][0]), float(s["rect"][2])
+        if token == PAL.index("primary"):
+            assert x + w <= handle_center - clearance + 1e-3
+        else:
+            assert token == PAL.index("secondary_container")
+            assert x >= handle_center + clearance - 1e-3
+
+
+def test_track_segments_are_square_near_the_handle_and_rounded_at_the_outer_end() -> None:
+    """Asymmetric per-corner rounding: `cradle_radius` faces the handle,
+    `track_radius` is the segment's own outer end -- consistent between the
+    active and inactive segments, different from each other."""
+    e = slider(value="50", style={"min": 0, "max": 100, "cradle_radius": 3.0, "track_radius": 9.0})
+    dl = painted(e)
+    tracks = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX
+        and round(float(s["rect"][3]), 3) == round(SliderElement.TRACK_HEIGHT, 3)
+    ]
+    assert len(tracks) == 2
+    for s in tracks:
+        token = int(s["flags"][2])
+        tl, tr, br, bl = (float(v) for v in s["radii"])
+        if token == PAL.index("primary"):
+            # Active: outer end is on the left, cradle (handle-facing) end
+            # is on the right.
+            assert (tl, bl) == (9.0, 9.0)
+            assert (tr, br) == (3.0, 3.0)
+        else:
+            assert token == PAL.index("secondary_container")
+            # Inactive: cradle end is on the left, outer end is on the right.
+            assert (tl, bl) == (3.0, 3.0)
+            assert (tr, br) == (9.0, 9.0)
+
+
+def test_handle_shape_circle_paints_a_round_handle_instead_of_the_line() -> None:
+    """M2's superseded circular thumb, opt-in via `style.handle_shape`."""
+    e = slider(value="50", style={"min": 0, "max": 100, "handle_shape": "circle"})
+    dl = painted(e)
+    diameter = SliderElement.HANDLE_CIRCLE_DIAMETER
+
+    circles = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX
+        and round(float(s["rect"][2]), 3) == round(diameter, 3)
+        and round(float(s["rect"][3]), 3) == round(diameter, 3)
+    ]
+    assert len(circles) == 1
+    assert tuple(float(v) for v in circles[0]["radii"]) == (diameter / 2,) * 4
+
+    heights = {round(float(s["rect"][3]), 3) for s in dl.view if s["flags"][0] == Kind.BOX}
+    assert round(SliderElement.HANDLE_HEIGHT, 3) not in heights

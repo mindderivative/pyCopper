@@ -415,6 +415,25 @@ class StyleSpec(_Frozen):
     #: How much one click or arrow-key press changes a SpinBox's or Slider's
     #: value by.
     step: float = Field(default=1.0, gt=0)
+    #: A Slider's handle shape. `"line"` is current M3 -- a narrow vertical
+    #: bar that narrows further when pressed (`COMPONENT_SLIDERS.md`: "a
+    #: vertical handle", explicitly replacing M2's circular one in the same
+    #: revision). `"circle"` is an opt-in back to that M2 shape for an
+    #: application that wants it; not a scraped M3 figure, since the current
+    #: spec no longer documents the M2 handle's own dimensions.
+    handle_shape: Literal["line", "circle"] = "line"
+    #: Gap between a Slider's handle and each track segment, in logical px.
+    #: Real M3 leaves the background showing on both sides of the handle
+    #: rather than running the active colour flush against it -- confirmed
+    #: visually, not a number the scraped spec text gives.
+    cradle_gap: float = Field(default=6.0, ge=0)
+    #: Corner radius on each of a Slider's track segments' handle-facing
+    #: end. Visibly more square than `track_radius`, its outer end -- also
+    #: not a scraped figure.
+    cradle_radius: float = Field(default=2.0, ge=0)
+    #: Corner radius on each of a Slider's track segments' outer end.
+    #: `COMPONENT_SLIDERS.md`'s own XS-size measurement table: 8dp.
+    track_radius: float = Field(default=8.0, gt=0)
     #: A Pagination's total number of pages.
     count: int = Field(default=1, ge=1)
 
