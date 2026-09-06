@@ -173,7 +173,7 @@ def test_value_is_bindable_to_a_signal() -> None:
 
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "s", "widget": "SearchBar", "value": "{{ q.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))

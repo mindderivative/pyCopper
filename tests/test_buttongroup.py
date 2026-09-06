@@ -21,7 +21,7 @@ from pycopper.widgets.buttongroup import ButtonGroupElement
 def _app(variant: str, count: int = 3):
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "bg",
@@ -96,7 +96,7 @@ def test_switching_back_to_standard_clears_the_override() -> None:
     """Reconciliation must undo a shape override, not just stop setting it."""
     view_connected = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "bg",
@@ -118,7 +118,7 @@ def test_switching_back_to_standard_clears_the_override() -> None:
     app.reload(
         {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [
                 {
                     "name": "bg",

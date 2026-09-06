@@ -134,7 +134,7 @@ def test_the_active_panel_is_marked_selected() -> None:
 
 
 def test_clicking_a_tab_switches_the_active_panel() -> None:
-    view = {"name": "root", "widget": "Column", "children": [_group(value="a")]}
+    view = {"name": "root", "widget": "Vertical", "children": [_group(value="a")]}
     a = app(view)
     g = a.root.find("g")
     _, x, w = g._tab_rects()[1]
@@ -147,7 +147,7 @@ def test_on_change_carries_the_new_panel_name() -> None:
     calls = []
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [_group(value="a", handlers={"on_change": "switch"})],
     }
     a = App(view, theme=Theme(dark=True))
@@ -164,7 +164,7 @@ def test_on_change_carries_the_new_panel_name() -> None:
 def test_value_is_bindable_to_a_signal() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [_group(value="{{ tab.get() }}")],
     }
     tab = Signal("a")
@@ -176,7 +176,7 @@ def test_value_is_bindable_to_a_signal() -> None:
 
 
 def test_selected_tab_uses_primary() -> None:
-    view = {"name": "root", "widget": "Column", "children": [_group(value="a")]}
+    view = {"name": "root", "widget": "Vertical", "children": [_group(value="a")]}
     a = app(view)
     tokens = {int(s["flags"][2]) for s in paint(a).view}
     assert PAL.index("primary") in tokens
@@ -251,7 +251,7 @@ def test_a_third_child_is_rejected() -> None:
 
 
 def test_dragging_the_divider_changes_the_ratio() -> None:
-    view = {"name": "root", "widget": "Column", "children": [_split(value="0.5")]}
+    view = {"name": "root", "widget": "Vertical", "children": [_split(value="0.5")]}
     a = app(view)
     s = a.root.find("s")
     rect = s.absolute_rect()
@@ -266,7 +266,7 @@ def test_on_change_carries_the_new_ratio() -> None:
     calls = []
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{**_split(value="0.5"), "handlers": {"on_change": "resize"}}],
     }
     a = App(view, theme=Theme(dark=True))
@@ -283,7 +283,7 @@ def test_on_change_carries_the_new_ratio() -> None:
 
 
 def test_arrow_keys_step_the_ratio() -> None:
-    view = {"name": "root", "widget": "Column", "children": [_split(value="0.5")]}
+    view = {"name": "root", "widget": "Vertical", "children": [_split(value="0.5")]}
     a = app(view)
     s = a.root.find("s")
     a.dispatcher.focus(s)
@@ -299,7 +299,11 @@ def test_arrow_keys_use_the_splits_own_axis_when_vertical() -> None:
     """`Right`/`Left` only make sense for a horizontal split; a vertical one
     must answer to `Down`/`Up` instead, the same axis-aware mapping its own
     layout already uses."""
-    view = {"name": "root", "widget": "Column", "children": [_split(value="0.5", axis="vertical")]}
+    view = {
+        "name": "root",
+        "widget": "Vertical",
+        "children": [_split(value="0.5", axis="vertical")],
+    }
     a = app(view)
     s = a.root.find("s")
     a.dispatcher.focus(s)
@@ -354,7 +358,7 @@ def test_nesting_a_split_inside_a_split() -> None:
 
 
 def test_divider_uses_outline_variant() -> None:
-    view = {"name": "root", "widget": "Column", "children": [_split()]}
+    view = {"name": "root", "widget": "Vertical", "children": [_split()]}
     a = app(view)
     tokens = {int(s["flags"][2]) for s in paint(a).view}
     assert PAL.index("outline_variant") in tokens

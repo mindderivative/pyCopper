@@ -22,7 +22,7 @@ from pycopper.widgets.timepicker import TimePickerElement
 def _app(*, calls: list[str] | None = None, **spec):
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "tp", "widget": "TimePicker", **spec}],
     }
     app = App(view, theme=Theme(dark=True))
@@ -106,7 +106,7 @@ def test_a_live_bound_value_also_starts_from_its_own_time() -> None:
 
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "tp", "widget": "TimePicker", "value": "{{ chosen.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))

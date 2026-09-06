@@ -38,7 +38,7 @@ def scroll_app(rows: int = 20):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -48,7 +48,7 @@ def scroll_app(rows: int = 20):
                         "children": [
                             {
                                 "name": "col",
-                                "widget": "Column",
+                                "widget": "Vertical",
                                 "style": {"width": "expand"},
                                 "children": [
                                     {
@@ -151,7 +151,7 @@ def test_dragging_scrolls_by_paint_not_layout() -> None:
 def sheet_app(*, handle: bool = True):
     app = App(
         {
-            "root": {"name": "root", "widget": "Column", "style": {"background": "surface"}},
+            "root": {"name": "root", "widget": "Vertical", "style": {"background": "surface"}},
             "overlays": [
                 {
                     "name": "sh",

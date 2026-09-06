@@ -23,7 +23,7 @@ def laid_out(spec, width=600.0, height=400.0):
 def app_with(children, value=None, widget="Tabs", style=None):
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"background": "surface", "width": "expand"},
         "children": [
             {
@@ -156,7 +156,7 @@ def test_drawer_shrinks_below_its_m3_minimum_rather_than_raising() -> None:
     """A layout node must return a size its own constraints permit
     (`layout/node.py` asserts this) -- M3's 240dp minimum is an aspiration,
     not something a narrower parent has to honour. Real crash this session:
-    squeezing a Row containing this widget below 300dp raised instead of
+    squeezing a Horizontal containing this widget below 300dp raised instead of
     shrinking, because the old code built its inner constraints from the
     unclamped M3 width outright."""
     e = laid_out({"name": "w", "widget": "NavigationDrawer", "children": RAIL}, width=143.0)
@@ -188,7 +188,7 @@ def test_a_collapsed_drawer_is_zero_wide() -> None:
 def test_collapsed_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "c",
@@ -219,7 +219,7 @@ def test_a_collapsed_rail_or_drawer_paints_nothing(widget: str) -> None:
     session. Skipping the paint outright is what actually removes it."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {"name": "c", "widget": widget, "value": "r1", "collapsed": "true", "children": RAIL}
         ],
@@ -242,7 +242,7 @@ def test_container_marks_only_the_named_child() -> None:
 def test_selection_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "c", "widget": "Tabs", "value": "{{ t.get() }}", "children": TABS}],
     }
     a = App(view, theme=Theme(dark=True))
@@ -298,7 +298,7 @@ def test_multi_select_with_no_value_selects_nothing() -> None:
 def test_multi_select_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "c",
@@ -418,7 +418,7 @@ def test_list_item_renders_both_lines() -> None:
 def test_supporting_text_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {"name": "li", "widget": "ListItem", "text": "H", "supporting_text": "{{ s.get() }}"}
         ],
@@ -436,7 +436,7 @@ def test_centered_app_bar_title_differs_from_left_aligned() -> None:
     def first_glyph_x(variant: str) -> float:
         view = {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": "expand", "background": "surface"},
             "children": [
                 {
@@ -556,7 +556,7 @@ def test_only_branches_draw_a_chevron() -> None:
     def render(children: list[dict]) -> DisplayList:
         view = {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [{"name": "w", "widget": "TreeItem", "text": "item", "children": children}],
         }
         app = App(view, theme=Theme(dark=True))
@@ -574,7 +574,7 @@ def test_only_branches_draw_a_chevron() -> None:
 def test_tree_selection_is_bindable_at_any_depth() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "tv",
@@ -603,7 +603,7 @@ def test_expand_state_is_bindable() -> None:
     and `test_motion.py`'s switch, driven by `app.motion.tick`."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "src",
@@ -638,7 +638,7 @@ def test_collapsing_an_ancestor_clips_every_descendant() -> None:
     """
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"background": "surface"},
         "children": [
             {
@@ -719,7 +719,7 @@ def test_a_spacer_splits_leading_and_trailing_groups() -> None:
     to close, since it never puts a Spacer among its own children)."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"background": "surface", "width": "expand"},
         "children": [
             {
@@ -752,7 +752,7 @@ def test_status_bar_pads_both_edges() -> None:
 
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"background": "surface", "width": "expand"},
         "children": [
             {

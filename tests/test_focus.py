@@ -17,12 +17,12 @@ from pycopper.tree.element import FOCUS_RING_OFFSET, FOCUS_RING_TOKEN, FOCUS_RIN
 
 VIEW = {
     "name": "root",
-    "widget": "Column",
+    "widget": "Vertical",
     "style": {"background": "surface", "padding": 10},
     "children": [
         {
             "name": "row",
-            "widget": "Row",
+            "widget": "Horizontal",
             "style": {"height": 56, "spacing": 16, "cross_alignment": "center"},
             "children": [
                 {

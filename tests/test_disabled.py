@@ -25,7 +25,7 @@ def hosted(children, **signals):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": children,
             }
@@ -105,7 +105,7 @@ def test_disabling_a_container_disables_what_is_inside_it() -> None:
         [
             {
                 "name": "section",
-                "widget": "Column",
+                "widget": "Vertical",
                 "disabled": "true",
                 "children": [
                     {
@@ -132,7 +132,7 @@ def test_an_enabled_child_of_a_disabled_parent_stays_disabled() -> None:
         [
             {
                 "name": "section",
-                "widget": "Column",
+                "widget": "Vertical",
                 "disabled": "true",
                 "children": [
                     {
@@ -353,7 +353,7 @@ def test_a_disabled_subtree_is_recoloured_once() -> None:
         [
             {
                 "name": "section",
-                "widget": "Column",
+                "widget": "Vertical",
                 "disabled": "true",
                 "children": [
                     {

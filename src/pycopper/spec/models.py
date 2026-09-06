@@ -40,8 +40,8 @@ class WidgetKind(StrEnum):
     """Enum, not a bare string -- an unknown widget fails at load."""
 
     CONTAINER = "Container"
-    ROW = "Row"
-    COLUMN = "Column"
+    HORIZONTAL = "Horizontal"
+    VERTICAL = "Vertical"
     STACK = "Stack"
     TEXT = "Text"
     BUTTON = "Button"
@@ -394,8 +394,8 @@ class StyleSpec(_Frozen):
     #: `name` of the ScrollView a TopAppBar collapses with. Without it a
     #: medium or large bar simply stays expanded.
     collapses_with: str | None = None
-    #: Which way a ScrollView scrolls. Row/Column encode their axis in the
-    #: widget kind, but a viewport's axis is independent of its content's.
+    #: Which way a ScrollView scrolls. Horizontal/Vertical encode their axis
+    #: in the widget kind, but a viewport's axis is independent of its content's.
     axis: Literal["vertical", "horizontal"] = "vertical"
     #: Draw a ScrollView's scrollbar when its content overflows.
     scrollbar: bool = True

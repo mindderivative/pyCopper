@@ -42,7 +42,7 @@ def scroll_view(n: int = 12, **style) -> ScrollViewElement:
         "widget": "ScrollView",
         "style": base,
         "children": [
-            {"name": "col", "widget": "Column", "style": {"width": "expand"}, "children": rows(n)}
+            {"name": "col", "widget": "Vertical", "style": {"width": "expand"}, "children": rows(n)}
         ],
     }
     element = build_element(parse_view(spec).root)
@@ -55,7 +55,7 @@ def app_with(inner: dict, size=(400, 300)) -> App:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [inner],
             }
@@ -103,7 +103,7 @@ def test_an_unbounded_scroll_axis_raises_rather_than_silently_not_scrolling() ->
     spec = {
         "name": "sv",
         "widget": "ScrollView",
-        "children": [{"widget": "Column", "children": rows(10)}],
+        "children": [{"widget": "Vertical", "children": rows(10)}],
     }
     element = build_element(parse_view(spec).root)
     unbounded = Constraints(min_width=0.0, max_width=300.0, min_height=0.0, max_height=INF)
@@ -152,7 +152,7 @@ def test_offset_is_reclamped_when_the_content_shrinks() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(5),
                 }
@@ -185,7 +185,7 @@ def test_scrolling_does_not_relayout() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }
@@ -222,7 +222,7 @@ def test_children_are_clipped_to_the_viewport() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }
@@ -247,7 +247,7 @@ def test_the_scrollbar_appears_only_when_the_content_overflows() -> None:
                 "children": [
                     {
                         "name": "col",
-                        "widget": "Column",
+                        "widget": "Vertical",
                         "style": {"width": "expand"},
                         "children": rows(n),
                     }
@@ -277,7 +277,7 @@ def test_the_scrollbar_is_painted_with_a_palette_token() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(20),
                 }
@@ -308,7 +308,7 @@ def test_the_wheel_scrolls_whatever_is_under_the_pointer() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }
@@ -330,7 +330,7 @@ def test_a_wheel_needs_no_declared_handler() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }
@@ -351,7 +351,7 @@ def test_hit_testing_follows_the_scrolled_content() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }
@@ -385,7 +385,7 @@ def test_absolute_rect_follows_the_scrolled_content() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }
@@ -412,7 +412,7 @@ def test_the_wheel_chains_to_an_outer_view_once_the_inner_one_is_done() -> None:
             "children": [
                 {
                     "name": "ocol",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": [
                         {
@@ -422,7 +422,7 @@ def test_the_wheel_chains_to_an_outer_view_once_the_inner_one_is_done() -> None:
                             "children": [
                                 {
                                     "name": "icol",
-                                    "widget": "Column",
+                                    "widget": "Vertical",
                                     "style": {"width": "expand"},
                                     "children": rows(6),
                                 }
@@ -458,7 +458,7 @@ def test_a_horizontal_scroll_view_measures_and_scrolls_on_x() -> None:
         "children": [
             {
                 "name": "row",
-                "widget": "Row",
+                "widget": "Horizontal",
                 "children": [
                     {"name": f"c{i}", "widget": "Container", "style": {"width": 80, "height": 40}}
                     for i in range(6)
@@ -484,7 +484,7 @@ def test_a_horizontal_view_ignores_vertical_wheel_movement() -> None:
         "children": [
             {
                 "name": "row",
-                "widget": "Row",
+                "widget": "Horizontal",
                 "children": [
                     {"name": f"c{i}", "widget": "Container", "style": {"width": 80, "height": 40}}
                     for i in range(6)
@@ -518,7 +518,7 @@ def test_scroll_position_survives_a_reload() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(20),
                 }
@@ -547,7 +547,7 @@ def test_the_canvas_wheel_payload_drives_scrolling() -> None:
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": rows(12),
                 }

@@ -39,7 +39,7 @@ def gallery_view(tmp_path: Path) -> Path:
         "screen_View.yaml",
         "root:\n"
         "  name: root\n"
-        "  widget: Column\n"
+        "  widget: Vertical\n"
         "  children:\n"
         "    - {name: a, source: panel_View.yaml, with: {label: A}}\n"
         "    - {name: b, source: panel_View.yaml, with: {label: B}}\n",

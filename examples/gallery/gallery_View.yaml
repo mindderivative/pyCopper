@@ -1,6 +1,6 @@
 # pyCopper widget gallery: a real navigation shell.
 #
-# `root` is a fixed header above a body Row: a collapsible navigation
+# `root` is a fixed header above a body Horizontal: a collapsible navigation
 # rail/drawer on the left, `PageHost` on the right showing exactly one page
 # at a time. Each page is its own file under pages/, each wrapped in its own
 # ScrollView -- content is grouped by what it's for, not crammed into one
@@ -23,12 +23,12 @@ styles:
 
 root:
   name: root
-  widget: Column
+  widget: Vertical
   style: {background: surface, width: expand, height: expand}
 
   children:
     - name: header
-      widget: Row
+      widget: Horizontal
       style: {height: 40, width: expand, cross_alignment: center, padding: 20}
       children:
         - name: title
@@ -37,11 +37,11 @@ root:
           style: {color: on_surface, font_size: 22}
 
     - name: body
-      widget: Row
+      widget: Horizontal
       style: {width: expand, height: expand}
       children:
         - name: nav
-          widget: Column
+          widget: Vertical
           style: {height: expand, background: surface_container_low}
           children:
             - name: nav_toggle
@@ -157,7 +157,7 @@ overlays:
     handlers: {on_dismiss: close_bottom_sheet}
     children:
       - name: bottom_sheet_body
-        widget: Column
+        widget: Vertical
         style: {padding: 16, spacing: 8, width: expand}
         children:
           - {name: bottom_sheet_title, widget: Text, text: "Bottom sheet", style: {font_size: 18, color: on_surface}}
@@ -169,7 +169,7 @@ overlays:
     handlers: {on_dismiss: close_side_sheet}
     children:
       - name: side_sheet_body
-        widget: Column
+        widget: Vertical
         style: {padding: 16, spacing: 8, width: expand}
         children:
           - {name: side_sheet_title, widget: Text, text: "Side sheet", style: {font_size: 18, color: on_surface}}

@@ -218,7 +218,7 @@ def hosted(variant: str, n: int = 6) -> App:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -504,7 +504,7 @@ def test_reduce_motion_snaps_without_travel() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -551,7 +551,7 @@ def test_item_content_is_oversized_so_panning_never_uncovers_an_edge() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -600,7 +600,7 @@ def parallax_carousel(variant: str = "multi_browse", n: int = 5):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -675,7 +675,7 @@ def test_an_item_label_paints_over_its_content() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {

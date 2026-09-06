@@ -8,7 +8,7 @@ name: advanced
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 28, padding: 24}
     children:
       - widget: Text

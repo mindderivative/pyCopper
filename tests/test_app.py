@@ -11,7 +11,7 @@ from pycopper.runtime.events import EventType, PointerEvent
 
 VIEW = {
     "name": "root",
-    "widget": "Column",
+    "widget": "Vertical",
     "style": {"padding": 16, "spacing": 12, "background": "surface"},
     "children": [
         {

@@ -1,4 +1,4 @@
-"""Column demo's logic: cycling cross_alignment via self.app.reload(...),
+"""Vertical demo's logic: cycling cross_alignment via self.app.reload(...),
 and the two source panels.
 
 See app.py in this directory for the entry point.
@@ -33,12 +33,12 @@ def _find(node: Any, name: str) -> dict[str, Any] | None:
     return None
 
 
-class ColumnDemo(ViewModel):
-    """State and commands for `Column_View.yaml`.
+class VerticalDemo(ViewModel):
+    """State and commands for `Vertical_View.yaml`.
 
     `cross_alignment` is a plain `style.*` property, not one of the handful
     of templated fields (`text:`, `value:`, ...), so it cannot be bound to
-    a Signal with `{{ }}`. The button instead reloads `Column_View.yaml`
+    a Signal with `{{ }}`. The button instead reloads `Vertical_View.yaml`
     ITSELF -- parsed fresh, never hand-duplicated -- with only the
     `live_demo` node's style patched, via `self.app.reload(...)`, the same
     mechanism hot reload uses. Reconciliation matches by `name:`, so
@@ -49,7 +49,7 @@ class ColumnDemo(ViewModel):
     def __init__(self) -> None:
         self._alignment_index = 0
 
-        self.view_source = (Path(__file__).parent / "Column_View.yaml").read_text()
+        self.view_source = (Path(__file__).parent / "Vertical_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
 
     def _view(self) -> dict[str, Any]:

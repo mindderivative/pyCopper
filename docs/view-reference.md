@@ -13,7 +13,7 @@ This page is the what.
 ```yaml
 root:                       # the widget tree
   name: root
-  widget: Column
+  widget: Vertical
   children: [ ... ]
 
 overlays:                   # optional: content that floats above the tree
@@ -305,7 +305,7 @@ styles:
     style: {width: 220}
 
 root:
-  widget: Column
+  widget: Vertical
   children:
     - {name: save,    widget: Button, text: Save}
     - {name: confirm, widget: Button, classes: danger, text: Confirm}
@@ -391,7 +391,7 @@ type_scale:
   body-medium: 14
 
 root:
-  widget: Column
+  widget: Vertical
   children:
     - {widget: Text, text: Heading, style: {text_style: title-large}}
     - {widget: Text, text: Body,    style: {text_style: body-medium}}
@@ -867,7 +867,7 @@ this shape.
   value: "{{ current_page.get() }}"   # names the active child, by `name`
   default: home                        # shown if value: matches nothing
   children:
-    - {name: home, widget: Column, source: pages/home_View.yaml}
+    - {name: home, widget: Vertical, source: pages/home_View.yaml}
     - {name: terminal, widget: Terminal}
 ```
 
@@ -1099,7 +1099,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | Widget | Notes |
 |---|---|
 | `Container` | A styled box with padding and at most one child. |
-| `Row` / `Column` | Lay children along an axis. `spacing`, `main_alignment`, `cross_alignment`. |
+| `Horizontal` / `Vertical` | Lay children along an axis. `spacing`, `main_alignment`, `cross_alignment`. |
 | `Stack` | Overlays children; positioned with `align_x` / `align_y`. |
 | `Spacer` | Empty space. `width: expand` pushes siblings apart. |
 | `ScrollView` | A clipped viewport. **Must** have a bounded size on its scroll axis. |
@@ -1108,7 +1108,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | `CodeEditor` | Multi-line, line-numbered, optionally syntax-highlighted. No M3 component. See [Code editor](#code-editor). |
 | `Terminal` | A real shell, spawned and parsed internally. No M3 component. See [Terminal](#terminal). |
 
-Inside a `Row` or `Column`, a child with `width: expand` (or `flex`) on the main
+Inside a `Horizontal` or `Vertical`, a child with `width: expand` (or `flex`) on the main
 axis shares the free space; anything else is measured first and takes what it
 needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 
@@ -1156,7 +1156,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `Accordion` | 56 / 72dp header (M3 gives this no component of its own, only Lists' "expand and collapse" behaviour). `text:` headline + `supporting_text:`, an optional child body, `value:` for open/closed. |
 | `TreeView` + `TreeItem` | Same M3 gap as `Accordion`, applied recursively. A `TreeItem` with `children:` is a branch (chevron, `value:` for open/closed); with none it's a leaf. `TreeView`'s own `value:` names the selected item by `name` at any depth. |
 | `TopAppBar` | 64dp small, 112dp `medium`, 152dp `large`. |
-| `StatusBar` | 24dp, `surface_container`. No M3 component or even the phrase "status bar" anywhere in M3's own vocabulary — the docked *toolbar* it might sound like is a row of action buttons, a different thing. A plain `Row` a view populates freely; a `Spacer` splits it into leading/trailing groups. |
+| `StatusBar` | 24dp, `surface_container`. No M3 component or even the phrase "status bar" anywhere in M3's own vocabulary — the docked *toolbar* it might sound like is a row of action buttons, a different thing. A plain `Horizontal` a view populates freely; a `Spacer` splits it into leading/trailing groups. |
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator. `collapsed: "{{ }}"` shrinks it to 0dp. |
 | `NavigationDrawer` | 240–360dp, 56dp items. `collapsed: "{{ }}"` shrinks it to 0dp — the pair is how a real app builds a collapsible rail, since `style.width` cannot be bound. |
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |
@@ -1486,7 +1486,7 @@ scrolls by pixels.
 |---|---|
 | `width`, `height` | a number (dp), `expand`, or a percentage like `50%` |
 | `padding`, `margin` | one number, or `[left, top, right, bottom]` |
-| `spacing` | gap between children of a `Row`/`Column` |
+| `spacing` | gap between children of a `Horizontal`/`Vertical` |
 
 ### Colour and shape
 

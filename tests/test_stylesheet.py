@@ -20,7 +20,7 @@ def view(styles, children, **root):
     return parse_view(
         {
             "styles": styles,
-            "root": {"name": "root", "widget": "Column", "children": children, **root},
+            "root": {"name": "root", "widget": "Vertical", "children": children, **root},
         }
     )
 
@@ -148,7 +148,7 @@ def test_the_sheet_reaches_nested_nodes() -> None:
         [
             {
                 "name": "outer",
-                "widget": "Column",
+                "widget": "Vertical",
                 "children": [{"name": "deep", "widget": "Text", "classes": "tag"}],
             }
         ],
@@ -160,7 +160,7 @@ def test_the_sheet_reaches_overlays() -> None:
     parsed = parse_view(
         {
             "styles": [{"widget": "Dialog", "style": {"corner_radius": 16}}],
-            "root": {"name": "root", "widget": "Column"},
+            "root": {"name": "root", "widget": "Vertical"},
             "overlays": [{"name": "d", "widget": "Dialog", "open": "true"}],
         }
     )
@@ -169,7 +169,7 @@ def test_the_sheet_reaches_overlays() -> None:
 
 def test_no_rules_leaves_the_tree_untouched() -> None:
     """The common case must not even copy the tree."""
-    parsed = parse_view({"root": {"name": "root", "widget": "Column"}})
+    parsed = parse_view({"root": {"name": "root", "widget": "Vertical"}})
     from pycopper.spec.stylesheet import apply_stylesheet
 
     assert apply_stylesheet(parsed) is parsed
@@ -185,7 +185,7 @@ def test_a_sheet_value_counts_as_explicit_for_component_defaults() -> None:
     parsed = parse_view(
         {
             "styles": [{"widget": "BottomSheet", "style": {"placement": "center"}}],
-            "root": {"name": "root", "widget": "Column"},
+            "root": {"name": "root", "widget": "Vertical"},
             "overlays": [{"name": "s", "widget": "BottomSheet", "open": "true"}],
         }
     )
@@ -194,7 +194,7 @@ def test_a_sheet_value_counts_as_explicit_for_component_defaults() -> None:
     app = App(
         {
             "styles": [{"widget": "BottomSheet", "style": {"placement": "center"}}],
-            "root": {"name": "root", "widget": "Column", "style": {"background": "surface"}},
+            "root": {"name": "root", "widget": "Vertical", "style": {"background": "surface"}},
             "overlays": [{"name": "s", "widget": "BottomSheet", "open": "true"}],
         },
         theme=Theme(dark=True),
@@ -211,7 +211,7 @@ def test_a_sheet_can_override_a_component_default() -> None:
             "styles": [{"widget": "CircularProgress", "style": {"thickness": 10}}],
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [{"name": "p", "widget": "CircularProgress", "value": "0.5"}],
             },
@@ -232,7 +232,7 @@ def test_an_unknown_style_property_in_a_rule_fails_at_load() -> None:
         parse_view(
             {
                 "styles": [{"widget": "Button", "style": {"nonsense": 1}}],
-                "root": {"name": "root", "widget": "Column"},
+                "root": {"name": "root", "widget": "Vertical"},
             }
         )
 
@@ -242,7 +242,7 @@ def test_an_unknown_widget_kind_in_a_selector_fails_at_load() -> None:
         parse_view(
             {
                 "styles": [{"widget": "Nonexistent", "style": {"height": 1}}],
-                "root": {"name": "root", "widget": "Column"},
+                "root": {"name": "root", "widget": "Vertical"},
             }
         )
 
@@ -252,7 +252,7 @@ def test_an_unknown_token_in_a_rule_fails_at_load() -> None:
         parse_view(
             {
                 "styles": [{"widget": "Button", "style": {"background": "chartreuse"}}],
-                "root": {"name": "root", "widget": "Column"},
+                "root": {"name": "root", "widget": "Vertical"},
             }
         )
 

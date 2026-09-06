@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
 VIEW = {
     "root": {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "go",
@@ -83,7 +83,7 @@ def labelled(update, label: str):
 
 def test_the_tree_converts_with_a_titled_window_root(bridge) -> None:
     """AccessKit expects the root to be a WINDOW carrying the title. Handing it
-    our own root -- a Column, which converts to GROUP -- left AT-SPI with
+    our own root -- a Vertical, which converts to GROUP -- left AT-SPI with
     nothing better to call the application than the process name. Found by
     asking the registry, not by reading the docs.
     """

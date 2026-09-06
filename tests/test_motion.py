@@ -260,7 +260,7 @@ def hosted(children, *, signals: dict | None = None, **settings) -> App:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface", "width": 300},
                 "children": children,
             }

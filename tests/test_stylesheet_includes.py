@@ -28,7 +28,7 @@ styles:
 {rules}
 root:
   name: root
-  widget: Column
+  widget: Vertical
   children:
     - {{name: ok,  widget: Button, text: OK}}
     - {{name: bad, widget: Button, classes: danger, text: Delete}}

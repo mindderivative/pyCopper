@@ -7,7 +7,7 @@ name: foundations
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 28, padding: 24}
     children:
       - widget: Text
@@ -33,7 +33,7 @@ children:
           body: "Shaped text with real kerning and ligatures: fi fl ffi. Shared pieces live in parts/ and are pulled in with source:."
 
       - name: cards
-        widget: Row
+        widget: Horizontal
         style: {height: 56, spacing: 10, width: expand}
         children:
           - {name: card_e, widget: Card, style: {width: 150, variant: elevated}}
@@ -41,7 +41,7 @@ children:
           - {name: card_o, widget: Card, style: {width: 150, variant: outlined}}
 
       - name: swatches
-        widget: Row
+        widget: Horizontal
         style: {height: 56, spacing: 10, width: expand}
         children:
           - {name: sw_primary,   source: ../parts/swatch_View.yaml, with: {token: primary}}
@@ -51,7 +51,7 @@ children:
           - {name: sw_surface,   source: ../parts/swatch_View.yaml, with: {token: surface_container_highest}}
 
       - name: icons
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 14, width: expand, cross_alignment: center}
         children:
           - {name: ic_home,   widget: Icon, text: home,     style: {color: on_surface, icon_size: 24}}
@@ -88,7 +88,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: buttons_div, widget: Divider, style: {width: expand}}
       - name: buttons_row
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 10, width: expand, cross_alignment: center}
         children:
           - {name: btn_filled,  widget: Button, text: "Filled",       style: {height: 40, variant: filled}}
@@ -99,7 +99,7 @@ children:
           - {name: gallery_link, widget: Link, text: "Documentation", style: {font_size: 16}}
 
       - name: fabs
-        widget: Row
+        widget: Horizontal
         style: {height: 56, spacing: 12, width: expand, cross_alignment: center}
         children:
           - {name: ib_std,   widget: IconButton, text: favorite, style: {variant: standard}}
@@ -122,7 +122,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: selection_div, widget: Divider, style: {width: expand}}
       - name: controls
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 16, width: expand, cross_alignment: center}
         children:
           # cb_on asks for M3's 48dp minimum target. It is still drawn at
@@ -160,13 +160,13 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: progress_div, widget: Divider, style: {width: expand}}
       - name: linear_progress_row
-        widget: Column
+        widget: Vertical
         style: {spacing: 10, width: expand}
         children:
           - {name: lp_determinate,   widget: LinearProgress, value: "0.65", style: {width: expand}}
           - {name: lp_indeterminate, widget: LinearProgress, style: {width: expand}}
       - name: circular_progress_row
-        widget: Row
+        widget: Horizontal
         style: {height: 48, spacing: 24, width: expand, cross_alignment: center}
         children:
           - {name: cp_determinate,   widget: CircularProgress, value: "0.4"}
@@ -186,7 +186,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: actions_div, widget: Divider, style: {width: expand}}
       - name: actions
-        widget: Row
+        widget: Horizontal
         style: {height: 44, spacing: 12, width: expand}
         children:
           - name: count_label

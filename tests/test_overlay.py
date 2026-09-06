@@ -17,7 +17,7 @@ def make(overlays, root_children=None, **signals):
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 20, "spacing": 10},
             "children": root_children
             if root_children is not None
@@ -214,7 +214,7 @@ def test_a_submenu_flips_to_the_left_when_it_would_overflow() -> None:
         _menu_with_submenu(sub_style={"width": 300}),
         root_children=[
             {
-                "widget": "Row",
+                "widget": "Horizontal",
                 "style": {"width": "expand"},
                 "children": [
                     {"widget": "Spacer", "style": {"width": "expand"}},
@@ -398,7 +398,7 @@ def test_topmost_overlay_wins_hit_testing() -> None:
 def test_handlers_inside_an_overlay_resolve() -> None:
     calls: list[str] = []
     view = {
-        "root": {"name": "root", "widget": "Column", "children": []},
+        "root": {"name": "root", "widget": "Vertical", "children": []},
         "overlays": [
             {
                 "name": "dlg",
@@ -444,7 +444,7 @@ def test_single_child_container_rejects_extra_children() -> None:
         App(
             {
                 "name": "r",
-                "widget": "Column",
+                "widget": "Vertical",
                 "children": [
                     {
                         "name": "c",
@@ -460,18 +460,18 @@ def test_single_child_container_rejects_extra_children() -> None:
         )
 
 
-def test_column_sized_only_on_width_does_not_fill_vertically() -> None:
-    """A Column's main axis is its HEIGHT; keying fill off `width` made a
+def test_vertical_sized_only_on_width_does_not_fill_vertically() -> None:
+    """A Vertical's main axis is its HEIGHT; keying fill off `width` made a
     menu stretch to the bottom of the window."""
     app = App(
         {
             "name": "r",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface"},
             "children": [
                 {
                     "name": "c",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand"},
                     "children": [
                         {
@@ -523,7 +523,7 @@ def _dialog_app(*, dismissable: bool = True, on_dismiss: bool = True):
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": "expand", "height": "expand"},
             "children": [
                 {"name": "ask", "widget": "Button", "text": "Delete", "style": {"width": 100}}

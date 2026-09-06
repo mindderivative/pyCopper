@@ -118,7 +118,7 @@ def test_an_explicit_size_wins() -> None:
     inst = shape_instance(
         {
             "name": "row",
-            "widget": "Row",
+            "widget": "Horizontal",
             "children": [{"name": "s", "widget": "Shape", "style": {"width": 120, "height": 80}}],
         }
     )

@@ -7,7 +7,7 @@ name: settings
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 20, padding: 24}
     children:
       - widget: Text
@@ -25,7 +25,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: settings_scheme_row
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 12, width: expand, cross_alignment: center}
         children:
           - widget: Text
@@ -36,7 +36,7 @@ children:
             style: {color: primary, font_size: 15}
 
       - name: settings_seed_row
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 12, width: expand, cross_alignment: center}
         children:
           - widget: Text
@@ -49,7 +49,7 @@ children:
             style: {color: on_surface_variant, font_size: 15}
 
       - name: settings_toggle_row
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 12, width: expand, cross_alignment: center}
         children:
           - widget: Text

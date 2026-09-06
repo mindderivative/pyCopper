@@ -44,7 +44,7 @@ def _view(value: str = "{{ page.get() }}", default: str | None = None) -> dict:
     }
     if default is not None:
         node["default"] = default
-    return {"name": "root", "widget": "Column", "children": [node]}
+    return {"name": "root", "widget": "Vertical", "children": [node]}
 
 
 def _app(value: str = "{{ page.get() }}", default: str | None = None, page: str = "home"):
@@ -160,7 +160,7 @@ def test_a_terminal_page_does_not_spawn_until_its_page_is_active() -> None:
     process only exists while its page is the one showing."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "host",

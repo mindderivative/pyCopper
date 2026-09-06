@@ -12,23 +12,23 @@ from pycopper.layout import (
     Align,
     Alignment,
     Center,
-    Column,
     ConstrainedBox,
     Constraints,
     CrossAxisAlignment,
     EdgeInsets,
     Flexible,
+    Horizontal,
     LayoutNode,
     LeafNode,
     MainAxisAlignment,
     MainAxisSize,
     Offset,
     Padding,
-    Row,
     Size,
     SizedBox,
     Spacer,
     Stack,
+    Vertical,
 )
 
 LOOSE_500 = Constraints.loose(Size(500, 500))
@@ -130,32 +130,32 @@ def test_constrained_box_enforces_within_parent() -> None:
 # --------------------------------------------------------------------- row
 
 
-def test_row_places_children_left_to_right() -> None:
+def test_horizontal_places_children_left_to_right() -> None:
     a, b, c = LeafNode(30, 10), LeafNode(50, 20), LeafNode(20, 5)
-    Row([a, b, c]).layout(Constraints.tight(Size(200, 100)))
+    Horizontal([a, b, c]).layout(Constraints.tight(Size(200, 100)))
     assert a.offset == Offset(0, 0)
     assert b.offset == Offset(30, 0)
     assert c.offset == Offset(80, 0)
 
 
-def test_row_cross_size_is_tallest_child() -> None:
-    row = Row([LeafNode(10, 10), LeafNode(10, 45), LeafNode(10, 20)])
+def test_horizontal_cross_size_is_tallest_child() -> None:
+    row = Horizontal([LeafNode(10, 10), LeafNode(10, 45), LeafNode(10, 20)])
     assert row.layout(Constraints.loose(Size(500, 500))).height == 45
 
 
-def test_row_main_size_max_fills_available() -> None:
-    row = Row([LeafNode(10, 10)], main_size=MainAxisSize.MAX)
+def test_horizontal_main_size_max_fills_available() -> None:
+    row = Horizontal([LeafNode(10, 10)], main_size=MainAxisSize.MAX)
     assert row.layout(Constraints.loose(Size(300, 100))).width == 300
 
 
-def test_row_main_size_min_shrinks_to_content() -> None:
-    row = Row([LeafNode(10, 10), LeafNode(20, 10)], main_size=MainAxisSize.MIN)
+def test_horizontal_main_size_min_shrinks_to_content() -> None:
+    row = Horizontal([LeafNode(10, 10), LeafNode(20, 10)], main_size=MainAxisSize.MIN)
     assert row.layout(Constraints.loose(Size(300, 100))).width == 30
 
 
-def test_row_spacing_between_children() -> None:
+def test_horizontal_spacing_between_children() -> None:
     a, b = LeafNode(10, 10), LeafNode(10, 10)
-    Row([a, b], spacing=8).layout(LOOSE_500)
+    Horizontal([a, b], spacing=8).layout(LOOSE_500)
     assert b.offset.x == 18
 
 
@@ -164,21 +164,21 @@ def test_row_spacing_between_children() -> None:
 
 def test_expanded_child_fills_free_space() -> None:
     fixed, flex = LeafNode(100, 10), Flexible(LeafNode(0, 10))
-    Row([fixed, flex]).layout(Constraints.tight(Size(300, 50)))
+    Horizontal([fixed, flex]).layout(Constraints.tight(Size(300, 50)))
     assert flex.size.width == 200
 
 
 def test_flex_weights_divide_proportionally() -> None:
     a = Flexible(LeafNode(0, 10), flex=1)
     b = Flexible(LeafNode(0, 10), flex=3)
-    Row([a, b]).layout(Constraints.tight(Size(400, 50)))
+    Horizontal([a, b]).layout(Constraints.tight(Size(400, 50)))
     assert (a.size.width, b.size.width) == (100, 300)
 
 
 def test_flex_distribution_loses_no_space() -> None:
     """Running-total distribution: shares must sum exactly, no dropped pixels."""
     kids = [Flexible(LeafNode(0, 10), flex=1) for _ in range(3)]
-    Row(kids).layout(Constraints.tight(Size(100, 50)))
+    Horizontal(kids).layout(Constraints.tight(Size(100, 50)))
     assert sum(k.size.width for k in kids) == pytest.approx(100.0)
 
 
@@ -188,7 +188,7 @@ def test_flex_distribution_loses_no_space() -> None:
 )
 def test_flex_always_fills_exactly(total: float, weights: list[int]) -> None:
     kids = [Flexible(LeafNode(0, 10), flex=w) for w in weights]
-    Row(kids).layout(Constraints.tight(Size(total, 50)))
+    Horizontal(kids).layout(Constraints.tight(Size(total, 50)))
     assert sum(k.size.width for k in kids) == pytest.approx(total, abs=1e-6)
 
 
@@ -196,18 +196,18 @@ def test_loose_fit_allows_smaller_child() -> None:
     from pycopper.layout import FlexFit
 
     flex = Flexible(LeafNode(20, 10), flex=1, fit=FlexFit.LOOSE)
-    Row([flex]).layout(Constraints.tight(Size(300, 50)))
+    Horizontal([flex]).layout(Constraints.tight(Size(300, 50)))
     assert flex.size.width == 20
 
 
 def test_spacer_consumes_free_space() -> None:
     a, b = LeafNode(50, 10), LeafNode(50, 10)
-    Row([a, Spacer(), b]).layout(Constraints.tight(Size(300, 50)))
+    Horizontal([a, Spacer(), b]).layout(Constraints.tight(Size(300, 50)))
     assert b.offset.x == 250
 
 
 def test_flex_in_unbounded_space_is_an_error() -> None:
-    row = Row([Flexible(LeafNode(10, 10))])
+    row = Horizontal([Flexible(LeafNode(10, 10))])
     with pytest.raises(ValueError, match="unbounded"):
         row.layout(Constraints.unbounded())
 
@@ -220,7 +220,7 @@ def test_negative_flex_is_rejected() -> None:
 def test_inflexible_children_measured_before_flexible() -> None:
     fixed = LeafNode(120, 10)
     flex = Flexible(LeafNode(0, 10))
-    Row([fixed, flex]).layout(Constraints.tight(Size(200, 50)))
+    Horizontal([fixed, flex]).layout(Constraints.tight(Size(200, 50)))
     assert fixed.size.width == 120
     assert flex.size.width == 80
 
@@ -241,13 +241,13 @@ def test_inflexible_children_measured_before_flexible() -> None:
 )
 def test_main_axis_alignment(alignment: MainAxisAlignment, first_x: float) -> None:
     a, b = LeafNode(50, 10), LeafNode(50, 10)
-    Row([a, b], main_alignment=alignment).layout(Constraints.tight(Size(200, 50)))
+    Horizontal([a, b], main_alignment=alignment).layout(Constraints.tight(Size(200, 50)))
     assert a.offset.x == pytest.approx(first_x, abs=1e-4)
 
 
 def test_space_between_pushes_to_edges() -> None:
     a, b = LeafNode(50, 10), LeafNode(50, 10)
-    Row([a, b], main_alignment=MainAxisAlignment.SPACE_BETWEEN).layout(
+    Horizontal([a, b], main_alignment=MainAxisAlignment.SPACE_BETWEEN).layout(
         Constraints.tight(Size(200, 50))
     )
     assert a.offset.x == 0
@@ -267,13 +267,13 @@ def test_space_between_pushes_to_edges() -> None:
 )
 def test_cross_axis_alignment(alignment: CrossAxisAlignment, y: float) -> None:
     child = LeafNode(10, 10)
-    Row([child], cross_alignment=alignment).layout(Constraints.tight(Size(200, 50)))
+    Horizontal([child], cross_alignment=alignment).layout(Constraints.tight(Size(200, 50)))
     assert child.offset.y == pytest.approx(y)
 
 
 def test_cross_axis_stretch_forces_full_height() -> None:
     child = LeafNode(10, 10)
-    Row([child], cross_alignment=CrossAxisAlignment.STRETCH).layout(
+    Horizontal([child], cross_alignment=CrossAxisAlignment.STRETCH).layout(
         Constraints.tight(Size(200, 50))
     )
     assert child.size.height == 50
@@ -282,17 +282,17 @@ def test_cross_axis_stretch_forces_full_height() -> None:
 # ------------------------------------------------------------------ column
 
 
-def test_column_stacks_vertically() -> None:
+def test_vertical_stacks_vertically() -> None:
     a, b = LeafNode(10, 30), LeafNode(10, 20)
-    Column([a, b]).layout(Constraints.tight(Size(100, 200)))
+    Vertical([a, b]).layout(Constraints.tight(Size(100, 200)))
     assert a.offset == Offset(0, 0)
     assert b.offset == Offset(0, 30)
 
 
-def test_column_flex_divides_height() -> None:
+def test_vertical_flex_divides_height() -> None:
     a = Flexible(LeafNode(10, 0), flex=1)
     b = Flexible(LeafNode(10, 0), flex=2)
-    Column([a, b]).layout(Constraints.tight(Size(100, 300)))
+    Vertical([a, b]).layout(Constraints.tight(Size(100, 300)))
     assert (a.size.height, b.size.height) == (100, 200)
 
 
@@ -334,10 +334,10 @@ def random_tree(draw: st.DrawFn, depth: int = 0) -> LayoutNode:
     # enough to actually exercise constraint propagation.
     if depth >= 5 or draw(st.integers(0, 4)) == 0:
         return LeafNode(draw(st.floats(0, 200)), draw(st.floats(0, 200)))
-    kind = draw(st.sampled_from(["row", "column", "padding", "align", "stack", "sized"]))
-    if kind in ("row", "column"):
+    kind = draw(st.sampled_from(["horizontal", "vertical", "padding", "align", "stack", "sized"]))
+    if kind in ("horizontal", "vertical"):
         kids = draw(st.lists(random_tree(depth + 1), min_size=1, max_size=4))
-        cls = Row if kind == "row" else Column
+        cls = Horizontal if kind == "horizontal" else Vertical
         return cls(kids)
     child = draw(random_tree(depth + 1))
     match kind:

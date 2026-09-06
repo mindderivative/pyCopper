@@ -89,7 +89,7 @@ class TextFieldElement(_StyledMixin, Padding):
     INDICATOR_FOCUSED: Final = 2.0
     SUPPORTING_GAP: Final = 4.0
     #: M3 states no minimum width for a text field. 120dp is pyCopper's own
-    #: floor, chosen so an unsized field in a Row is still usable rather than
+    #: floor, chosen so an unsized field in a Horizontal is still usable rather than
     #: collapsing to its label -- said plainly because it is not sourced.
     MIN_WIDTH: Final = 120.0
 

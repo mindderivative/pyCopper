@@ -7,7 +7,7 @@ name: input
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 28, padding: 24}
     children:
       - widget: Text
@@ -28,7 +28,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: text_input_div, widget: Divider, style: {width: expand}}
       - name: text_fields
-        widget: Row
+        widget: Horizontal
         style: {height: 64, spacing: 16, width: expand}
         children:
           - name: field_filled
@@ -54,7 +54,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: overlays_div, widget: Divider, style: {width: expand}}
       - name: overlays_row
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 10, width: expand}
         children:
           - name: ask_btn
@@ -83,7 +83,7 @@ children:
             style: {height: 40, variant: text}
             handlers: {on_click: open_tooltip}
       - name: overlays_row2
-        widget: Row
+        widget: Horizontal
         style: {height: 40, spacing: 10, width: expand}
         children:
           - name: snackbar_btn

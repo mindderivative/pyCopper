@@ -85,7 +85,7 @@ def test_roles_resolve_inside_nested_nodes_and_overlays() -> None:
             "type_scale": {"title-large": 22},
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "children": [
                     {"name": "deep", "widget": "Text", "style": {"text_style": "title-large"}}
                 ],
@@ -128,7 +128,7 @@ def test_a_view_overrides_the_built_in_scale_per_role() -> None:
             "type_scale": {"title-large": 30},
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "children": [
                     {"name": "a", "widget": "Text", "style": {"text_style": "title-large"}},
                     {"name": "b", "widget": "Text", "style": {"text_style": "body-medium"}},
@@ -338,7 +338,7 @@ def test_a_label_is_measured_and_painted_with_one_set_of_metrics(
 
     Only the *metrics* have to match. A `Text` legitimately measures against the
     width it is offered and paints against the narrower box it settled on --
-    that is how it shrink-wraps instead of starving its siblings in a Row.
+    that is how it shrink-wraps instead of starving its siblings in a Horizontal.
     """
     from pycopper.paint.display_list import Kind
 

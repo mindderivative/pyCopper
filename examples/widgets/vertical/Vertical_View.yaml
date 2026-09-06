@@ -2,7 +2,7 @@ name: root
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style:
       background: surface
       padding: 32
@@ -12,7 +12,7 @@ children:
     children:
       - name: title
         widget: Text
-        text: "Column"
+        text: "Vertical"
         style: {text_style: headline-small, color: on_surface}
 
       - name: summary
@@ -25,12 +25,12 @@ children:
       - name: explanation
         widget: Text
         text: |
-          The same `Flex` algorithm `Row` uses, with the main axis
+          The same `Flex` algorithm `Horizontal` uses, with the main axis
           rotated to vertical: children lay out top to bottom first,
           then `style.cross_alignment` positions each one horizontally
           -- start, end, center, or stretch to the column's own width.
           `stretch` is what most pages in this whole set of demos use
-          for their own outer Column, which is why headings, dividers,
+          for their own outer Vertical, which is why headings, dividers,
           and code panels all read full width by default. Since this is
           a plain style property, the button below drives it by
           rebuilding the view in Python and calling
@@ -49,7 +49,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
-        widget: Column
+        widget: Vertical
         style: {cross_alignment: start, spacing: 8, width: expand, background: surface_container_low, corner_radius: 8, padding: 12}
         children:
           - {widget: Container, style: {width: 160, height: 32, background: primary, corner_radius: 6}}
@@ -62,7 +62,7 @@ children:
         style: {color: on_surface_variant}
 
       - name: controls
-        widget: Row
+        widget: Horizontal
         style: {spacing: 8}
         children:
           - {widget: Button, text: "Cycle cross_alignment", style: {variant: outlined}, handlers: {on_click: cycle_alignment}}
@@ -75,7 +75,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: code_panels
-        widget: Row
+        widget: Horizontal
         style: {spacing: 16, width: expand, height: 260}
         children:
           - name: yaml_source

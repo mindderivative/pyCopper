@@ -72,7 +72,7 @@ def test_supporting_text_adds_its_line_below_the_container() -> None:
 
 def test_an_unbounded_field_falls_back_to_its_own_minimum() -> None:
     """M3 states no minimum width. 120dp is pyCopper's, so that a field in an
-    unbounded Row is still usable rather than invisible."""
+    unbounded Horizontal is still usable rather than invisible."""
     element = build_element(parse_view({"name": "f", "widget": "TextField"}).root)
     element.layout(Constraints(0.0, float("inf"), 0.0, float("inf")))
     assert element.size.width == TextFieldElement.MIN_WIDTH

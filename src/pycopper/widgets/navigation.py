@@ -303,7 +303,7 @@ class NavigationRailElement(_SelectionContainer):
     def perform_layout(self, constraints: Constraints) -> Size:
         #: `constrain_width` is not optional here -- a layout node must
         #: return a size its constraints permit (`layout/node.py` asserts
-        #: this). Found the hard way: squeezing a `Row` containing this
+        #: this). Found the hard way: squeezing a `Horizontal` containing this
         #: widget below 80dp raised instead of shrinking, since the old
         #: code built `inner` from the unclamped M3 width outright. See
         #: `_resolved_width`'s sibling docstring in `overlays.py` for the
@@ -352,7 +352,7 @@ class NavigationDrawerElement(_SelectionContainer):
         #: return a size its constraints permit (`layout/node.py` asserts
         #: this). `_resolved_width`'s own "no explicit width" fallback
         #: returns the flat M3 default with no regard for how much room
-        #: was actually offered, so a `Row` squeezed narrower than 300dp
+        #: was actually offered, so a `Horizontal` squeezed narrower than 300dp
         #: raised instead of shrinking. See `overlays.py`'s sibling
         #: `_resolved_width` for the same reasoning applied to
         #: Menu/Dialog/Popover/the sheets.
@@ -559,7 +559,7 @@ class StatusBarElement(_StyledMixin, Flex):
     Built the way `TopAppBar` is: a plain `Flex` a view populates with
     whatever `Text`/`Icon`/`Divider` children it wants. There is no special
     "leading"/"trailing" slot to learn -- a `Spacer` does that split the same
-    way it would in any other `Row`.
+    way it would in any other `Horizontal`.
 
     `surface_container` background, no drawn border, follows this
     framework's existing convention for a docked surface (`Card`, `Menu`,
@@ -582,8 +582,8 @@ class StatusBarElement(_StyledMixin, Flex):
         self._spacing = self.style.spacing or 8.0
 
     def flex_of(self, child: Any) -> int:
-        """A child styled `expand` or `flex:n` is flexible, matching Row and
-        Column's own `_FlexElement.flex_of`.
+        """A child styled `expand` or `flex:n` is flexible, matching Horizontal and
+        Vertical's own `_FlexElement.flex_of`.
 
         This widget extends `Flex` directly rather than `_FlexElement`, so
         without this override a `Spacer` meant to push trailing items to the

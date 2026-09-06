@@ -2,7 +2,7 @@ name: root
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style:
       background: surface
       padding: 32
@@ -34,7 +34,7 @@ children:
           a plain `Flex` a view populates with whatever `Text`/`Icon`/
           `Divider` children it wants, with a `Spacer` doing the
           leading/trailing split the same way it would in any other
-          `Row`.
+          `Horizontal`.
 
           Use cases: a persistent, low-emphasis strip of live state at
           the edge of a window -- an editor's line/column position, a
@@ -66,7 +66,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: code_panels
-        widget: Row
+        widget: Horizontal
         style: {spacing: 16, width: expand, height: 260}
         children:
           - name: yaml_source

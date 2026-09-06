@@ -1,22 +1,22 @@
-"""Column demo -- its own window, own process.
+"""Horizontal demo -- its own window, own process.
 
-python examples/widgets/column/app.py
+python examples/widgets/horizontal/app.py
 """
 
 from pathlib import Path
 
-from Column_ViewModel import ColumnDemo
+from Horizontal_ViewModel import HorizontalDemo
 
 from pycopper import App, Settings, Theme
 
-VIEW = Path(__file__).parent / "Column_View.yaml"
+VIEW = Path(__file__).parent / "Horizontal_View.yaml"
 
 app = App(
     VIEW,
     theme=Theme(seed="#6750A4", dark=True),
-    settings=Settings(title="pyCopper widgets -- Column", width=800, height=820),
+    settings=Settings(title="pyCopper widgets -- Horizontal", width=800, height=820),
 )
-demo = ColumnDemo()
+demo = HorizontalDemo()
 app.bind_view_model(VIEW.name, demo)
 # See Container's app.py for why the handler and the {{ }} names are also
 # registered globally: self.app.reload(...) rebuilds the view with no file

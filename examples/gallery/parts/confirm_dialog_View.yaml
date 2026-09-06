@@ -29,7 +29,7 @@ style:
 handlers: {on_dismiss: dismiss}
 children:
   - name: actions
-    widget: Row
+    widget: Horizontal
     style: {width: expand, height: 40, spacing: 8, main_alignment: end}
     children:
       - name: cancel

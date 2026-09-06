@@ -347,7 +347,7 @@ the circumradius, so a rounded hexagon stays the size of a sharp one; at the
 maximum it collapses to its inscribed circle, which is one of the two ways to
 morph to a circle (raising `sides` is the other, and reaches the circumcircle).
 
-`layout/algorithms.py` provides: `Box` (single child + padding/alignment), `Row` / `Column` (main-axis flex distribution in two sub-passes — inflexible children first, then remaining space to flex weights), `Stack` (z-ordered overlay), `Scroll` (unbounded child constraint on one axis, clipping viewport), and `TextBox` (delegates to §5.7).
+`layout/algorithms.py` provides: `Box` (single child + padding/alignment), `Horizontal` / `Vertical` (main-axis flex distribution in two sub-passes — inflexible children first, then remaining space to flex weights), `Stack` (z-ordered overlay), `Scroll` (unbounded child constraint on one axis, clipping viewport), and `TextBox` (delegates to §5.7).
 
 **This module imports nothing from `render/` or `wgpu`.** It is exercised entirely by unit tests.
 
@@ -382,7 +382,7 @@ every box as a glyph rather than fail.
 
 **Subtree caching.** Each Element caches the instance slice it produced. A clean subtree's cached slice is copied wholesale into the frame buffer; only `needs_paint` subtrees re-emit. Because instances carry absolute coordinates, a subtree that merely *moved* still needs re-emission — this is a deliberate simplicity trade, revisitable by adding a per-instance transform index.
 
-**The cache key is the whole geometry the slice was built from** — absolute origin, size, pixel ratio, and the inherited clip — not the origin alone. Keying on origin alone shipped, and made window resizing paint stale frames: a row stretched across a Column keeps its origin when the window widens and changes only its width, so it passed the check and was spliced from its older, narrower slice. The symptom was not an obviously frozen window but *several different widths in one frame*, because rows that also shifted vertically did repaint and rows that did not stayed stale. Everything in the key is baked into the physical coordinates the slice holds, and nothing downstream can notice that they are wrong.
+**The cache key is the whole geometry the slice was built from** — absolute origin, size, pixel ratio, and the inherited clip — not the origin alone. Keying on origin alone shipped, and made window resizing paint stale frames: a row stretched across a Vertical keeps its origin when the window widens and changes only its width, so it passed the check and was spliced from its older, narrower slice. The symptom was not an obviously frozen window but *several different widths in one frame*, because rows that also shifted vertically did repaint and rows that did not stayed stale. Everything in the key is baked into the physical coordinates the slice holds, and nothing downstream can notice that they are wrong.
 
 ### 5.6 Theme — `theme/`
 
@@ -1053,7 +1053,7 @@ Three things make it safe, and one of them was a bug first:
   element repaints and re-measures rather than trusting a stale bound.
 - **An extent measured while descendants were skipped is a lower bound rather
   than the truth**, and is refused. Without this the mechanism eats itself: a
-  `Column` that painted four rows reports a four-row extent, and at the next
+  `Vertical` that painted four rows reports a four-row extent, and at the next
   scroll position that extent falls outside the viewport and takes the whole
   list with it. Found by watching a 60-row list paint one instance.
 
@@ -1222,7 +1222,7 @@ its content beneath. Three things only that exercise could have found:
   the adapter never registers, which is `update_if_active` doing its job and is
   why a per-frame push costs nothing.
 - **The tree's root must be a `WINDOW` carrying the title.** Handing AccessKit
-  our own root — a `Column`, which converts to `GROUP` — left AT-SPI listing
+  our own root — a `Vertical`, which converts to `GROUP` — left AT-SPI listing
   the application as `python3.14`, the process name, for want of anything
   better. The bridge now wraps the view in a titled window node.
 - **The adapter must be shut down deterministically.** AccessKit runs a D-Bus
@@ -1653,8 +1653,8 @@ Two bugs this work surfaced, both pre-existing and both now fixed:
   widgets lay out `children[0]` only, but paint walks all of them — so a Card
   with two children rendered them unpositioned on top of each other with no
   error. Adding a second child now raises, naming the fix.
-- **A Column sized only on `width` filled vertically.** `main_size` was chosen
-  from `style.width` regardless of axis, and a Column's main axis is its
+- **A Vertical sized only on `width` filled vertically.** `main_size` was chosen
+  from `style.width` regardless of axis, and a Vertical's main axis is its
   *height*. An anchored menu stretched to the bottom of the window.
 
 And one surfaced by building the components on top of it:
@@ -1723,7 +1723,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination. `collapsed:` (`WidgetSpec`, not `style` — `style.width` is a load-time value, confirmed not `{{ }}`-bindable) shrinks it to 0dp; `perform_layout` clamps to it and `paint` is skipped outright rather than clipped to it, since a zero-size *clip* rect is this codebase's own sentinel for "unclipped" |
 | `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem`; same `collapsed:` mechanism as `NavigationRail` — together they are how a real application builds one collapsible rail/drawer pair (`examples/gallery`'s own nav shell) rather than animating a width |
 | `TopAppBar` | 64dp small, 112dp medium, 152dp large | medium and large collapse on scroll (§5.19) |
-| `StatusBar` | 24dp, `surface_container`, 16dp horizontal padding | no M3 component, and the phrase does not appear anywhere in M3's own vocabulary either; the docked *toolbar* is a different thing (action buttons, not information). Fixes a real gap `TopAppBar` shares: extending `Flex` directly, not `_FlexElement`, means a `Spacer` styled `width: expand` is invisible to the base `flex_of` and starves whatever comes after it — `StatusBar` overrides `flex_of` to recognise it, the same way `_FlexElement` already does for `Row`/`Column` |
+| `StatusBar` | 24dp, `surface_container`, 16dp horizontal padding | no M3 component, and the phrase does not appear anywhere in M3's own vocabulary either; the docked *toolbar* is a different thing (action buttons, not information). Fixes a real gap `TopAppBar` shares: extending `Flex` directly, not `_FlexElement`, means a `Spacer` styled `width: expand` is invisible to the base `flex_of` and starves whatever comes after it — `StatusBar` overrides `flex_of` to recognise it, the same way `_FlexElement` already does for `Horizontal`/`Vertical` |
 | `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment. `style.multi_select` (M3 names both a single- and multi-select form) is `_SelectionContainer.apply_selection`'s own shared switch -- `value:` becomes a comma-separated set instead of one name, off by default so `Tabs`/`NavigationRail`/`NavigationDrawer` (which share the same base class but have no M3 multi-select form of their own) are unaffected |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
@@ -1884,7 +1884,7 @@ display list is already built for.
   widget: ScrollView
   style: {height: 300, width: expand}   # bounded on the scroll axis
   children:
-    - widget: Column
+    - widget: Vertical
       children: [ ... ]
 ```
 
@@ -2621,7 +2621,7 @@ way `Pagination` and `StatusBar` were, rather than assumed absent. `DockSplit`
 divides exactly two children with a draggable divider; `DockGroup` is a
 tabbed stack of `DockPanel`s, exactly one visible at a time; `DockPanel` is
 one pane, its `text:` the tab label. This is **the static half only** — the
-tree is arranged once in the view file, the way a `Row`/`Column`/`Stack` tree
+tree is arranged once in the view file, the way a `Horizontal`/`Vertical`/`Stack` tree
 already is. Runtime drag-and-drop, dragging a tab onto an edge to split or
 rearrange the layout while the app runs, is a separate and substantially
 larger feature (drop-zone hit-testing, tree mutation, tab reordering, drag
@@ -3289,7 +3289,7 @@ navigation elsewhere (WPF's `Frame`, for one).
 No M3-sourced role exists (no M3 component to source one from); ARIA
 convention has no single role for "a container that shows one of several
 things," so it is treated as a plain `"group"`, the same as `Container`/
-`Row`/`Column`/`Stack` -- not silenced the way `NavigationRail`/
+`Horizontal`/`Vertical`/`Stack` -- not silenced the way `NavigationRail`/
 `NavigationDrawer` are, since those have a stated "role is not announced"
 in M3 itself and `PageHost` has no such statement to point to.
 
@@ -3636,7 +3636,7 @@ pyCopper/
 │       │   └── reconcile.py     # keyed diff, state preservation
 │       ├── layout/
 │       │   ├── constraints.py   # Constraints, Size, Offset, EdgeInsets
-│       │   └── algorithms.py    # Box, Row, Column, Stack, Scroll, TextBox
+│       │   └── algorithms.py    # Box, Horizontal, Vertical, Stack, Scroll, TextBox
 │       ├── paint/
 │       │   ├── display_list.py  # INSTANCE_DTYPE, painter-order walk, caching
 │       │   └── commands.py      # box/glyph/image emitters
@@ -3860,7 +3860,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | M | Deliverable | Proves |
 |---|---|---|
 | **M0** ✅ | `pyproject.toml`, package skeleton, CI matrix, `theme/` complete, a window that clears to an MD3 surface colour | **Done.** 33 tests green (5 on GPU), `ruff` clean, `mypy --strict` clean across 17 files |
-| **M1** ✅ | `layout/` — constraints algebra, boundary/caching protocol, `LayoutOwner`, and `Padding`/`Align`/`SizedBox`/`ConstrainedBox`/`Row`/`Column`/`Flex`/`Stack`/`Spacer`. No rendering. | **Done.** 129 tests green, including Hypothesis property tests over random trees asserting the size invariant |
+| **M1** ✅ | `layout/` — constraints algebra, boundary/caching protocol, `LayoutOwner`, and `Padding`/`Align`/`SizedBox`/`ConstrainedBox`/`Horizontal`/`Vertical`/`Flex`/`Stack`/`Spacer`. No rendering. | **Done.** 129 tests green, including Hypothesis property tests over random trees asserting the size invariant |
 | **M2** ✅ | Instanced pipeline + `ui.wgsl`: rounded boxes, per-corner radii, borders, shadows, analytic AA, rounded shader clipping, palette tokens. **First benchmark.** | **Done.** 180 tests green (24 GPU); 500 mixed primitives verified as one draw call; **R1 quantified — see §12.1** |
 | **M3** ✅ | `spec/` (Pydantic + sandboxed expressions), `runtime/signals.py`, `tree/` (element + reconcile), `runtime/events.py`, `widgets/`, and the public `App` | **Done.** 293 tests green. Full slice works: YAML → elements → layout → paint → click → signal → re-render, with state-preserving reload |
 | **M4** ✅ | `text/` — Face/FontDB with coverage fallback, uharfbuzz shaping with a size-independent cache, bidi + script itemisation, UAX #14/#29 segmentation, paragraph layout with wrapping and alignment; `render/atlas.py` skyline packer; real `Text`/`Button` labels | **Done.** 371 tests green. Shaped, kerned, ligature-forming Roboto renders through the atlas in the same single draw call |

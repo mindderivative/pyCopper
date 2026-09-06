@@ -102,7 +102,7 @@ class Paragraph:
     size: Size = SIZE_ZERO
     #: Width the text was wrapped and aligned to. `size.width` is the INK
     #: extent -- the widest line -- so a Text widget shrink-wraps instead of
-    #: claiming its whole wrap box and starving its siblings in a Row.
+    #: claiming its whole wrap box and starving its siblings in a Horizontal.
     box_width: float = 0.0
     px: float = 14.0
     #: Letter spacing in logical px, added after every grapheme cluster --

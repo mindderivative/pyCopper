@@ -35,7 +35,7 @@ def laid_out(spec: dict, constraints: Constraints = LOOSE):
 def video_app(*, style: dict | None = None) -> App:
     view = {
         "root": {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [{"name": "v", "widget": "Video", "style": style or {}}],
         }
     }
@@ -190,7 +190,7 @@ def test_an_apps_elements_use_the_apps_own_atlas() -> None:
 def test_two_video_elements_get_independent_atlas_slots() -> None:
     view = {
         "root": {
-            "widget": "Row",
+            "widget": "Horizontal",
             "children": [
                 {"name": "a", "widget": "Video"},
                 {"name": "b", "widget": "Video"},

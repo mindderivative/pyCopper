@@ -7,7 +7,7 @@ name: structure
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 28, padding: 24}
     children:
       - widget: Text
@@ -28,7 +28,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: structure_div, widget: Divider, style: {width: expand}}
       - name: list_items
-        widget: Column
+        widget: Vertical
         style: {width: expand}
         children:
           - {name: li_one, widget: ListItem, text: "One-line item"}
@@ -58,7 +58,7 @@ children:
               - {name: widgets_dir, widget: TreeItem, text: "widgets/", handlers: {on_click: select_tree}}
           - {name: readme, widget: TreeItem, text: "README.md", handlers: {on_click: select_tree}}
       - name: shapes_row
-        widget: Row
+        widget: Horizontal
         style: {height: 64, spacing: 16, width: expand, cross_alignment: center}
         children:
           - {name: shape_tri, widget: Shape, style: {width: 56, height: 56, sides: 3, background: primary}}
@@ -89,7 +89,7 @@ children:
           - {name: t1, widget: Tab, text: "Details",  handlers: {on_click: select_tab}}
           - {name: t2, widget: Tab, text: "History",  handlers: {on_click: select_tab}}
       - name: rail_and_drawer
-        widget: Row
+        widget: Horizontal
         style: {height: 220, spacing: 16, width: expand}
         children:
           - name: rail_demo
@@ -109,7 +109,7 @@ children:
               - {name: d1, widget: NavItem, text: search,   supporting_text: "Search",   handlers: {on_click: select_rail}}
               - {name: d2, widget: NavItem, text: settings, supporting_text: "Settings", handlers: {on_click: select_rail}}
           - name: status_bar_demo
-            widget: Column
+            widget: Vertical
             style: {width: expand, height: expand}
             children:
               - name: status_bar_filler

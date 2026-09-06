@@ -12,7 +12,7 @@ name: home
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 20, padding: 24}
     children:
       - widget: Text

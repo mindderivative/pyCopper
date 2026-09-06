@@ -25,7 +25,7 @@ from pycopper.widgets.splitbutton import SplitButtonElement
 def _app(*, calls: list[str] | None = None, **spec):
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "sb", "widget": "SplitButton", **spec}],
     }
     app = App(view, theme=Theme(dark=True))

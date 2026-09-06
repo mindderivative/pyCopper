@@ -13,7 +13,7 @@ from pycopper.runtime.hotreload import HotReloader
 
 BASE = {
     "name": "root",
-    "widget": "Column",
+    "widget": "Vertical",
     "style": {"background": "surface", "padding": 8},
     "children": [
         {
@@ -169,7 +169,7 @@ def test_invalid_view_is_rejected_and_the_app_survives(view) -> None:
     app.watch()
     try:
         time.sleep(0.3)  # let the watcher settle before touching the file
-        view.write_text("id: root\nwidget: Column\nstyle: {background: not_a_token}\n")
+        view.write_text("id: root\nwidget: Vertical\nstyle: {background: not_a_token}\n")
         assert wait_for(lambda: (app.poll_reload(), app.reload_errors)[1])
     finally:
         app.unwatch()

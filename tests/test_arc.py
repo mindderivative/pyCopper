@@ -32,7 +32,7 @@ def arcs_of(**spec) -> list:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [{"name": "p", "widget": "CircularProgress", **spec}],
             }
@@ -111,7 +111,7 @@ def test_a_non_square_box_inscribes_the_circle_rather_than_stretching_it() -> No
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -204,7 +204,7 @@ def test_linear_and_circular_progress_agree_on_their_track() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface", "width": 200},
                 "children": [
                     {

@@ -35,14 +35,14 @@ from ..tree.element import ElementMixin, PaintContext, default_text_engine
 
 __all__ = [
     "ButtonElement",
-    "ColumnElement",
     "ContainerElement",
+    "HorizontalElement",
     "IconElement",
     "LinkElement",
-    "RowElement",
     "SpacerElement",
     "StackElement",
     "TextElement",
+    "VerticalElement",
     "build_element",
     "content_token",
     "create_element",
@@ -139,8 +139,8 @@ class ContainerElement(_StyledMixin, Padding):
 def _main_size_for(axis: Axis, style: StyleSpec) -> MainAxisSize:
     """Fill the main axis only when the view sized THAT axis.
 
-    The main axis of a Column is its HEIGHT. Keying this off `width` made a
-    Column with `width: expand` greedily fill vertically as well.
+    The main axis of a Vertical is its HEIGHT. Keying this off `width` made a
+    Vertical with `width: expand` greedily fill vertically as well.
     """
     sized = style.width if axis is Axis.HORIZONTAL else style.height
     return MainAxisSize.MAX if sized.kind != "auto" else MainAxisSize.MIN
@@ -195,11 +195,11 @@ class _FlexElement(_StyledMixin, Flex):
         return outer.constrain(inner.inflate(pad))
 
 
-class RowElement(_FlexElement):
+class HorizontalElement(_FlexElement):
     axis = Axis.HORIZONTAL
 
 
-class ColumnElement(_FlexElement):
+class VerticalElement(_FlexElement):
     axis = Axis.VERTICAL
 
 
@@ -878,8 +878,8 @@ def _material_registry() -> dict[WidgetKind, type]:
 
 _REGISTRY: dict[WidgetKind, type] = {
     WidgetKind.CONTAINER: ContainerElement,
-    WidgetKind.ROW: RowElement,
-    WidgetKind.COLUMN: ColumnElement,
+    WidgetKind.HORIZONTAL: HorizontalElement,
+    WidgetKind.VERTICAL: VerticalElement,
     WidgetKind.STACK: StackElement,
     WidgetKind.BUTTON: ButtonElement,
     WidgetKind.LINK: LinkElement,

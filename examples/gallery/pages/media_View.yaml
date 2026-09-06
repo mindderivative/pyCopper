@@ -7,7 +7,7 @@ name: media
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style: {width: expand, spacing: 28, padding: 24}
     children:
       - widget: Text
@@ -101,7 +101,7 @@ children:
         style: {color: on_surface, font_size: 15}
       - {name: media_div, widget: Divider, style: {width: expand}}
       - name: media_row
-        widget: Row
+        widget: Horizontal
         style: {height: 160, spacing: 16, width: expand}
         children:
           - name: image_demo

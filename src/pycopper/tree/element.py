@@ -719,7 +719,7 @@ class ElementMixin:
             # Measured while its own descendants were being skipped, so it
             # describes what survived rather than what is there. Culling
             # against it is circular, and it bites exactly once the list has
-            # been scrolled: a Column that painted four rows reports a
+            # been scrolled: a Vertical that painted four rows reports a
             # four-row extent, and at the next scroll position that extent
             # falls outside the viewport and takes the whole list with it.
             # Found by watching a 60-row list paint one instance.

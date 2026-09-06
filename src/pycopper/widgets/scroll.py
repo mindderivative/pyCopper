@@ -31,13 +31,13 @@ __all__ = ["ScrollViewElement"]
 class ScrollViewElement(_StyledMixin, Padding):
     """A viewport that clips one oversized child and scrolls it.
 
-    Wraps a single child, normally a Column::
+    Wraps a single child, normally a Vertical::
 
         - name: list
           widget: ScrollView
           style: {height: 300, width: expand}
           children:
-            - widget: Column
+            - widget: Vertical
               children: [ ... many rows ... ]
 
     The viewport **must be bounded on its scroll axis**. A ScrollView that

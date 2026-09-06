@@ -131,7 +131,7 @@ def test_app_text_renders_through_the_element_tree(render_scene) -> None:
 
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"background": "surface", "padding": 12},
         "children": [
             {

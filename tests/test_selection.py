@@ -108,7 +108,7 @@ def hosted(*, selectable: bool = True, text: str = "Hello selectable world"):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface", "padding": 10},
                 "children": [
                     {
@@ -212,7 +212,7 @@ def test_an_explicit_cursor_still_wins() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {

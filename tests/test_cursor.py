@@ -21,7 +21,7 @@ def hosted(children, size=(300, 340)):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": children,
             }
@@ -76,7 +76,7 @@ def test_a_disabled_container_reaches_its_children() -> None:
         [
             {
                 "name": "section",
-                "widget": "Column",
+                "widget": "Vertical",
                 "disabled": "true",
                 "children": [BUTTON],
             }
@@ -134,7 +134,7 @@ def scroll_app():
                 "children": [
                     {
                         "name": "col",
-                        "widget": "Column",
+                        "widget": "Vertical",
                         "style": {"width": "expand"},
                         "children": rows,
                     }
@@ -169,7 +169,7 @@ def test_a_horizontal_view_asks_for_the_other_axis() -> None:
                 "children": [
                     {
                         "name": "row",
-                        "widget": "Row",
+                        "widget": "Horizontal",
                         "children": [
                             {
                                 "name": f"c{i}",
@@ -192,7 +192,7 @@ def test_a_horizontal_view_asks_for_the_other_axis() -> None:
 def test_a_sheet_handle_asks_for_a_resize_cursor() -> None:
     app = App(
         {
-            "root": {"name": "root", "widget": "Column", "style": {"background": "surface"}},
+            "root": {"name": "root", "widget": "Vertical", "style": {"background": "surface"}},
             "overlays": [
                 {
                     "name": "sh",

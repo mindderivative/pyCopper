@@ -42,7 +42,7 @@ def graph(*children: dict, edges: list | None = None, style: dict | None = None)
 
 
 def app(view: dict) -> App:
-    a = App({"name": "root", "widget": "Column", "children": [view]}, theme=Theme(dark=True))
+    a = App({"name": "root", "widget": "Vertical", "children": [view]}, theme=Theme(dark=True))
     a.mount()
     a.update()
     return a
@@ -142,7 +142,7 @@ def test_dragging_the_content_area_does_not_move_the_node() -> None:
 def test_on_change_carries_the_new_position_once_the_drag_ends() -> None:
     calls: list[str] = []
     view = graph({**node("a", 0.0, 0.0), "handlers": {"on_change": "moved"}})
-    a = App({"name": "root", "widget": "Column", "children": [view]}, theme=Theme(dark=True))
+    a = App({"name": "root", "widget": "Vertical", "children": [view]}, theme=Theme(dark=True))
     a._handlers["moved"] = lambda e: calls.append(e.value)
     a.mount()
     a.update()
@@ -160,7 +160,7 @@ def test_on_change_carries_the_new_position_once_the_drag_ends() -> None:
 def test_arrow_keys_nudge_the_node_and_fire_on_change() -> None:
     calls: list[str] = []
     view = graph({**node("a", 40.0, 40.0), "handlers": {"on_change": "moved"}})
-    a = App({"name": "root", "widget": "Column", "children": [view]}, theme=Theme(dark=True))
+    a = App({"name": "root", "widget": "Vertical", "children": [view]}, theme=Theme(dark=True))
     a._handlers["moved"] = lambda e: calls.append(e.value)
     a.mount()
     a.update()

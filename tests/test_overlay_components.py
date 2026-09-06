@@ -51,7 +51,7 @@ def hosted(overlay: dict, *, root_children: list | None = None, size=(1024, 768)
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": root_children or [],
             },
@@ -167,7 +167,7 @@ def test_dialog_places_actions_below_the_text_block() -> None:
             "widget": "Dialog",
             "text": "Title",
             "supporting_text": "Body",
-            "children": [{"widget": "Row", "style": {"height": 40}}],
+            "children": [{"widget": "Horizontal", "style": {"height": 40}}],
         }
     )
     actions = dialog.children[0]

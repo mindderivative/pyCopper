@@ -9,7 +9,7 @@ from pycopper.widgets import build_element
 
 
 def spec(**kw):
-    return parse_view({"name": "root", "widget": "Column", **kw}).root
+    return parse_view({"name": "root", "widget": "Vertical", **kw}).root
 
 
 def tree(**kw):
@@ -129,7 +129,7 @@ def test_reordering_preserves_identity_and_state() -> None:
 def test_nested_subtrees_reconcile() -> None:
     nested = {
         "name": "outer",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "inner", "widget": "Container", "style": {"width": 5, "height": 5}}],
     }
     root = tree(children=[nested])

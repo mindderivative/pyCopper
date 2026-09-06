@@ -1,22 +1,22 @@
-"""Row demo -- its own window, own process.
+"""Vertical demo -- its own window, own process.
 
-python examples/widgets/row/app.py
+python examples/widgets/vertical/app.py
 """
 
 from pathlib import Path
 
-from Row_ViewModel import RowDemo
+from Vertical_ViewModel import VerticalDemo
 
 from pycopper import App, Settings, Theme
 
-VIEW = Path(__file__).parent / "Row_View.yaml"
+VIEW = Path(__file__).parent / "Vertical_View.yaml"
 
 app = App(
     VIEW,
     theme=Theme(seed="#6750A4", dark=True),
-    settings=Settings(title="pyCopper widgets -- Row", width=800, height=820),
+    settings=Settings(title="pyCopper widgets -- Vertical", width=800, height=820),
 )
-demo = RowDemo()
+demo = VerticalDemo()
 app.bind_view_model(VIEW.name, demo)
 # See Container's app.py for why the handler and the {{ }} names are also
 # registered globally: self.app.reload(...) rebuilds the view with no file

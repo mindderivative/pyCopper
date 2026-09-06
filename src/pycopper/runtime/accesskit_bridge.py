@@ -118,7 +118,7 @@ class AccessKitBridge(Bridge):
         self._toolkit_name = toolkit_name
         self._toolkit_version = toolkit_version
         #: AccessKit expects the tree's root to be a WINDOW carrying the title.
-        #: Handing it our own root -- a Column, which converts to GROUP -- made
+        #: Handing it our own root -- a Vertical, which converts to GROUP -- made
         #: AT-SPI list the application as "python3.14", the process name,
         #: because there was nothing better to call it. Found by asking the
         #: registry rather than by reading the docs.

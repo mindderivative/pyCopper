@@ -26,7 +26,7 @@ from pycopper.widgets.datepicker import DatePickerElement
 def _app(*, calls: list[str] | None = None, **spec):
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "dp", "widget": "DatePicker", **spec}],
     }
     app = App(view, theme=Theme(dark=True))
@@ -114,7 +114,7 @@ def test_a_live_bound_value_also_starts_on_its_own_month() -> None:
 
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "dp", "widget": "DatePicker", "value": "{{ chosen.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))

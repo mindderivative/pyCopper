@@ -2,7 +2,7 @@ name: root
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style:
       background: surface
       padding: 32
@@ -49,7 +49,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
-        widget: Row
+        widget: Horizontal
         style: {spacing: 12, width: expand}
         children:
           - name: btn_filled
@@ -91,7 +91,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: code_panels
-        widget: Row
+        widget: Horizontal
         style: {spacing: 16, width: expand, height: 260}
         children:
           - name: yaml_source

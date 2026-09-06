@@ -9,7 +9,7 @@ Material Design 3 interface — rendered through WebGPU in **a single draw call*
 # view.yaml
 root:
   name: root
-  widget: Column
+  widget: Vertical
   style: {background: surface, padding: 24, spacing: 16, width: expand}
   children:
     - name: label

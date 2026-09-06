@@ -64,7 +64,7 @@ def test_a_filter_chip_reads_as_a_checkbox_and_the_others_as_buttons() -> None:
     variants alike would lose exactly what a user needs to know."""
     view = {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "children": [
             {"name": "f", "widget": "Chip", "text": "Filter", "style": {"variant": "filter"}},
             {"name": "a", "widget": "Chip", "text": "Assist", "style": {"variant": "assist"}},
@@ -119,7 +119,7 @@ def test_a_text_fields_supporting_text_is_a_description_not_its_name() -> None:
 def test_checkable_and_uncheckable_are_distinguishable() -> None:
     view = {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "children": [
             {"name": "c", "widget": "Checkbox", "value": "true"},
             {"name": "b", "widget": "Button", "text": "Go"},
@@ -133,7 +133,7 @@ def test_checkable_and_uncheckable_are_distinguishable() -> None:
 def test_selected_and_unselected_are_distinguishable() -> None:
     view = {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "children": [
             {
                 "name": "rail",
@@ -189,7 +189,7 @@ def test_silent_nodes_do_not_bury_their_children() -> None:
     nothing to reach something."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {"name": "gap", "widget": "Spacer", "style": {"height": 8}},
             {
@@ -212,7 +212,7 @@ def test_an_icon_name_is_never_announced_as_a_label() -> None:
     bug nobody sees until they listen to it."""
     view = {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "children": [
             {"name": "n", "widget": "NavItem", "text": "home", "supporting_text": "Home"},
             {"name": "i", "widget": "IconButton", "text": "chevron_right"},
@@ -231,7 +231,7 @@ def test_find_locates_a_node_by_role_and_name() -> None:
     rectangle at some coordinate."""
     view = {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "children": [
             {"name": "a", "widget": "Button", "text": "Cancel"},
             {"name": "b", "widget": "Button", "text": "Confirm"},
@@ -249,7 +249,7 @@ def test_bounds_come_from_the_laid_out_element() -> None:
     tree = tree_of(
         {
             "name": "root",
-            "widget": "Row",
+            "widget": "Horizontal",
             "children": [{"name": "b", "widget": "Button", "text": "Go", "style": {"width": 120}}],
         }
     )
@@ -265,7 +265,7 @@ def test_a_visible_overlay_is_appended_to_the_root() -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [{"name": "b", "widget": "Button", "text": "Open"}],
         },
         "overlays": [
@@ -293,7 +293,7 @@ def test_a_closed_overlay_is_absent_entirely() -> None:
     """Not "present but hidden": a reader must not reach a dialog that is
     not up."""
     view = {
-        "root": {"name": "root", "widget": "Column", "children": []},
+        "root": {"name": "root", "widget": "Vertical", "children": []},
         "overlays": [{"name": "d", "widget": "Dialog", "text": "Nope", "open": "false"}],
     }
     app = App(view, theme=Theme(dark=True))

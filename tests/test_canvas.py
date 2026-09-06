@@ -28,12 +28,12 @@ def laid_out(spec: dict, constraints: Constraints = LOOSE):
 
 
 def canvas_app(painter, *, style: dict | None = None) -> App:
-    """A Canvas inside a Column, so its own style actually takes effect --
+    """A Canvas inside a Vertical, so its own style actually takes effect --
     the root element is force-fit to the window's own tight constraints, the
     same reason `test_dock.py` and every sizing test here wrap its subject."""
     view = {
         "root": {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [
                 {
                     "name": "c",

@@ -172,7 +172,7 @@ def test_icon_font_is_loaded_lazily() -> None:
 
 ICON_VIEW = {
     "name": "root",
-    "widget": "Row",
+    "widget": "Horizontal",
     "style": {"background": "surface", "padding": 8, "spacing": 8, "height": 48},
     "children": [
         {

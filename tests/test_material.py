@@ -30,7 +30,7 @@ def painted(theme: Theme | None = None, **spec) -> DisplayList:
     app = App(
         {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface"},
             "children": [{"name": "w", **spec}],
         },
@@ -139,7 +139,7 @@ def test_a_stretched_button_keeps_its_height() -> None:
 
     view = {
         "name": "col",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"cross_alignment": "stretch"},
         "children": [{"name": "b", "widget": "Button", "text": "Wide"}],
     }
@@ -218,7 +218,7 @@ def test_divider_is_one_dp_and_fills_width() -> None:
     """M3 3.6: 1dp thick, spanning the available width.
 
     Given a *tight* constraint it must obey that instead -- a node cannot
-    violate its constraints -- so this uses the constraint a Column actually
+    violate its constraints -- so this uses the constraint a Vertical actually
     hands its children: bounded width, loose height.
     """
     e = element(widget="Divider")
@@ -260,7 +260,7 @@ def test_checked_parses_truthiness(raw: str, expected: bool) -> None:
 def test_value_is_bindable_to_a_signal() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "cb", "widget": "Checkbox", "value": "{{ on.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))
@@ -299,7 +299,7 @@ def test_indeterminate_looks_filled_even_when_value_is_false() -> None:
 def test_indeterminate_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "cb",
@@ -321,7 +321,7 @@ def test_indeterminate_is_bindable() -> None:
 def test_badge_count_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [{"name": "b", "widget": "Badge", "value": "{{ n.get() }}"}],
     }
     app = App(view, theme=Theme(dark=True))
@@ -437,7 +437,7 @@ def test_hover_adds_a_state_layer(kind: str) -> None:
     """
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {"name": "w", "widget": kind, "text": "add" if kind in ("IconButton", "Fab") else None}
         ],
@@ -461,7 +461,7 @@ def test_hover_adds_a_state_layer(kind: str) -> None:
 
 def test_hover_does_not_trigger_layout() -> None:
     app = App(
-        {"name": "root", "widget": "Column", "children": [{"name": "w", "widget": "Switch"}]},
+        {"name": "root", "widget": "Vertical", "children": [{"name": "w", "widget": "Switch"}]},
         theme=Theme(dark=True),
     )
     app.mount()
@@ -478,7 +478,7 @@ def test_hover_does_not_trigger_layout() -> None:
 def _switch_app(checked: bool = False):
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "sw",
@@ -634,7 +634,7 @@ def test_link_draws_only_its_label_and_underline() -> None:
     between the two."""
     dl = painted(widget="Link", text="Go")
     glyphs = sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)
-    # Excludes the wrapping Column's own background box, which `painted()`
+    # Excludes the wrapping Vertical's own background box, which `painted()`
     # always draws regardless of what widget is under test.
     own_boxes = [s for s in dl.view if s["flags"][0] == Kind.BOX and float(s["rect"][3]) < 10.0]
     assert glyphs == len("Go")
@@ -664,7 +664,7 @@ def _spin_box_app(*, value="3", min=None, max=None, step=1, on_change=None):
     child = {"name": "sb", "widget": "SpinBox", "value": value, "style": style}
     if on_change is not None:
         child["handlers"] = {"on_change": "change"}
-    view = {"name": "root", "widget": "Column", "children": [child]}
+    view = {"name": "root", "widget": "Vertical", "children": [child]}
     app = App(view, theme=Theme(dark=True))
     if on_change is not None:
         app._handlers["change"] = on_change
@@ -790,7 +790,7 @@ def _pagination_app(*, value="1", count=10, on_change=None):
     child = {"name": "pg", "widget": "Pagination", "value": value, "style": style}
     if on_change is not None:
         child["handlers"] = {"on_change": "change"}
-    view = {"name": "root", "widget": "Column", "children": [child]}
+    view = {"name": "root", "widget": "Vertical", "children": [child]}
     app = App(view, theme=Theme(dark=True))
     if on_change is not None:
         app._handlers["change"] = on_change
@@ -971,7 +971,7 @@ def test_accordion_chevron_swaps_rather_than_stacking() -> None:
 def test_accordion_expand_state_is_bindable() -> None:
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "acc",
@@ -1004,7 +1004,7 @@ def test_accordion_hover_state_layer_does_not_cover_the_body() -> None:
     revealed body too, so this widget emits its own header-sized box."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "children": [
             {
                 "name": "acc",

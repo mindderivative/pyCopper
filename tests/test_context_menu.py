@@ -36,7 +36,7 @@ def hosted(*, size=(500, 400), with_menu: bool = True):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -103,7 +103,7 @@ def test_a_right_click_does_not_press_focus_or_click() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -222,7 +222,7 @@ def test_pointer_placement_needs_no_anchor_element() -> None:
 
     view = parse_view(
         {
-            "root": {"name": "root", "widget": "Column"},
+            "root": {"name": "root", "widget": "Vertical"},
             "overlays": [
                 {"name": "m", "widget": "Menu", "open": "true", "style": {"placement": "pointer"}}
             ],

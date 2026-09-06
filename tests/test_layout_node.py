@@ -18,7 +18,7 @@ from pycopper.layout import (
     Size,
     SizedBox,
 )
-from pycopper.layout.algorithms import Column, EdgeInsets
+from pycopper.layout.algorithms import EdgeInsets, Vertical
 
 
 class CountingLeaf(LeafNode):
@@ -35,7 +35,7 @@ class CountingLeaf(LeafNode):
         return super().perform_layout(constraints)
 
 
-class CountingColumn(Column):
+class CountingVertical(Vertical):
     __slots__ = ("layouts",)
 
     def __init__(self, children=()) -> None:  # type: ignore[no-untyped-def]
@@ -156,7 +156,7 @@ def test_boundary_is_inherited_through_loose_parents() -> None:
     """Under genuinely loose constraints, descendants share the nearest boundary."""
     leaf = LeafNode(10, 10)
     inner = Padding(leaf, EdgeInsets.all(1))
-    outer = Column([inner])
+    outer = Vertical([inner])
     root = Align(outer)
     root.layout(Constraints.loose(Size(500, 500)))
 
@@ -172,13 +172,13 @@ def test_boundary_is_inherited_through_loose_parents() -> None:
 def test_dirt_stops_at_the_nearest_boundary() -> None:
     """The headline claim: a deep change does not reach the root.
 
-    The leaf sits under a Column (loose constraints, so no boundary of its own)
-    inside a fixed-size box. Dirt climbs to the Column and stops there.
+    The leaf sits under a Vertical (loose constraints, so no boundary of its own)
+    inside a fixed-size box. Dirt climbs to the Vertical and stops there.
     """
     leaf = CountingLeaf()
-    inner = Column([leaf])
+    inner = Vertical([leaf])
     boundary = SizedBox(inner, width=100, height=100)
-    root = CountingColumn([boundary])
+    root = CountingVertical([boundary])
 
     owner = LayoutOwner()
     root.attach(owner)
@@ -197,9 +197,9 @@ def test_dirt_stops_at_the_nearest_boundary() -> None:
 
 def test_flush_relayouts_only_the_dirty_subtree() -> None:
     leaf = CountingLeaf()
-    boundary = SizedBox(Column([leaf]), width=100, height=100)
+    boundary = SizedBox(Vertical([leaf]), width=100, height=100)
     sibling = CountingLeaf()
-    root = CountingColumn([boundary, sibling])
+    root = CountingVertical([boundary, sibling])
 
     owner = LayoutOwner()
     root.attach(owner)
@@ -217,7 +217,7 @@ def test_flush_relayouts_only_the_dirty_subtree() -> None:
 
 def test_boundary_size_is_unchanged_by_subtree_relayout() -> None:
     leaf = CountingLeaf()
-    boundary = SizedBox(Column([leaf]), width=100, height=100)
+    boundary = SizedBox(Vertical([leaf]), width=100, height=100)
     owner = LayoutOwner()
     boundary.attach(owner)
     boundary.layout(Constraints.loose(Size(500, 500)))
@@ -231,8 +231,8 @@ def test_flush_processes_parents_before_children() -> None:
     outer_leaf = CountingLeaf()
     inner_leaf = CountingLeaf()
     inner = SizedBox(inner_leaf, width=40, height=40)
-    outer = SizedBox(Column([outer_leaf, inner]), width=100, height=100)
-    root = Column([outer])
+    outer = SizedBox(Vertical([outer_leaf, inner]), width=100, height=100)
+    root = Vertical([outer])
 
     owner = LayoutOwner()
     root.attach(owner)
@@ -260,7 +260,7 @@ def test_marking_dirty_twice_schedules_once() -> None:
 
 
 def test_adding_a_child_dirties_the_parent() -> None:
-    parent = Column([])
+    parent = Vertical([])
     parent.layout(Constraints.unbounded())
     assert not parent.needs_layout
     parent.add_child(LeafNode(10, 10))
@@ -269,7 +269,7 @@ def test_adding_a_child_dirties_the_parent() -> None:
 
 def test_removing_a_child_dirties_the_parent_and_detaches_it() -> None:
     leaf = LeafNode(10, 10)
-    parent = Column([leaf])
+    parent = Vertical([leaf])
     parent.layout(Constraints.unbounded())
     assert not parent.needs_layout
 
@@ -280,7 +280,7 @@ def test_removing_a_child_dirties_the_parent_and_detaches_it() -> None:
 
 def test_depth_tracks_nesting() -> None:
     leaf = LeafNode()
-    root = Column([Column([leaf])])
+    root = Vertical([Vertical([leaf])])
     assert root.depth == 0
     assert root.children[0].depth == 1
     assert leaf.depth == 2
@@ -288,12 +288,12 @@ def test_depth_tracks_nesting() -> None:
 
 def test_reparenting_requires_removal_first() -> None:
     leaf = LeafNode()
-    Column([leaf])
+    Vertical([leaf])
     with pytest.raises(ValueError, match="already has a parent"):
-        Column([leaf])
+        Vertical([leaf])
 
 
 def test_walk_is_depth_first_preorder() -> None:
     a, b = LeafNode(), LeafNode()
-    root = Column([a, b])
+    root = Vertical([a, b])
     assert list(root.walk()) == [root, a, b]

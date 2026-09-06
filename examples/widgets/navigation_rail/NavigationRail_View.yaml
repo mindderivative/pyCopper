@@ -2,7 +2,7 @@ name: root
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style:
       background: surface
       padding: 32
@@ -43,7 +43,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
-        widget: Row
+        widget: Horizontal
         style: {spacing: 16}
         children:
           - name: rail
@@ -55,7 +55,7 @@ children:
               - {name: home, widget: NavItem, text: "home", supporting_text: "Home", handlers: {on_click: select}}
               - {name: search, widget: NavItem, text: "search", supporting_text: "Search", handlers: {on_click: select}}
               - {name: settings, widget: NavItem, text: "settings", supporting_text: "Settings", handlers: {on_click: select}}
-          - widget: Column
+          - widget: Vertical
             style: {spacing: 8}
             children:
               - {widget: Button, text: "Toggle collapsed", style: {variant: outlined}, handlers: {on_click: toggle_collapsed}}
@@ -71,7 +71,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: code_panels
-        widget: Row
+        widget: Horizontal
         style: {spacing: 16, width: expand, height: 260}
         children:
           - name: yaml_source

@@ -1,5 +1,5 @@
 name: root
-widget: Column
+widget: Vertical
 style:
   background: surface
   padding: 32
@@ -29,7 +29,7 @@ children:
         style: {color: on_surface_variant, font_size: 16}
 
   - name: actions
-    widget: Row
+    widget: Horizontal
     style: {height: 48, spacing: 12, width: expand}
     children:
       - name: inc

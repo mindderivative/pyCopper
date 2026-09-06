@@ -25,7 +25,7 @@ states. If the spec points at a cross-cutting topic -- a colour role, an
 elevation level, a motion pattern -- follow `m3-lookup`'s style path for that
 topic too, rather than treating the component page as the whole story.
 
-If the widget has no clean M3 analogue (pyCopper's `Row`, `Column`, `Stack`,
+If the widget has no clean M3 analogue (pyCopper's `Horizontal`, `Vertical`, `Stack`,
 `Spacer` are layout primitives with no catalogue entry), say so and design from
 pyCopper's own precedent instead of forcing a mapping.
 
@@ -176,7 +176,7 @@ what to close before implementing.
 
 **Available:** spec/Pydantic validation with binding expressions; fine-grained
 signals; element tree with state-preserving reconciliation; constraint layout
-(Padding, Align, SizedBox, ConstrainedBox, Flex/Row/Column, Stack, Flexible,
+(Padding, Align, SizedBox, ConstrainedBox, Flex/Horizontal/Vertical, Stack, Flexible,
 Spacer, ScrollView); the single instanced SDF pipeline with per-corner radii, borders,
 shadows, analytic antialiasing and rounded in-shader clipping; the full 59-token
 MD3 palette with one-upload theme switching; events with hit testing,
@@ -219,9 +219,9 @@ binding; `placement` is `center`, `anchor` (with `anchor: <id>`), or an edge;
 
 **Single-child containers reject a second child.** Container, Card, Text, Icon
 and the selection controls are `Padding`-based and take one child — wrap
-several in a Row or Column.
+several in a Horizontal or Vertical.
 
-**Widgets today (39 kinds):** primitives — Container, Row, Column, Stack,
+**Widgets today (39 kinds):** primitives — Container, Horizontal, Vertical, Stack,
 Spacer, Text, Icon, ScrollView. M3 components — Button (5 variants), Card,
 Divider, Checkbox, Radio, Switch, Chip, IconButton, Fab, Badge,
 NavigationRail, NavigationDrawer, NavItem, TopAppBar, Tabs, Tab,
@@ -270,7 +270,7 @@ standard), and weights below 200 are lifted automatically at that size per M3's
 guidance. An unknown icon name raises; check membership with
 `TextEngine.icons`.
 
-**Sizing inside a Row or Column:** a child styled `width: expand` (or `flex:n`)
+**Sizing inside a Horizontal or Vertical:** a child styled `width: expand` (or `flex:n`)
 along the main axis is flexible and shares the free space; anything else is
 measured first and takes what it needs. A `Text` widget shrink-wraps to its ink
 extent, so it will not starve its siblings.

@@ -28,20 +28,20 @@ __all__ = [
     "Align",
     "Axis",
     "Center",
-    "Column",
     "ConstrainedBox",
     "CrossAxisAlignment",
     "Flex",
     "FlexFit",
     "Flexible",
+    "Horizontal",
     "MainAxisAlignment",
     "MainAxisSize",
     "Padding",
-    "Row",
     "SingleChildNode",
     "SizedBox",
     "Spacer",
     "Stack",
+    "Vertical",
 ]
 
 
@@ -96,7 +96,8 @@ class SingleChildNode(LayoutNode):
         """
         if self._children:
             raise ValueError(
-                f"{type(self).__name__} takes a single child; wrap several in a Row or Column"
+                f"{type(self).__name__} takes a single child; "
+                "wrap several in a Horizontal or Vertical"
             )
         super().insert_child(index, child)
 
@@ -482,7 +483,7 @@ class Flex(LayoutNode):
                 cursor += between
 
 
-class Row(Flex):
+class Horizontal(Flex):
     """Horizontal :class:`Flex`."""
 
     __slots__ = ()
@@ -491,7 +492,7 @@ class Row(Flex):
         super().__init__(children, axis=Axis.HORIZONTAL, **kw)  # type: ignore[arg-type]
 
 
-class Column(Flex):
+class Vertical(Flex):
     """Vertical :class:`Flex`."""
 
     __slots__ = ()

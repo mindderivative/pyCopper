@@ -151,12 +151,12 @@ ROLES: Final[dict[str, str]] = {
     "NodeGraph": "graphics-document",
     "Node": "graphics-object",
     "Container": "group",
-    "Row": "group",
-    "Column": "group",
+    "Horizontal": "group",
+    "Vertical": "group",
     "Stack": "group",
     # No M3 component -- see PageHostElement's own docstring. Structurally a
-    # plain box holding one child at a time, the same shape as Container/Row/
-    # Column/Stack above, not a navigation container with a stated "not
+    # plain box holding one child at a time, the same shape as Container/
+    # Horizontal/Vertical/Stack above, not a navigation container with a stated "not
     # announced" role like NavigationRail/Drawer below -- so it gets the same
     # generic "group" those get, rather than being silenced.
     "PageHost": "group",
@@ -344,7 +344,7 @@ def accessibility_tree(root: Any, overlays: Any = None) -> AccessibleNode:
     """Snapshot the semantic tree for a mounted element tree.
 
     A silent element is skipped but its children are kept and lifted to its
-    parent, so a `Row` wrapping three buttons does not bury them behind a node
+    parent, so a `Horizontal` wrapping three buttons does not bury them behind a node
     that says only "group" -- and a `Spacer` disappears entirely rather than
     becoming an empty announcement.
 

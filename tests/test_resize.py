@@ -30,7 +30,7 @@ PALETTE = Palette(Theme())
 
 STRETCHED = {
     "name": "root",
-    "widget": "Column",
+    "widget": "Vertical",
     "style": {
         "width": "expand",
         "height": "expand",
@@ -74,7 +74,7 @@ def test_a_row_that_kept_its_origin_is_repainted_at_its_new_width() -> None:
     """The bug, in the smallest form that shows it.
 
     The paint cache was keyed on an element's absolute origin alone. A row
-    stretched across a Column keeps its origin when the window widens and
+    stretched across a Vertical keeps its origin when the window widens and
     changes only its width, so it passed the check and was spliced from its
     old, narrower slice -- correct geometry in the element tree, stale
     geometry on screen.

@@ -32,7 +32,7 @@ def hosted(*, overlays=None, children=None, **settings):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": children or [{"name": "bg", "widget": "Text", "text": "behind"}],
             },
@@ -333,7 +333,7 @@ def selection_app(**settings):
         {
             "root": {
                 "name": "root",
-                "widget": "Row",
+                "widget": "Horizontal",
                 "style": {"background": "surface", "spacing": 8},
                 "children": [
                     {"name": "cb", "widget": "Checkbox", "value": "{{ on.get() }}"},
@@ -430,7 +430,7 @@ def test_a_non_filter_chip_has_no_checkmark_to_animate() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Row",
+                "widget": "Horizontal",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -493,7 +493,7 @@ def indicator_app(widget: str, value: str, children: list, *, style=None, **sett
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {

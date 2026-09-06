@@ -28,7 +28,7 @@ def app_with(variant: str = "large", rows: int = 20, *, link: bool = True, heigh
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {"name": "bar", "widget": "TopAppBar", "text": "Inbox", "style": style},
@@ -39,7 +39,7 @@ def app_with(variant: str = "large", rows: int = 20, *, link: bool = True, heigh
                         "children": [
                             {
                                 "name": "col",
-                                "widget": "Column",
+                                "widget": "Vertical",
                                 "style": {"width": "expand"},
                                 "children": [
                                     {
@@ -142,7 +142,7 @@ def test_naming_a_view_that_does_not_exist_is_not_fatal() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {
@@ -255,7 +255,7 @@ def test_an_explicit_background_overrides_the_scroll_fill() -> None:
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": [
                     {

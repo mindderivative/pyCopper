@@ -35,7 +35,7 @@ def list_view(rows: int = 60, height: float = 200.0):
             "children": [
                 {
                     "name": "col",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "children": [
                         {"name": f"r{i}", "widget": "ListItem", "text": f"Row {i}"}
                         for i in range(rows)
@@ -96,12 +96,12 @@ def test_a_row_straddling_the_viewport_edge_is_still_painted() -> None:
 
 
 def test_an_unclipped_context_never_culls() -> None:
-    """Without a clip there is nothing to be outside of, so a plain Column must
+    """Without a clip there is nothing to be outside of, so a plain Vertical must
     paint every child however far down the page it is."""
     view = {
         "root": {
             "name": "col",
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [
                 {"name": f"r{i}", "widget": "ListItem", "text": f"Row {i}"} for i in range(40)
             ],

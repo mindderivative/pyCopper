@@ -36,7 +36,7 @@ def laid_out(spec: dict, constraints: Constraints = LOOSE):
 def image_app(path: str, *, style: dict | None = None) -> App:
     view = {
         "root": {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [{"name": "img", "widget": "Image", "path": path, "style": style or {}}],
         }
     }
@@ -219,7 +219,7 @@ def test_path_is_bindable_to_a_signal(tmp_path) -> None:
     make_png(big, 80, 40)
     view = {
         "root": {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [{"name": "img", "widget": "Image", "path": "{{ p.get() }}"}],
         }
     }

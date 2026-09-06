@@ -30,7 +30,7 @@ def tree(spec: dict, width: float = 200.0, height: float = 100.0):
 def row(*children: dict, spacing: float = 16.0) -> dict:
     return {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "style": {
             "width": "expand",
             "height": "expand",
@@ -95,7 +95,7 @@ def test_a_minimum_grows_only_the_axis_that_is_short() -> None:
     root = tree(
         {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": "expand", "height": "expand"},
             "children": [
                 {
@@ -119,7 +119,7 @@ def test_padding_grows_each_edge_independently() -> None:
     root = tree(
         {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": "expand", "height": "expand"},
             "children": [
                 {
@@ -201,12 +201,12 @@ def test_a_grandchild_target_is_reachable_through_two_ancestors() -> None:
     root = tree(
         {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": "expand", "height": "expand"},
             "children": [
                 {
                     "name": "mid",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"width": 18, "height": 18},
                     "children": [
                         {"name": "cb", "widget": "Checkbox", "style": {"min_hit_size": 48}}
@@ -225,7 +225,7 @@ def test_a_clipping_parent_confines_the_target() -> None:
     show a response to."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"width": "expand", "height": "expand"},
         "children": [
             {"name": "gap", "widget": "Spacer", "style": {"height": 40}},
@@ -236,7 +236,7 @@ def test_a_clipping_parent_confines_the_target() -> None:
                 "children": [
                     {
                         "name": "col",
-                        "widget": "Column",
+                        "widget": "Vertical",
                         "style": {"width": "expand"},
                         "children": [
                             {"name": "cb", "widget": "Checkbox", "style": {"min_hit_size": 48}},

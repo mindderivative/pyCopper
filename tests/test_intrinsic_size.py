@@ -31,9 +31,9 @@ LOOSE = Constraints(0.0, 400.0, 0.0, 300.0)
 #: to write the reason down is for.
 EMPTY_IS_HONEST = {
     "Container": "a box around nothing",
-    "Row": "as wide as its children, and it has none",
+    "Horizontal": "as wide as its children, and it has none",
     "ButtonGroup": "an invisible container hugging its buttons, and it has none",
-    "Column": "as tall as its children, and it has none",
+    "Vertical": "as tall as its children, and it has none",
     "TreeView": "as wide as its items, and it has none",
     "Spacer": "space is all it is; with no flex or size there is none to take",
     "SegmentedButton": "as wide as its segments; it keeps its 40dp height",

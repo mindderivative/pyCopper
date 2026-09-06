@@ -19,7 +19,7 @@ IDE's layout is:
 onto an edge to split or rearrange the tree at runtime -- is a separate,
 substantially larger feature (drop-zone hit-testing, tree mutation, tab
 reordering, drag previews) and is deliberately not part of this pass. A
-layout is arranged once, in the view file, the way a `Row`/`Column`/`Stack`
+layout is arranged once, in the view file, the way a `Horizontal`/`Vertical`/`Stack`
 tree already is.
 """
 

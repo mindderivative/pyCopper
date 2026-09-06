@@ -23,7 +23,7 @@ def hosted(children):
         {
             "root": {
                 "name": "root",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface"},
                 "children": children,
             }

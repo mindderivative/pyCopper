@@ -2,7 +2,7 @@ name: root
 widget: ScrollView
 style: {width: expand, height: expand}
 children:
-  - widget: Column
+  - widget: Vertical
     style:
       background: surface
       padding: 32
@@ -17,7 +17,7 @@ children:
 
       - name: summary
         widget: Text
-        text: "Pure flex-filler: with no flex or size of its own there is none to take, so it only does anything inside a Row or Column."
+        text: "Pure flex-filler: with no flex or size of its own there is none to take, so it only does anything inside a Horizontal or Vertical."
         style: {text_style: body-large, color: on_surface_variant}
 
       - {name: div1, widget: Divider, style: {width: expand}}
@@ -25,7 +25,7 @@ children:
       - name: explanation
         widget: Text
         text: |
-          A child styled `width: flex:N` (Row) or `height: flex:N` shares
+          A child styled `width: flex:N` (Horizontal) or `height: flex:N` shares
           the parent's leftover space in proportion to its own weight
           against every other flexible sibling's -- a plain Spacer is
           just a widget with nothing else to draw, used purely for that
@@ -35,7 +35,7 @@ children:
           drives it by rebuilding the view in Python and calling
           `self.app.reload(...)`.
 
-          Use cases: pinning one item to each end of a Row (a single
+          Use cases: pinning one item to each end of a Horizontal (a single
           Spacer between them), or distributing space between several
           items in a known ratio.
         style: {text_style: body-medium, color: on_surface_variant}
@@ -48,7 +48,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
-        widget: Row
+        widget: Horizontal
         style: {width: expand, height: 56, background: surface_container_low, corner_radius: 8, padding: {left: 12, right: 12}}
         children:
           - {widget: Container, style: {width: 40, height: 32, background: primary, corner_radius: 6}}
@@ -63,7 +63,7 @@ children:
         style: {color: on_surface_variant}
 
       - name: controls
-        widget: Row
+        widget: Horizontal
         style: {spacing: 8}
         children:
           - {widget: Button, text: "Cycle ratio", style: {variant: outlined}, handlers: {on_click: cycle_ratio}}
@@ -76,7 +76,7 @@ children:
         style: {text_style: title-medium, color: primary}
 
       - name: code_panels
-        widget: Row
+        widget: Horizontal
         style: {spacing: 16, width: expand, height: 260}
         children:
           - name: yaml_source

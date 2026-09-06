@@ -141,7 +141,7 @@ registry. **Read it, don't recall it** -- it changes as widgets land:
 This is not a strict name match. Reason about real analogues even under
 different names, and state each mapping explicitly rather than assuming it.
 Some pyCopper widgets are layout primitives with no M3 catalogue entry at all
-(`Row`, `Column`, `Stack`, `Spacer`, `Container`) -- that is expected; don't
+(`Horizontal`, `Vertical`, `Stack`, `Spacer`, `Container`) -- that is expected; don't
 force a mapping. Present two lists: covered (M3 component -> pyCopper widget),
 and not yet covered.
 

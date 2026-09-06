@@ -122,7 +122,7 @@ def test_widget_tree_baseline(render_scene, assert_golden) -> None:
     """A real App through the full four-tree pipeline."""
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {
             "background": "surface",
             "padding": 16,
@@ -160,7 +160,7 @@ def test_widget_tree_baseline(render_scene, assert_golden) -> None:
             },
             {
                 "name": "row",
-                "widget": "Row",
+                "widget": "Horizontal",
                 "style": {"height": 44, "spacing": 10, "width": "expand"},
                 "children": [
                     {
@@ -244,8 +244,8 @@ def test_gallery_baseline(render_scene, assert_golden) -> None:
     gallery did -- that breadth now lives in each widget's own unit tests
     and in `test_gallery_advanced_page_baseline` below for the one page
     (Terminal) that needs a real running `App` to render deterministically.
-    This is still the corpus test for the shell itself: Container, Row,
-    Column, Stack, Text, Button, Spacer, PageHost, and the nav rail together,
+    This is still the corpus test for the shell itself: Container, Horizontal,
+    Vertical, Stack, Text, Button, Spacer, PageHost, and the nav rail together,
     so a regression anywhere in the four-tree pipeline shows up here.
     """
     demo = _import_gallery_app()
@@ -363,12 +363,12 @@ def test_focus_ring_baseline(render_scene, assert_golden) -> None:
 
     view = {
         "name": "root",
-        "widget": "Column",
+        "widget": "Vertical",
         "style": {"background": "surface", "padding": 16},
         "children": [
             {
                 "name": "row",
-                "widget": "Row",
+                "widget": "Horizontal",
                 "style": {"height": 56, "spacing": 20, "cross_alignment": "center"},
                 "children": [
                     {
@@ -411,7 +411,7 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
 
     view = {
         "name": "root",
-        "widget": "Row",
+        "widget": "Horizontal",
         "style": {"background": "surface", "width": "expand", "height": "expand"},
         "children": [
             {
@@ -442,7 +442,7 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
             },
             {
                 "name": "main",
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"width": "expand"},
                 "children": [
                     {
@@ -470,7 +470,7 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
                     },
                     {
                         "name": "body",
-                        "widget": "Column",
+                        "widget": "Vertical",
                         "style": {"padding": 16, "spacing": 14, "width": "expand"},
                         "children": [
                             {
@@ -520,7 +520,7 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 20, "spacing": 12},
             "children": [
                 {
@@ -560,7 +560,7 @@ def test_overlay_baseline(render_scene, assert_golden) -> None:
                 "children": [
                     {
                         "name": "mcol",
-                        "widget": "Column",
+                        "widget": "Vertical",
                         "style": {"width": "expand"},
                         "children": [
                             {
@@ -626,12 +626,12 @@ def test_overlay_components_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 20, "spacing": 12},
             "children": [
                 {
                     "name": "top",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"width": "expand", "height": 40, "spacing": 12},
                     "children": [
                         {
@@ -712,7 +712,7 @@ def test_dialog_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 20, "spacing": 12},
             "children": [
                 {
@@ -736,7 +736,7 @@ def test_dialog_baseline(render_scene, assert_golden) -> None:
                 "children": [
                     {
                         "name": "actions",
-                        "widget": "Row",
+                        "widget": "Horizontal",
                         "style": {
                             "width": "expand",
                             "height": 40,
@@ -780,7 +780,7 @@ def test_bottom_sheet_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 20},
             "children": [
                 {
@@ -841,7 +841,7 @@ def test_scroll_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 10},
             "children": [
                 {
@@ -862,7 +862,7 @@ def test_scroll_baseline(render_scene, assert_golden) -> None:
                     "children": [
                         {
                             "name": "col",
-                            "widget": "Column",
+                            "widget": "Vertical",
                             "style": {"width": "expand"},
                             "children": [
                                 {
@@ -906,12 +906,12 @@ def test_arc_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 16},
             "children": [
                 {
                     "name": "row",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"height": 48, "spacing": 14, "width": "expand"},
                     "children": [
                         {
@@ -924,7 +924,7 @@ def test_arc_baseline(render_scene, assert_golden) -> None:
                 },
                 {
                     "name": "row2",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"height": 56, "spacing": 14, "width": "expand"},
                     "children": [
                         {
@@ -991,7 +991,7 @@ def test_carousel_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 8, "spacing": 8},
             "children": [
                 strip("mb", "multi_browse"),
@@ -1046,12 +1046,12 @@ def test_motion_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 14},
             "children": [
                 {
                     "name": "switches",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"height": 32, "spacing": 16},
                     "children": [
                         {"name": "off", "widget": "Switch", "value": "false"},
@@ -1072,7 +1072,7 @@ def test_motion_baseline(render_scene, assert_golden) -> None:
                 },
                 {
                     "name": "circles",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"height": 48, "spacing": 20},
                     "children": [
                         {"name": "cir_i", "widget": "CircularProgress"},
@@ -1129,7 +1129,7 @@ def test_transitions_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 12},
             "children": [
                 {
@@ -1193,7 +1193,7 @@ def test_selection_controls_baseline(render_scene, assert_golden) -> None:
     def column(name: str, value: str) -> dict:
         return {
             "name": name,
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": 120, "spacing": 14, "cross_alignment": "start"},
             "children": [
                 {"name": f"{name}_cb", "widget": "Checkbox", "value": value},
@@ -1211,7 +1211,7 @@ def test_selection_controls_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Row",
+            "widget": "Horizontal",
             "style": {"background": "surface", "padding": 16, "spacing": 8},
             "children": [
                 column("off", "false"),
@@ -1252,7 +1252,7 @@ def test_indicators_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Row",
+            "widget": "Horizontal",
             "style": {"background": "surface", "spacing": 12},
             "children": [
                 {
@@ -1282,7 +1282,7 @@ def test_indicators_baseline(render_scene, assert_golden) -> None:
                 },
                 {
                     "name": "right",
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "style": {"width": "expand", "spacing": 20, "padding": 12},
                     "children": [
                         {
@@ -1345,7 +1345,7 @@ def test_app_bar_collapse_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface"},
             "children": [
                 {
@@ -1361,7 +1361,7 @@ def test_app_bar_collapse_baseline(render_scene, assert_golden) -> None:
                     "children": [
                         {
                             "name": "col",
-                            "widget": "Column",
+                            "widget": "Vertical",
                             "style": {"width": "expand"},
                             "children": [
                                 {
@@ -1412,7 +1412,7 @@ def test_carousel_parallax_baseline(render_scene, assert_golden) -> None:
             "children": [
                 {
                     "name": f"row{j}",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"width": "expand", "height": "expand"},
                     "children": [
                         {
@@ -1441,7 +1441,7 @@ def test_carousel_parallax_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 8, "spacing": 10},
             "children": [
                 {
@@ -1483,7 +1483,7 @@ def test_disabled_baseline(render_scene, assert_golden) -> None:
     def controls(suffix: str, disabled: str) -> dict:
         return {
             "name": f"col{suffix}",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"width": 170, "spacing": 12},
             "disabled": disabled,
             "children": [
@@ -1501,7 +1501,7 @@ def test_disabled_baseline(render_scene, assert_golden) -> None:
                 },
                 {
                     "name": f"row{suffix}",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"height": 40, "spacing": 14, "cross_alignment": "center"},
                     "children": [
                         {"name": f"cb{suffix}", "widget": "Checkbox", "value": "true"},
@@ -1522,7 +1522,7 @@ def test_disabled_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Row",
+            "widget": "Horizontal",
             "style": {"background": "surface", "padding": 16, "spacing": 24},
             "children": [controls("a", "false"), controls("b", "true")],
         }
@@ -1557,7 +1557,7 @@ def test_stylesheet_baseline(render_scene, assert_golden) -> None:
         ],
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 12},
             "children": [
                 {"name": "plain", "widget": "Button", "text": "Plain"},
@@ -1621,7 +1621,7 @@ def test_type_scale_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 12, "spacing": 2},
             "children": children,
         }
@@ -1647,7 +1647,7 @@ def test_text_field_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 12},
             "children": [
                 {
@@ -1716,7 +1716,7 @@ def test_multiline_field_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 12},
             "children": [
                 {
@@ -1867,10 +1867,10 @@ def test_shapes_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 12},
             "children": [
-                {"name": f"r{i}", "widget": "Row", "style": {"spacing": 12}, "children": r}
+                {"name": f"r{i}", "widget": "Horizontal", "style": {"spacing": 12}, "children": r}
                 for i, r in enumerate(rows)
             ],
         }
@@ -1899,7 +1899,7 @@ def test_unsized_widgets_baseline(render_scene, assert_golden) -> None:
     """
     row = {
         "name": "controls",
-        "widget": "Row",
+        "widget": "Horizontal",
         "style": {"spacing": 8, "cross_alignment": "center"},
         "children": [
             {"name": "cb", "widget": "Checkbox", "value": "true"},
@@ -1914,7 +1914,7 @@ def test_unsized_widgets_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {
                 "background": "surface",
                 "padding": 16,
@@ -1966,7 +1966,7 @@ def test_elevation_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 20, "spacing": 18},
             "children": [
                 {
@@ -2009,7 +2009,7 @@ def test_context_menu_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16},
             "children": [
                 {
@@ -2081,7 +2081,7 @@ def test_text_selection_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 16, "spacing": 14},
             "children": [
                 {
@@ -2154,7 +2154,7 @@ def test_svg_icons_baseline(render_scene, assert_golden, tmp_path) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Row",
+            "widget": "Horizontal",
             "style": {"background": "surface", "padding": 20, "spacing": 20},
             "children": [
                 {"name": "tri", "widget": "Icon", "text": "triangle", "style": {"icon_size": 48}},
@@ -2191,7 +2191,7 @@ def test_popover_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24},
             "children": [
                 {"name": "trigger", "widget": "Button", "text": "Info", "style": {"width": 80}}
@@ -2221,7 +2221,7 @@ def test_popover_baseline(render_scene, assert_golden) -> None:
 
 
 def test_accordion_baseline(render_scene, assert_golden) -> None:
-    """One collapsed, one expanded, stacked in a Column.
+    """One collapsed, one expanded, stacked in a Vertical.
 
     Proves the header/chevron/reveal/clip together: the collapsed panel shows
     only its 56dp header with `expand_more`, and the expanded one reveals its
@@ -2231,7 +2231,7 @@ def test_accordion_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24},
             "children": [
                 {
@@ -2282,7 +2282,7 @@ def test_tree_view_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24},
             "children": [
                 {
@@ -2340,7 +2340,7 @@ def test_submenu_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24},
             "children": [
                 {"name": "trigger", "widget": "Button", "text": "File", "style": {"width": 80}}
@@ -2394,12 +2394,12 @@ def test_link_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24, "spacing": 16},
             "children": [
                 {
                     "name": "row",
-                    "widget": "Row",
+                    "widget": "Horizontal",
                     "style": {"spacing": 4},
                     "children": [
                         {"name": "lead", "widget": "Text", "text": "Read our"},
@@ -2436,7 +2436,7 @@ def test_spin_box_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24, "spacing": 20},
             "children": [
                 {"name": "mid", "widget": "SpinBox", "value": "3", "style": {"min": 0, "max": 5}},
@@ -2465,7 +2465,7 @@ def test_pagination_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24, "spacing": 20},
             "children": [
                 {"name": "first", "widget": "Pagination", "value": "1", "style": {"count": 10}},
@@ -2495,7 +2495,7 @@ def test_status_bar_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "width": "expand", "height": "expand"},
             "children": [
                 {
@@ -2777,7 +2777,7 @@ def test_image_baseline(render_scene, assert_golden, tmp_path) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Row",
+            "widget": "Horizontal",
             "style": {"spacing": 16, "padding": 16, "background": "surface"},
             "children": [
                 {
@@ -2867,7 +2867,7 @@ def test_tree_view_deep_collapse_baseline(render_scene, assert_golden) -> None:
     view = {
         "root": {
             "name": "root",
-            "widget": "Column",
+            "widget": "Vertical",
             "style": {"background": "surface", "padding": 24},
             "children": [
                 {

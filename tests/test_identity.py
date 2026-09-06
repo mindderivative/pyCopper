@@ -18,7 +18,7 @@ from pycopper.widgets import build_element
 
 
 def spec(**kw):
-    return parse_view({"widget": "Column", **kw}).root
+    return parse_view({"widget": "Vertical", **kw}).root
 
 
 def app_for(view):
@@ -39,7 +39,7 @@ def test_ids_are_assigned_automatically() -> None:
 
 
 def test_ids_encode_the_path() -> None:
-    root = spec(children=[{"widget": "Column", "children": [{"widget": "Text"}]}])
+    root = spec(children=[{"widget": "Vertical", "children": [{"widget": "Text"}]}])
     assert root.children[0].children[0].id == "/0/0/"
 
 
@@ -52,7 +52,7 @@ def test_ids_cannot_collide_with_a_name() -> None:
 def test_overlay_ids_are_distinct_from_root_ids() -> None:
     view = parse_view(
         {
-            "root": {"widget": "Column"},
+            "root": {"widget": "Vertical"},
             "overlays": [{"widget": "Card", "style": {"width": 10, "height": 10}}],
         }
     )
@@ -76,7 +76,7 @@ def test_name_is_optional() -> None:
 def test_find_matches_the_name() -> None:
     app = app_for(
         {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [
                 {"widget": "Text", "text": "no"},
                 {"name": "target", "widget": "Text", "text": "yes"},
@@ -87,7 +87,7 @@ def test_find_matches_the_name() -> None:
 
 
 def test_find_returns_none_for_an_unnamed_node() -> None:
-    app = app_for({"widget": "Column", "children": [{"widget": "Text", "text": "x"}]})
+    app = app_for({"widget": "Vertical", "children": [{"widget": "Text", "text": "x"}]})
     assert app.root.find("x") is None
 
 
@@ -126,7 +126,7 @@ def test_classes_repeat_across_nodes() -> None:
     """Unlike a name, several nodes may share a class -- that is the point."""
     app = app_for(
         {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [
                 {"widget": "Button", "text": "a", "classes": "action"},
                 {"widget": "Button", "text": "b", "classes": "action primary"},
@@ -142,7 +142,7 @@ def test_classes_repeat_across_nodes() -> None:
 def test_has_class() -> None:
     app = app_for(
         {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [{"name": "b", "widget": "Button", "text": "x", "classes": "action"}],
         }
     )
@@ -226,7 +226,7 @@ def test_anchor_resolves_a_name() -> None:
     app = App(
         {
             "root": {
-                "widget": "Column",
+                "widget": "Vertical",
                 "style": {"background": "surface", "padding": 10},
                 "children": [
                     {
@@ -261,7 +261,7 @@ def test_anchor_resolves_a_name() -> None:
 def test_selection_container_matches_a_child_name() -> None:
     app = app_for(
         {
-            "widget": "Column",
+            "widget": "Vertical",
             "children": [
                 {
                     "widget": "Tabs",
@@ -285,7 +285,7 @@ def test_duplicate_names_are_rejected_at_load() -> None:
         parse_view(
             {
                 "root": {
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "children": [
                         {"name": "dup", "widget": "Container"},
                         {"name": "dup", "widget": "Container"},
@@ -300,7 +300,7 @@ def test_duplicate_name_error_names_both_positions() -> None:
         parse_view(
             {
                 "root": {
-                    "widget": "Column",
+                    "widget": "Vertical",
                     "children": [
                         {"name": "dup", "widget": "Container"},
                         {"name": "dup", "widget": "Container"},

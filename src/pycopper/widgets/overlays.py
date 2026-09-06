@@ -159,7 +159,7 @@ class DialogElement(_StyledMixin, Padding):
 
     Anatomy, from `COMPONENT_DIALOGS.md`: an optional 24dp icon, a headline
     (`text:`), supporting text (`supporting_text:`), and an actions area --
-    supplied as the single child, normally a Row of buttons.
+    supplied as the single child, normally a Horizontal of buttons.
 
     The dialog **shrink-wraps its height** ("Container height: Dynamic") and
     clamps its width to 280-560dp. That is the point of having the widget: the
