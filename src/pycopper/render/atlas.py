@@ -80,27 +80,8 @@ class AtlasEntry:
 def _uv_rect(
     x: int, y: int, width: int, height: int, atlas_size: int
 ) -> tuple[float, float, float, float]:
-    """UV rect for one atlas entry, inset half a texel on every edge.
-
-    A quad's corner UVs are the exact interpolation endpoints (`vs_main`'s
-    `mix(in.uv.xy, in.uv.zw, in.corner)`), so at each corner they land
-    EXACTLY on the value this returns -- and with `nearest` filtering,
-    sampling exactly on a texel boundary is not `floor`-and-done, it is
-    genuinely undefined which of the two adjacent texels a GPU rounds to.
-    Bilinear filtering never showed this: it blends smoothly across
-    whatever boundary it lands on. `nearest` doesn't, and landing on the
-    wrong side means reading a DIFFERENT glyph's (or a neighbour's padding)
-    texel -- exactly the corrupted-looking `e`/`a` this insetting fixes.
-    Half a texel is enough to guarantee every sampled corner resolves
-    inside this entry's own texels, never a neighbour's.
-    """
     s = float(atlas_size)
-    return (
-        (x + 0.5) / s,
-        (y + 0.5) / s,
-        (x + width - 0.5) / s,
-        (y + height - 0.5) / s,
-    )
+    return (x / s, y / s, (x + width) / s, (y + height) / s)
 
 
 class SkylinePacker:
