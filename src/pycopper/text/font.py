@@ -29,6 +29,22 @@ SUBPIXEL_BUCKETS: Final = 3
 
 _NOTDEF: Final = 0
 
+# Coverage gamma applied after rasterisation, compensating for disabling
+# hinting (see `Face.rasterize`): an unhinted outline's flat edges (E/l/v's
+# top and bottom bars) can each land at an arbitrary, independent fractional
+# pixel offset, so one edge often renders as a faint single-row fade while
+# the opposite edge lands almost exactly on a pixel boundary and comes out
+# fully solid -- an asymmetry confirmed by dumping row-max coverage values
+# for the same glyph at several sizes. Darkening partial coverage (gamma <
+# 1) pulls a faint fade most of the way toward the solid edge's weight
+# without moving any outline point, so curve shapes (d/g/p's bowls) are
+# untouched -- verified by comparing gamma-corrected renders side by side
+# with gamma=1.0 at the same size. This mirrors the "stem darkening"
+# compensation other unhinted-by-default rendering stacks apply for the
+# same reason.
+_COVERAGE_GAMMA: Final = 0.6
+_GAMMA_LUT: Final = (np.linspace(0.0, 1.0, 256) ** _COVERAGE_GAMMA * 255.0).round().astype(np.uint8)
+
 
 @dataclass(frozen=True, slots=True)
 class FontMetrics:
@@ -229,7 +245,8 @@ class Face:
             return GlyphBitmap(np.zeros((0, 0), dtype=np.uint8), 0.0, 0.0)
 
         buffer = np.frombuffer(bytes(bitmap.buffer), dtype=np.uint8)
-        coverage = buffer.reshape(bitmap.rows, bitmap.pitch)[:, : bitmap.width].copy()
+        coverage = buffer.reshape(bitmap.rows, bitmap.pitch)[:, : bitmap.width]
+        coverage = _GAMMA_LUT[coverage]
         return GlyphBitmap(coverage, float(slot.bitmap_left), float(slot.bitmap_top))
 
     def __repr__(self) -> str:
