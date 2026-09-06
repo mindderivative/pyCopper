@@ -121,7 +121,11 @@ fn resolve(literal: vec4<f32>, token: u32) -> vec4<f32> {
 fn sd_rounded_box(p: vec2<f32>, half: vec2<f32>, r: vec4<f32>) -> f32 {
     // r is (tl, tr, br, bl); pick the radius for the quadrant p falls in.
     let pair   = select(r.wz, r.xy, p.y < 0.0);   // top pair vs bottom pair
-    let radius = select(pair.y, pair.x, p.x < 0.0);
+    // Clamped to the box's own half-extent: this formula assumes radius never
+    // exceeds it, and silently returns "fully outside" everywhere -- an
+    // invisible box, not a pill -- when a caller passes a larger one. Match
+    // CSS's own border-radius behaviour (clamp to a stadium/circle) instead.
+    let radius = min(select(pair.y, pair.x, p.x < 0.0), min(half.x, half.y));
     let q = abs(p) - half + radius;
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - radius;
 }
