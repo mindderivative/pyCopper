@@ -441,3 +441,23 @@ def test_an_image_respects_its_clip(offscreen_engine) -> None:
     frame = np.asarray(engine.canvas.draw())
     assert tuple(frame[64, 30, :3]) == (0, 200, 0), "inside the clip should be drawn"
     assert frame[64, 100, 1] < 50, "outside the clip should be removed"
+
+
+def test_an_image_honours_its_own_corner_radius(offscreen_engine) -> None:
+    """`Image`/`Video`'s `style.corner_radius` reached `add_image`'s own
+    `radii` field, but the KIND_IMAGE fragment-shader branch never read it --
+    every image painted with square corners regardless (found live via the
+    Image widget demo's `corner_radius: 12` example, which rendered with
+    plainly square corners). Mirrors `test_rounded_corner_removes_the_square_
+    corner`'s KIND_BOX assertion shape for KIND_IMAGE instead."""
+    engine = offscreen_engine(width=128, height=128)
+    entry, size = _bound_atlas(engine, np.full((8, 8, 4), (0, 200, 0, 255), dtype=np.uint8))
+
+    def paint(dl: DisplayList) -> None:
+        dl.add_image(20, 20, 60, 60, uv=entry.uv(size), radii=(20, 20, 20, 20))
+
+    engine.painter = paint
+    engine.canvas.request_draw(engine.draw_frame)
+    frame = np.asarray(engine.canvas.draw())
+    assert frame[22, 22, 1] < 50, "corner was not rounded away"
+    assert tuple(frame[50, 50, :3]) == (0, 200, 0), "centre should still be filled"

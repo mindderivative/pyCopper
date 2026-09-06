@@ -312,7 +312,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
 
     } else if (kind == KIND_IMAGE) {
         let texel = textureSample(image_atlas, atlas_sampler, in.uv);
-        color = premultiply(texel * fill);
+        color = premultiply(texel * fill) * coverage(sd_rounded_box(p, half, in.radii));
     }
 
     // Rounded clipping, evaluated analytically so the draw call stays whole.
