@@ -62,21 +62,7 @@ class UIPipeline:
         # plain `r8unorm` -- coverage has no colour to decode.
         self.image_atlas = self._placeholder("rgba8unorm-srgb", b"\xff\xff\xff\xff")
         self.sampler = device.create_sampler(
-            # Magnification is the glyph/icon case: every glyph is rasterised
-            # fresh, by `GlyphAtlas.get`, at its exact on-screen physical size
-            # -- always sampled 1:1, never scaled up -- and FreeType already
-            # anti-aliases the coverage bitmap it hands back. `linear` here
-            # blurred an already-correctly-antialiased bitmap a second time
-            # (reported live as blurry text AND icons, since both are glyphs
-            # in the same atlas), and directly undercut the whole reason
-            # `SUBPIXEL_BUCKETS` exists: a separate pre-rasterised bitmap per
-            # subpixel offset, specifically so sampling can be exact rather
-            # than blended. `nearest` for magnification fixes that.
-            # Minification stays `linear` -- that's the image atlas's case
-            # (a photo or video scaled down), where smoothing still avoids
-            # aliasing and there is no equivalent pre-rasterised-per-scale
-            # mechanism to make `nearest` the better choice.
-            mag_filter=wgpu.FilterMode.nearest,
+            mag_filter=wgpu.FilterMode.linear,
             min_filter=wgpu.FilterMode.linear,
             address_mode_u=wgpu.AddressMode.clamp_to_edge,
             address_mode_v=wgpu.AddressMode.clamp_to_edge,
