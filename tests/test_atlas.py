@@ -124,6 +124,26 @@ def test_glyphs_are_padded_apart(face) -> None:
     assert b.x >= a.x + a.width + PADDING or b.y >= a.y + a.height + PADDING
 
 
+def test_glyph_edges_are_extruded_into_padding(face) -> None:
+    """Bilinear sampling at a UV boundary blends with whatever is just past
+    this glyph's own texels. Left as transparent padding, that blends the
+    outermost row of real antialiasing coverage toward zero on every edge --
+    reported live as antialiasing looking cut off, worst on small glyphs.
+    Extruding the edge into the padding fixes what the blend lands on
+    without changing the glyph's own declared rect."""
+    atlas = GlyphAtlas(size=256)
+    gid = face.glyph_for(ord("g"))
+    bitmap = face.rasterize(gid, 14.0)
+    entry = atlas.get(face, gid, 14.0)
+    x, y, w, h = entry.x, entry.y, entry.width, entry.height
+    assert np.array_equal(atlas.pixels[y : y + h, x + w], bitmap.coverage[:, -1])
+    assert np.array_equal(atlas.pixels[y + h, x : x + w], bitmap.coverage[-1, :])
+    if x > 0:
+        assert np.array_equal(atlas.pixels[y : y + h, x - 1], bitmap.coverage[:, 0])
+    if y > 0:
+        assert np.array_equal(atlas.pixels[y - 1, x : x + w], bitmap.coverage[0, :])
+
+
 def test_overflow_resets_and_keeps_working(face) -> None:
     """Eviction is wholesale: the skyline cannot free individual rectangles."""
     atlas = GlyphAtlas(size=64)

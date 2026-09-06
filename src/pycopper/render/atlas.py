@@ -250,6 +250,28 @@ class GlyphAtlas:
             x, y = self._packer.allocate(w + PADDING, h + PADDING)
 
         self._pixels[y : y + h, x : x + w] = bitmap.coverage
+        # Extrude the glyph's own edge pixels one row/column into its padding
+        # border, on all four sides. A UV boundary sample blends toward
+        # whatever is just past this glyph's own texels, and left
+        # unextruded that is always transparent -- this glyph's own reserved
+        # right/bottom padding, or blank atlas space to its left/top -- so
+        # bilinear filtering blended the outermost row of real antialiasing
+        # coverage toward zero on every glyph's every edge. Reported live as
+        # "the antialiasing for 1 pixel row is being cut off on all glyphs",
+        # worse the smaller the glyph since one lost row is a bigger
+        # fraction of it. Extruding means that boundary blends toward a
+        # duplicate of the true edge value instead of toward nothing.
+        self._pixels[y : y + h, x + w] = bitmap.coverage[:, -1]
+        self._pixels[y + h, x : x + w] = bitmap.coverage[-1, :]
+        self._pixels[y + h, x + w] = bitmap.coverage[-1, -1]
+        if x > 0:
+            self._pixels[y : y + h, x - 1] = bitmap.coverage[:, 0]
+            self._pixels[y + h, x - 1] = bitmap.coverage[-1, 0]
+        if y > 0:
+            self._pixels[y - 1, x : x + w] = bitmap.coverage[0, :]
+            self._pixels[y - 1, x + w] = bitmap.coverage[0, -1]
+        if x > 0 and y > 0:
+            self._pixels[y - 1, x - 1] = bitmap.coverage[0, 0]
         entry = AtlasEntry(x, y, w, h, bitmap.left, bitmap.top, self._generation)
         self._cache[key] = entry
         self._dirty = True
