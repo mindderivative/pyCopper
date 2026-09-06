@@ -346,7 +346,15 @@ def _wrap_block(
             i += 1
 
     if line_start < len(stripped):
-        runs, w = shape_segment(stripped[line_start:].rstrip())
+        # No `.rstrip()` here, unlike `_emit`'s real mid-paragraph wrap
+        # points: this is whatever's left after the loop, which is the
+        # WHOLE block when nothing wrapped at all. A trailing space at the
+        # true end of the text (not at a break the wrap consumed) is
+        # meaningful content -- it is what lets a sentence built from
+        # several sibling widgets (a `Text`, a `Link`, another `Text`) keep
+        # the gaps between them, and stripping it collapsed "Read the " and
+        # a following `Link` together with no space at all.
+        runs, w = shape_segment(stripped[line_start:])
         lines.append(TextLine(runs, offset + line_start, offset + len(block), w))
 
     return lines or [TextLine([], offset, offset + len(block), 0.0)]

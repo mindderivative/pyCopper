@@ -251,6 +251,21 @@ def test_hard_breaks_split_lines(db: FontDB) -> None:
     assert layout_text("one\ntwo\nthree", db, px=14).line_count == 3
 
 
+def test_a_trailing_space_on_unwrapped_text_still_has_width(db: FontDB) -> None:
+    """Found live via the Link demo: 'Read the ' immediately followed by a
+    sibling `Link` widget rendered as 'Read theM3...' with no gap at all.
+    `_wrap_block`'s final "flush the remainder" step (`layout.py`) stripped
+    trailing whitespace from that segment's width unconditionally -- correct
+    for a real mid-paragraph wrap point (`_emit`'s own rstrip, unaffected by
+    this fix), wrong when nothing ever wrapped and the "remainder" is the
+    whole block. A sentence built from several sibling widgets (a `Text`, a
+    `Link`, another `Text`) relies on each one's own trailing/leading space
+    for the visible gap between them."""
+    with_space = layout_text("Read the ", db, px=14, max_width=500)
+    without_space = layout_text("Read the", db, px=14, max_width=500)
+    assert with_space.lines[0].width > without_space.lines[0].width
+
+
 def test_lines_stack_without_overlapping(db: FontDB) -> None:
     para = layout_text("alpha beta gamma delta epsilon zeta", db, px=14, max_width=100)
     baselines = [line.baseline for line in para.lines]
