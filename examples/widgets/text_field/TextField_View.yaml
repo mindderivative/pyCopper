@@ -47,7 +47,7 @@ children:
 
       - name: live_demo
         widget: Horizontal
-        style: {spacing: 16, height: 64, width: expand}
+        style: {spacing: 16, width: expand}
         children:
           - name: field_filled
             widget: TextField
