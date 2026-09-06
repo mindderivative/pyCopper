@@ -340,8 +340,22 @@ class TextEngine:
             entry = self.atlas.get(place.face, place.gid, px_physical, bucket)
             if entry.is_blank:
                 continue
+            # `pen_x`'s fractional part chose `bucket` above, and that same
+            # fraction is already baked into `entry`'s own pixels -- FreeType
+            # rendered it pre-shifted by exactly that amount (font.py's
+            # `_activate`). Placing the quad at the full, un-floored `pen_x`
+            # applies the fraction a SECOND time on top of that. Bilinear
+            # filtering blurred the resulting double-counted offset into
+            # softness; `floor` here (not on `pen_y`, which has no bucket
+            # system and needs its own fractional part) is what makes the
+            # bucket's pre-shift the only shift that happens.
             rects.append(
-                (pen_x + entry.left, pen_y - entry.top, float(entry.width), float(entry.height))
+                (
+                    math.floor(pen_x) + entry.left,
+                    pen_y - entry.top,
+                    float(entry.width),
+                    float(entry.height),
+                )
             )
             uvs.append(entry.uv(atlas_size))
             if spans is not None:
