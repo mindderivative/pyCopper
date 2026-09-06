@@ -320,32 +320,42 @@ def test_the_caret_has_real_height_on_an_empty_field() -> None:
     assert float(caret["rect"][3]) > 0.0
 
 
-def test_an_outlined_label_floats_fully_above_the_border() -> None:
-    """A first attempt centred the floated label ON the border line and
-    erased only a thin band matching the border's own 2dp stroke width --
-    which looked identical to the border continuing through the letters,
-    since both paint in the same accent colour at the same height (found
-    from a live screenshot: real M3 instead has the border stop and resume
-    cleanly around a solid label sitting clear above it, not blended into
-    letters at the same height and colour)."""
+def test_an_outlined_label_centres_on_the_border_inside_a_full_height_patch() -> None:
+    """Real M3 has the floated label sit centred ON the border line, visibly
+    overlapping it -- confirmed against a user-supplied M3 screenshot. A
+    first attempt erased only a thin band matching the border's own 2dp
+    stroke while the label's own line box is much taller, leaving most of
+    each letter directly adjacent to un-erased, colour-matched border ink at
+    the patch's left/right edges -- unreadable, not because the label
+    overlapped the border, but because the patch didn't fully cover it.
+    Fixed by sizing the patch to the label's whole line height instead."""
     element = field(text="Search", style={"variant": "outlined"})
     driver(element)
     dl = painted(element)
     glyphs = [s for s in dl.view if int(s["flags"][0]) == Kind.GLYPH]
     assert glyphs, "the label should have painted glyphs"
+    tops = [float(s["rect"][1]) for s in glyphs]
     bottoms = [float(s["rect"][1]) + float(s["rect"][3]) for s in glyphs]
-    assert max(bottoms) <= 0.0, "the whole label should sit at or above the border line"
+    assert min(tops) < 0.0, "the label should reach above the border line"
+    assert max(bottoms) > 0.0, "the label should also overlap below it"
 
-    # The erasure patch behind the label must cover its full line height,
-    # not just a thin band matching the border's own stroke -- a too-thin
-    # patch leaves the border's own colour-matched ink right at the label's
-    # edges, reading as "border through the text" rather than a clean gap.
+    # The erasure patch must fully contain the label's own vertical extent --
+    # not just a thin band matching the border's own stroke -- so no
+    # un-erased, colour-matched border ink sits adjacent to any letter.
     surface = Palette(Theme()).index("surface")
     patches = [
-        s for s in dl.view if int(s["flags"][0]) == Kind.BOX and int(s["flags"][2]) == surface
-    ]
+        s
+        for s in dl.view
+        if int(s["flags"][0]) == Kind.BOX
+        and int(s["flags"][2]) == surface
+        and tuple(float(v) for v in s["radii"]) == (0.0, 0.0, 0.0, 0.0)
+    ]  # excludes the outlined container's own (radius'd, alpha=0) surface-token box
     assert patches, "the label should paint an erasure patch behind it"
-    assert float(patches[0]["rect"][3]) > element.INDICATOR_FOCUSED
+    patch = patches[0]
+    patch_top = float(patch["rect"][1])
+    patch_bottom = patch_top + float(patch["rect"][3])
+    assert patch_top <= min(tops), "the patch must reach as high as the label does"
+    assert patch_bottom >= max(bottoms), "the patch must reach as low as the label does"
 
 
 def test_a_selection_draws_a_highlight() -> None:

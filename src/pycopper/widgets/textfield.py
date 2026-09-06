@@ -441,23 +441,24 @@ class TextFieldElement(_StyledMixin, Padding):
             self.INPUT_ROLE.tracking + (self.FLOAT_ROLE.tracking - self.INPUT_ROLE.tracking) * t
         )
         # The label rests centred on the FIRST line, not on a grown box.
-        # Floated, a FILLED label just moves up inside the container (PAD_Y),
-        # but an OUTLINED one floats clear ABOVE the border entirely -- not
-        # straddling it. A first attempt centred the label ON the border
-        # line and erased only a thin band matching the border's own stroke
-        # width, which looked identical to the border simply continuing
-        # through the letters: both are painted in the same accent colour,
-        # at the same height, so the eye cannot tell "border" from "letter
-        # stroke" at the seam. Real M3 avoids this by giving the label a
-        # patch that covers its WHOLE line height, well clear of the border,
-        # so the border visibly stops and resumes around a solid label
-        # rather than the label sitting half-in the border ink itself.
+        # Floated, a FILLED label just moves up inside the container (PAD_Y);
+        # an OUTLINED one centres directly ON the border line instead, per
+        # real M3 -- the label visibly overlaps the border, not sitting
+        # above it. The border is not what makes that readable, though: a
+        # first attempt erased only a thin band matching the border's own
+        # 2dp stroke while the label's actual line box is much taller,
+        # leaving most of each letter directly adjacent to un-erased border
+        # ink at the patch's left/right edges -- both painted in the same
+        # accent colour, so the eye could not tell "border" from "letter
+        # stroke" there. The fix is the patch's own height, not the label's
+        # position: it has to cover the label's WHOLE line box, not just the
+        # border's stroke width, so nothing borders the letters at all.
         line_height = (
             self.INPUT_ROLE.line_height
             + (self.FLOAT_ROLE.line_height - self.INPUT_ROLE.line_height) * t
         )
         resting = (self.HEIGHT - self.INPUT_ROLE.line_height) / 2
-        floated = -self.FLOAT_ROLE.line_height if outlined else self.PAD_Y
+        floated = -self.FLOAT_ROLE.line_height / 2 if outlined else self.PAD_Y
         y = resting + (floated - resting) * t
         token = (
             accent
