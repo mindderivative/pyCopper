@@ -7,6 +7,8 @@ so an invisible focus state is a defect rather than a cosmetic gap
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from pycopper import App, Theme
@@ -165,6 +167,40 @@ def test_tab_after_a_click_restores_the_ring(app) -> None:
     d.drain()
     assert d.focused.state.focus_visible
     assert len(rings(paint(app))) == 1
+
+
+def test_clicking_does_not_leave_a_state_layer_either(app) -> None:
+    """The same click-is-silent convention `rings()` already covers applies
+    to the tonal state-layer overlay every M3 widget shares via
+    `_emit_state_layer`/`_state_alpha` -- not just the ring. Found live: a
+    button kept showing a visible focus tint after a plain mouse click,
+    traced to `_state_alpha` reading `state.focused` (true for a click too)
+    instead of `state.focus_visible` (true only for keyboard focus)."""
+    from pycopper.widgets.material import _state_alpha
+
+    d = app.dispatcher
+    r = app.root.find("btn").absolute_rect()
+    d.post(PointerEvent(EventType.POINTER_DOWN, x=r.x + 5, y=r.y + 5))
+    d.post(PointerEvent(EventType.POINTER_UP, x=r.x + 5, y=r.y + 5))
+    d.drain()
+    assert d.focused.name == "btn"
+    assert _state_alpha(d.focused) == 0.0
+
+    d.post(KeyEvent(EventType.KEY_DOWN, key="Tab"))
+    d.drain()
+    d.post(KeyEvent(EventType.KEY_DOWN, key="Tab", modifiers=frozenset({"shift"})))
+    d.drain()
+    assert d.focused.name == "btn"
+    assert d.focused.state.focus_visible
+    # The first `_state_alpha` call above already created this element's
+    # "state_layer" animation at 0.0; this second target needs real elapsed
+    # time to transition (STATE_LAYER_MOTION = short2 = 100ms), and that
+    # clock only advances via `update()`'s `motion.tick(dt)` -- called by
+    # `app.paint()` (see `paint()` below), never by `_state_alpha` itself.
+    for _ in range(4):
+        paint(app)
+        time.sleep(0.05)
+    assert _state_alpha(d.focused) > 0.0
 
 
 def test_moving_focus_clears_the_previous_ring(app) -> None:

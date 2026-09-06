@@ -73,7 +73,7 @@ def _state_alpha(element: Any) -> float:
     """
     if element.state.pressed:
         target = PRESS
-    elif element.state.focused:
+    elif element.state.focus_visible:
         target = FOCUS
     elif element.state.hovered:
         target = HOVER
