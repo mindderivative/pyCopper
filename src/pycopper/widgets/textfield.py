@@ -441,8 +441,14 @@ class TextFieldElement(_StyledMixin, Padding):
             self.INPUT_ROLE.tracking + (self.FLOAT_ROLE.tracking - self.INPUT_ROLE.tracking) * t
         )
         # The label rests centred on the FIRST line, not on a grown box.
+        # Floated, a FILLED label just moves up inside the container (PAD_Y),
+        # but an OUTLINED one has to straddle the border stroke itself --
+        # "M3 cuts the outline where the label crosses it" only makes visual
+        # sense if the label is actually centred ON that line (y=0), not
+        # sitting below it like the filled variant.
         resting = (self.HEIGHT - self.INPUT_ROLE.line_height) / 2
-        y = resting + (self.PAD_Y - resting) * t
+        floated = -self.FLOAT_ROLE.line_height / 2 if outlined else self.PAD_Y
+        y = resting + (floated - resting) * t
         token = (
             accent
             if (self.state.focused or self.in_error)

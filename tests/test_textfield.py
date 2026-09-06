@@ -304,6 +304,40 @@ def test_focusing_draws_the_caret() -> None:
     assert boxes(painted(element)) > before, "the caret is a box and it was not there"
 
 
+def test_the_caret_has_real_height_on_an_empty_field() -> None:
+    """`caret_at` used to special-case an empty paragraph to an all-zero
+    rect, which produced a genuinely invisible (0-tall) caret on any
+    freshly focused, empty field -- found live, since every existing test
+    up to this point focused a field that already had a value."""
+    element = field()
+    driver(element)
+    dl = painted(element)
+    caret = next(
+        s
+        for s in dl.view
+        if int(s["flags"][0]) == Kind.BOX and float(s["rect"][2]) == element.CARET_WIDTH
+    )
+    assert float(caret["rect"][3]) > 0.0
+
+
+def test_an_outlined_label_floats_onto_the_border_not_below_it() -> None:
+    """M3 cuts the outline where a floated label crosses it -- which only
+    makes visual sense if the label is centred ON the border line (y=0),
+    unlike a filled field's label, which floats to PAD_Y (well inside the
+    container) instead. Found live: the notch that erases a strip of the
+    border was correctly positioned, but the label itself floated to the
+    filled-field position and never actually crossed it."""
+    element = field(text="Search", style={"variant": "outlined"})
+    driver(element)
+    dl = painted(element)
+    glyphs = [s for s in dl.view if int(s["flags"][0]) == Kind.GLYPH]
+    assert glyphs, "the label should have painted glyphs"
+    tops = [float(s["rect"][1]) for s in glyphs]
+    bottoms = [float(s["rect"][1]) + float(s["rect"][3]) for s in glyphs]
+    assert min(tops) < 0.0, "the label should reach above the border line"
+    assert max(bottoms) > 0.0, "the label should also reach below it"
+
+
 def test_a_selection_draws_a_highlight() -> None:
     element = field(value="Ada")
     dispatcher = driver(element)

@@ -138,7 +138,11 @@ def caret_at(para: Paragraph, offset: int) -> SelectionRect:
     somewhere the caret then would not draw.
     """
     if not para.lines:
-        return SelectionRect(0.0, 0.0, 0.0, 0.0)
+        # An empty paragraph still records a correct line height (see
+        # `layout_text`'s own early-return for `not text`) -- returning it
+        # here, not 0, is what keeps a caret on an empty field visible
+        # instead of collapsing to a degenerate zero-height rect.
+        return SelectionRect(0.0, 0.0, 0.0, para.size.height)
     top = 0.0
     line = para.lines[0]
     for candidate in para.lines:
