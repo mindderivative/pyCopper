@@ -450,7 +450,7 @@ class App:
                 )
             )
         elif kind == "char":
-            self.dispatcher.post(KeyEvent(EventType.TEXT, text=str(event.get("char", ""))))
+            self.dispatcher.post(KeyEvent(EventType.TEXT, text=str(event.get("data", ""))))
         else:
             return
         if self.engine is not None:

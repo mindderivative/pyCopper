@@ -312,6 +312,37 @@ def test_a_selection_draws_a_highlight() -> None:
     assert boxes(painted(element)) > plain
 
 
+# ------------------------------------------------------------ native input
+
+
+def test_the_canvas_char_payload_inserts_the_typed_character() -> None:
+    """Guards the boundary with rendercanvas, the same way
+    `test_scroll.py::test_the_canvas_wheel_payload_drives_scrolling` guards
+    the wheel payload. `rendercanvas/glfw.py` submits the typed character
+    under `data` (with `char_str` as a compat alias due for removal) -- not
+    `char`, which every real keystroke silently read as missing, inserting
+    an empty string every time. Caught live: typing into a real window's
+    TextField visibly did nothing, while every dispatcher-level test kept
+    passing because they all post `KeyEvent(EventType.TEXT, ...)` directly,
+    bypassing this exact translation layer entirely."""
+    from pycopper import App, Settings, Theme
+
+    app = App(
+        {"root": {"name": "f", "widget": "TextField"}},
+        theme=Theme(dark=True),
+        settings=Settings(width=300, height=200),
+    )
+    app.mount()
+    app.update()
+    element = app.root
+    app.dispatcher.focus(element)
+
+    app._on_canvas_event({"event_type": "char", "data": "z", "char_str": "z", "modifiers": ()})
+    app.dispatcher.drain()
+
+    assert element.content == "z"
+
+
 def test_reduce_motion_gives_a_solid_caret() -> None:
     """Everything else obeys the setting by arriving at once. The equivalent
     for something that never arrives is to stop it moving -- a caret that
