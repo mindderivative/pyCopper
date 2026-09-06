@@ -442,12 +442,22 @@ class TextFieldElement(_StyledMixin, Padding):
         )
         # The label rests centred on the FIRST line, not on a grown box.
         # Floated, a FILLED label just moves up inside the container (PAD_Y),
-        # but an OUTLINED one has to straddle the border stroke itself --
-        # "M3 cuts the outline where the label crosses it" only makes visual
-        # sense if the label is actually centred ON that line (y=0), not
-        # sitting below it like the filled variant.
+        # but an OUTLINED one floats clear ABOVE the border entirely -- not
+        # straddling it. A first attempt centred the label ON the border
+        # line and erased only a thin band matching the border's own stroke
+        # width, which looked identical to the border simply continuing
+        # through the letters: both are painted in the same accent colour,
+        # at the same height, so the eye cannot tell "border" from "letter
+        # stroke" at the seam. Real M3 avoids this by giving the label a
+        # patch that covers its WHOLE line height, well clear of the border,
+        # so the border visibly stops and resumes around a solid label
+        # rather than the label sitting half-in the border ink itself.
+        line_height = (
+            self.INPUT_ROLE.line_height
+            + (self.FLOAT_ROLE.line_height - self.INPUT_ROLE.line_height) * t
+        )
         resting = (self.HEIGHT - self.INPUT_ROLE.line_height) / 2
-        floated = -self.FLOAT_ROLE.line_height / 2 if outlined else self.PAD_Y
+        floated = -self.FLOAT_ROLE.line_height if outlined else self.PAD_Y
         y = resting + (floated - resting) * t
         token = (
             accent
@@ -459,16 +469,16 @@ class TextFieldElement(_StyledMixin, Padding):
         )
 
         if outlined and t > 0.0:
-            # M3 cuts the outline where the label crosses it. The shader draws
-            # no notch, so the label gets a patch of the surface behind it --
-            # which assumes the field sits on `surface`. Stated rather than
-            # hidden: on a tinted container the patch will show.
+            # The shader draws no notch, so the label gets a patch of the
+            # surface behind it, sized to its own line box -- which assumes
+            # the field sits on `surface`. Stated rather than hidden: on a
+            # tinted container the patch will show.
             _box(
                 ctx,
                 absolute.x + self.PAD_X - 4.0,
-                absolute.y,
+                absolute.y + y,
                 metrics.width + 8.0,
-                self.INDICATOR_FOCUSED,
+                line_height,
                 token=ctx.palette.index("surface"),
                 radius=0.0,
                 alpha=t,

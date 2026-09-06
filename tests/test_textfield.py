@@ -320,22 +320,32 @@ def test_the_caret_has_real_height_on_an_empty_field() -> None:
     assert float(caret["rect"][3]) > 0.0
 
 
-def test_an_outlined_label_floats_onto_the_border_not_below_it() -> None:
-    """M3 cuts the outline where a floated label crosses it -- which only
-    makes visual sense if the label is centred ON the border line (y=0),
-    unlike a filled field's label, which floats to PAD_Y (well inside the
-    container) instead. Found live: the notch that erases a strip of the
-    border was correctly positioned, but the label itself floated to the
-    filled-field position and never actually crossed it."""
+def test_an_outlined_label_floats_fully_above_the_border() -> None:
+    """A first attempt centred the floated label ON the border line and
+    erased only a thin band matching the border's own 2dp stroke width --
+    which looked identical to the border continuing through the letters,
+    since both paint in the same accent colour at the same height (found
+    from a live screenshot: real M3 instead has the border stop and resume
+    cleanly around a solid label sitting clear above it, not blended into
+    letters at the same height and colour)."""
     element = field(text="Search", style={"variant": "outlined"})
     driver(element)
     dl = painted(element)
     glyphs = [s for s in dl.view if int(s["flags"][0]) == Kind.GLYPH]
     assert glyphs, "the label should have painted glyphs"
-    tops = [float(s["rect"][1]) for s in glyphs]
     bottoms = [float(s["rect"][1]) + float(s["rect"][3]) for s in glyphs]
-    assert min(tops) < 0.0, "the label should reach above the border line"
-    assert max(bottoms) > 0.0, "the label should also reach below it"
+    assert max(bottoms) <= 0.0, "the whole label should sit at or above the border line"
+
+    # The erasure patch behind the label must cover its full line height,
+    # not just a thin band matching the border's own stroke -- a too-thin
+    # patch leaves the border's own colour-matched ink right at the label's
+    # edges, reading as "border through the text" rather than a clean gap.
+    surface = Palette(Theme()).index("surface")
+    patches = [
+        s for s in dl.view if int(s["flags"][0]) == Kind.BOX and int(s["flags"][2]) == surface
+    ]
+    assert patches, "the label should paint an erasure patch behind it"
+    assert float(patches[0]["rect"][3]) > element.INDICATOR_FOCUSED
 
 
 def test_a_selection_draws_a_highlight() -> None:
