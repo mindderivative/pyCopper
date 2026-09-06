@@ -15,6 +15,7 @@ import datetime
 from pycopper import App, Theme
 from pycopper.layout import Offset
 from pycopper.paint import DisplayList
+from pycopper.paint.display_list import Kind
 from pycopper.runtime.events import EventType, PointerEvent
 from pycopper.spec import WidgetKind, parse_view
 from pycopper.theme import Palette
@@ -197,3 +198,37 @@ def test_painting_does_not_crash() -> None:
     ctx = PaintContext(display_list=dl, palette=Palette(Theme(dark=True)))
     dp.paint(ctx, Offset(0.0, 0.0))
     assert dl.view.shape[0] > 0
+
+
+def test_the_month_label_clears_the_chevron_left_icon() -> None:
+    """The header paints `chevron_left`/`chevron_right` centred at
+    PAD_X+CELL/2 and WIDTH-PAD_X-CELL/2 -- the same cell width the click
+    hit-test (`local_x < self.PAD_X + self.CELL`) already reserves for each.
+    The label used to start at PAD_X alone, landing directly under the
+    chevron_left icon instead of clear of it -- visible live as garbled,
+    overlapping text where the icon should be."""
+    _, dp = _app(value="2026-09-04")
+    dl = DisplayList()
+    ctx = PaintContext(display_list=dl, palette=Palette(Theme(dark=True)))
+    dp.paint(ctx, Offset(0.0, 0.0))
+
+    nav_top = dp.HEADLINE_HEIGHT
+    nav_bottom = nav_top + dp.NAV_HEIGHT
+    # Each icon's own glyph occupies roughly [cx-12, cx+12] (a 24px icon) --
+    # widened by a few px either side for real font/atlas bearing, so a
+    # tight exact-centre comparison doesn't let an icon glyph slip through
+    # as if it were a label glyph.
+    left_icon_lo, left_icon_hi = dp.PAD_X + dp.CELL / 2 - 16.0, dp.PAD_X + dp.CELL / 2 + 16.0
+    right_lo = dp.WIDTH - dp.PAD_X - dp.CELL / 2 - 16.0
+    right_hi = dp.WIDTH - dp.PAD_X - dp.CELL / 2 + 16.0
+
+    label_glyphs = [
+        s
+        for s in dl.view
+        if int(s["flags"][0]) == Kind.GLYPH
+        and nav_top <= float(s["rect"][1]) < nav_bottom
+        and not (left_icon_lo <= float(s["rect"][0]) <= left_icon_hi)
+        and not (right_lo <= float(s["rect"][0]) <= right_hi)
+    ]
+    assert label_glyphs, "the month/year label should have painted glyphs"
+    assert min(float(s["rect"][0]) for s in label_glyphs) >= dp.PAD_X + dp.CELL

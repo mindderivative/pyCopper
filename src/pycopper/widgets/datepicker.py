@@ -212,7 +212,10 @@ class DatePickerElement(_StyledMixin, Padding):
         dpr = ctx.pixel_ratio
         y = absolute.y + self.HEADLINE_HEIGHT
         label = f"{calendar.month_name[self._view_month]} {self._view_year}"
-        paint_text(ctx, absolute.x + self.PAD_X, y + 12.0, label, _LABEL_ROLE, content)
+        # The left nav cell occupies [0, PAD_X + CELL] (matching the hit-test
+        # boundary below) -- starting the label at PAD_X alone put it right
+        # under the chevron_left icon instead of clear of it.
+        paint_text(ctx, absolute.x + self.PAD_X + self.CELL, y + 12.0, label, _LABEL_ROLE, content)
         for name, cx in (
             ("chevron_left", absolute.x + self.PAD_X + self.CELL / 2),
             ("chevron_right", absolute.x + self.WIDTH - self.PAD_X - self.CELL / 2),
