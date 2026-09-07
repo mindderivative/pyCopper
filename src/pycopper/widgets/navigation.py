@@ -380,19 +380,29 @@ class TopAppBarElement(_StyledMixin, Flex):
     follower of that scroll view, which relayouts it as the view moves -- the
     scrolled content itself is untouched and still travels at paint time.
 
-    The expanded heights are **not sourced**: that spec page's measurements are
-    images. The behaviour and the colour change are quoted.
+    Heights and title typography are the condensed spec's own text (not the
+    deep-dive page's measurement images, which remain unread): 64dp small/
+    center-aligned; medium collapsed 64dp, expanded 112dp; large collapsed
+    64dp, expanded 152dp. Title typography is title-large (22sp) collapsed;
+    headline-medium (28sp) for the medium variant expanded, headline-large
+    (32sp) for the large variant expanded -- two different expanded roles,
+    not one size shared by both.
     """
 
     HEIGHT: Final = 64.0
     PAD: Final = 16.0
     #: variant -> expanded height. Small and centre-aligned do not collapse.
     EXPANDED: Final = {"medium": 112.0, "large": 152.0}
-    #: The expanded headline, shrinking to title-large on collapse. Held as a
-    #: role so the size and the line height shrink together -- interpolating
-    #: one and pinning the other would tighten the leading as the bar moved.
-    HEADLINE_ROLE: Final = TYPE_SCALE["headline-medium"]
-    HEADLINE: Final = HEADLINE_ROLE.size
+    #: The expanded headline, shrinking to title-large on collapse -- one role
+    #: per variant, since M3 states "headline-medium (28sp) for medium
+    #: expanded; headline-large (32sp) for large expanded", not one size for
+    #: both. Held as a role (not a bare size) so the size and the line height
+    #: shrink together -- interpolating one and pinning the other would
+    #: tighten the leading as the bar moved.
+    EXPANDED_HEADLINE_ROLE: Final = {
+        "medium": TYPE_SCALE["headline-medium"],
+        "large": TYPE_SCALE["headline-large"],
+    }
 
     def __init__(self, spec: WidgetSpec) -> None:
         Flex.__init__(self, axis=Axis.HORIZONTAL, spacing=spec.style.spacing or 8.0)
@@ -486,10 +496,9 @@ class TopAppBarElement(_StyledMixin, Flex):
         if self.expanded_height > self.HEIGHT:
             # The headline shrinks to title-large as the bar becomes a small
             # one, so the two forms agree at the moment of arrival.
-            size = self.HEADLINE + (size - self.HEADLINE) * t
-            leading = (
-                self.HEADLINE_ROLE.line_height + (leading - self.HEADLINE_ROLE.line_height) * t
-            )
+            headline_role = self.EXPANDED_HEADLINE_ROLE[str(style.variant)]
+            size = headline_role.size + (size - headline_role.size) * t
+            leading = headline_role.line_height + (leading - headline_role.line_height) * t
         label = measure_text(
             title,
             size,

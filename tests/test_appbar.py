@@ -280,3 +280,28 @@ def test_an_explicit_background_overrides_the_scroll_fill() -> None:
     tokens = {int(s["flags"][2]) for s in dl.view if int(s["flags"][2]) != NO_TOKEN}
     assert PALETTE.index("primary_container") in tokens
     assert PALETTE.index("surface_container") not in tokens
+
+
+def test_a_large_bar_expands_its_headline_further_than_a_medium_one() -> None:
+    """M3: headline-medium (28sp) expanded for medium, headline-large (32sp)
+    expanded for large -- two different roles, not one size shared by both.
+    """
+
+    def title_glyphs(variant: str) -> list:
+        _app, bar, _body = app_with(variant, link=False)
+        dl = DisplayList()
+        ctx = PaintContext(
+            display_list=dl,
+            palette=Palette(Theme(dark=True)),
+            text=bar.text_engine,
+            pixel_ratio=1.0,
+        )
+        bar.paint(ctx, Offset(0.0, 0.0))
+        return [s for s in dl.view if int(s["flags"][0]) == 1]
+
+    medium_glyphs = title_glyphs("medium")
+    large_glyphs = title_glyphs("large")
+    assert len(medium_glyphs) == len(large_glyphs)  # same title, "Inbox"
+    medium_width = max(float(s["rect"][2]) for s in medium_glyphs)
+    large_width = max(float(s["rect"][2]) for s in large_glyphs)
+    assert large_width > medium_width
