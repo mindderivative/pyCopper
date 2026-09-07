@@ -637,14 +637,22 @@ class TabElement(_StyledMixin, Padding):
 
 
 class TabsElement(_SelectionContainer):
-    """M3 Tabs: 48dp high, 3dp active indicator.
+    """M3 Tabs: 48dp high.
 
-    Primary tabs anchor the indicator to the bottom edge with rounded top
-    corners; secondary tabs use a flat full-width stroke.
+    Primary tabs anchor a 3dp, fully-rounded active indicator to the bottom
+    edge, inset 2dp on each side so it does not touch the tab's own edges;
+    secondary tabs use a flat, full-width, 2dp stroke -- two different
+    heights, not one shared between them (`COMPONENT_TABS.md`'s own
+    measurements table: "Primary active indicator height: 3dp", "Secondary
+    active indicator height: 2dp").
     """
 
     HEIGHT: Final = 48.0
-    INDICATOR_H: Final = 3.0
+    INDICATOR_H_PRIMARY: Final = 3.0
+    INDICATOR_H_SECONDARY: Final = 2.0
+    #: "Primary tab active indicators are inset 2dp on each side" -- secondary's
+    #: own "full-width thin stroke" phrasing means no inset at all.
+    PRIMARY_INSET: Final = 2.0
     axis = Axis.HORIZONTAL
 
     def perform_layout(self, constraints: Constraints) -> Size:
@@ -665,20 +673,22 @@ class TabsElement(_SelectionContainer):
         if active is None:
             return
         primary = self.style.variant != "secondary"
-        y = absolute.y + self.size.height - self.INDICATOR_H
+        indicator_h = self.INDICATOR_H_PRIMARY if primary else self.INDICATOR_H_SECONDARY
+        inset = self.PRIMARY_INSET if primary else 0.0
+        y = absolute.y + self.size.height - indicator_h
         # The indicator belongs to the container, not to a tab, which is what
         # lets it travel between them. Both edges animate, so it stretches and
         # settles rather than jumping -- and this costs paint only, since the
         # tabs themselves have not moved.
         x = self.animated(
             "indicator_x",
-            active.offset.x,
+            active.offset.x + inset,
             duration=INDICATOR_MOTION,
             curve=INDICATOR_CURVE,
         )
         width = self.animated(
             "indicator_w",
-            active.size.width,
+            active.size.width - inset * 2.0,
             duration=INDICATOR_MOTION,
             curve=INDICATOR_CURVE,
         )
@@ -687,9 +697,9 @@ class TabsElement(_SelectionContainer):
             absolute.x + x,
             y,
             width,
-            self.INDICATOR_H,
+            indicator_h,
             token=ctx.palette.index("primary"),
-            radius=self.INDICATOR_H if primary else 0.0,
+            radius=indicator_h if primary else 0.0,
         )
 
 

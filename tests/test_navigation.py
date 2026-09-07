@@ -410,7 +410,7 @@ def test_multi_select_is_bindable() -> None:
 
 
 def test_tabs_draw_an_indicator_under_the_active_tab() -> None:
-    """M3 4.7: a 3dp active indicator."""
+    """M3 4.7/COMPONENT_TABS.md: a 3dp primary indicator, inset 2dp a side."""
     app = app_with(TABS, value="t1")
     active = app.root.find("t1")
     bars = [
@@ -419,12 +419,31 @@ def test_tabs_draw_an_indicator_under_the_active_tab() -> None:
         if abs(float(s["rect"][3]) - 3.0) < 0.01 and int(s["flags"][2]) == PAL.index("primary")
     ]
     assert len(bars) == 1
+    assert float(bars[0]["rect"][2]) == pytest.approx(active.size.width - 4.0)
+    assert float(bars[0]["rect"][0]) == pytest.approx(active.offset.x + 2.0)
+
+
+def test_a_secondary_indicator_is_thinner_and_spans_the_full_tab() -> None:
+    """COMPONENT_TABS.md: "Secondary active indicator height: 2dp", no inset."""
+    app = app_with(TABS, value="t1", style={"variant": "secondary"})
+    active = app.root.find("t1")
+    bars = [
+        s
+        for s in paint(app).view
+        if abs(float(s["rect"][3]) - 2.0) < 0.01 and int(s["flags"][2]) == PAL.index("primary")
+    ]
+    assert len(bars) == 1
     assert float(bars[0]["rect"][2]) == pytest.approx(active.size.width)
+    assert float(bars[0]["rect"][0]) == pytest.approx(active.offset.x)
 
 
 def test_tabs_with_no_selection_draw_no_indicator() -> None:
     app = app_with(TABS)
-    bars = [s for s in paint(app).view if abs(float(s["rect"][3]) - 3.0) < 0.01]
+    bars = [
+        s
+        for s in paint(app).view
+        if abs(float(s["rect"][3]) - 3.0) < 0.01 or abs(float(s["rect"][3]) - 2.0) < 0.01
+    ]
     assert bars == []
 
 

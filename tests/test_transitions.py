@@ -15,6 +15,7 @@ from pycopper.paint import NO_TOKEN, DisplayList
 from pycopper.runtime.events import EventType, PointerEvent
 from pycopper.runtime.overlay import ENTER_DURATION, EXIT_DURATION
 from pycopper.widgets.material import HOVER, PRESS
+from pycopper.widgets.navigation import TabsElement
 
 
 class Clock:
@@ -538,7 +539,7 @@ def test_the_tab_indicator_travels_between_tabs() -> None:
     app, value, clock = indicator_app("Tabs", "t1", TABS)
     tabs = app.root.find("c")
     start = tabs.animation("indicator_x").value
-    assert start == 0.0
+    assert start == pytest.approx(TabsElement.PRIMARY_INSET)  # 2dp inset, primary variant
 
     value.set("t3")
     app.paint(DisplayList())
@@ -550,7 +551,9 @@ def test_the_tab_indicator_travels_between_tabs() -> None:
     for _ in range(10):
         clock.t += 0.05
         app.paint(DisplayList())
-    assert tabs.animation("indicator_x").value == pytest.approx(app.root.find("t3").offset.x)
+    assert tabs.animation("indicator_x").value == pytest.approx(
+        app.root.find("t3").offset.x + TabsElement.PRIMARY_INSET
+    )
     assert not app.motion.active
 
 
@@ -564,7 +567,9 @@ def test_the_tab_indicator_resizes_as_well_as_moves() -> None:
     for _ in range(10):
         clock.t += 0.05
         app.paint(DisplayList())
-    assert tabs.animation("indicator_w").value == pytest.approx(app.root.find("t3").size.width)
+    assert tabs.animation("indicator_w").value == pytest.approx(
+        app.root.find("t3").size.width - 2.0 * TabsElement.PRIMARY_INSET
+    )
 
 
 def test_the_tab_indicator_costs_paint_only() -> None:
@@ -665,5 +670,7 @@ def test_reduce_motion_moves_indicators_at_once() -> None:
     tabs = app.root.find("c")
     value.set("t3")
     app.paint(DisplayList())
-    assert tabs.animation("indicator_x").value == pytest.approx(app.root.find("t3").offset.x)
+    assert tabs.animation("indicator_x").value == pytest.approx(
+        app.root.find("t3").offset.x + TabsElement.PRIMARY_INSET
+    )
     assert not app.motion.active
