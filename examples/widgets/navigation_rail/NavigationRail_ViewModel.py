@@ -17,7 +17,10 @@ class NavigationRailDemo(ViewModel):
 
     def __init__(self) -> None:
         self.selected = Signal("home", name="selected")
-        self.collapsed = Signal(False, name="collapsed")
+        #: True (the widget's own narrow/icon-only state) to start, not the
+        #: field's own default (False, expanded) -- a "Navigation Rail"
+        #: demo reads better starting narrow, then expanding on request.
+        self.collapsed = Signal(True, name="collapsed")
 
         self.view_source = (Path(__file__).parent / "NavigationRail_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()

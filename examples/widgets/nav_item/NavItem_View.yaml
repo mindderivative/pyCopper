@@ -29,10 +29,9 @@ children:
           icon's FILL axis goes to 1 when selected -- M3's own mechanism
           for expressing selection, rather than swapping to a visually
           different icon. A NavItem only makes sense inside a
-          NavigationRail or NavigationDrawer, so this demo hosts three
-          of them in a minimal rail; NavItem's own anatomy is what this
-          page focuses on, not the rail around it (which has its own
-          demo).
+          NavigationRail, so this demo hosts three of them in a minimal
+          rail; NavItem's own anatomy is what this page focuses on, not
+          the rail around it (which has its own demo).
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}

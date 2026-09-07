@@ -106,17 +106,13 @@ class Gallery(ViewModel):
     # -------------------------------------------------------- navigation
 
     def select_nav(self, event: Any) -> None:
-        """One handler for every rail *and* drawer destination.
-
-        The rail's and drawer's own copies of each destination are named
-        with `r_`/`d_` prefixes (see gallery_View.yaml) -- distinct from
-        each other AND from PageHost's own bare page names -- because all
-        three sets of names live in the same view file and this file has
-        one name-uniqueness requirement. Both still drive the same
-        `current_page`; stripping whichever prefix is present is what lets
-        one handler serve both without knowing which one fired.
-        """
-        self.current_page.set(event.target.name.removeprefix("r_").removeprefix("d_"))
+        """One handler for the rail's destinations -- a single
+        `NavigationRail` now, collapsed or expanded, rather than a paired
+        rail+drawer with duplicate `r_`/`d_`-prefixed items. Each item is
+        still `nav_`-prefixed (PageHost's own pages beneath already use
+        these bare names, and names must be unique across the view), so one
+        prefix still needs stripping -- just one instead of two."""
+        self.current_page.set(event.target.name.removeprefix("nav_"))
 
     def toggle_nav(self, event: Any) -> None:
         self.nav_expanded.update(lambda on: not on)

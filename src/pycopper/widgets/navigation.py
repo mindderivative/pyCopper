@@ -1,8 +1,8 @@
 """Material Design 3 navigation, app bar, tabs, lists, and progress.
 
-Four of these -- NavigationRail, NavigationDrawer, Tabs, SegmentedButton --
-share one shape: a container of items where exactly one is selected. That is
-modelled once here:
+Three of these -- NavigationRail, Tabs, SegmentedButton -- share one shape:
+a container of items where exactly one is selected. That is modelled once
+here:
 
 * the container carries ``value:``, the id of the selected child;
 * during layout it calls ``set_selected`` on each child;
@@ -43,7 +43,6 @@ __all__ = [
     "LinearProgressElement",
     "ListItemElement",
     "NavItemElement",
-    "NavigationDrawerElement",
     "NavigationRailElement",
     "SegmentElement",
     "SegmentedButtonElement",
@@ -65,9 +64,9 @@ __all__ = [
 #:
 #: A Segment reuses the Tab role. Only the Tab's is sourced; a segmented button
 #: is its sibling control and looking different from it would be worse than
-#: following it. The navigation *drawer* is not here: section 4.4 states no
-#: typography, so its label keeps a plain size rather than borrowing a role it
-#: was never given.
+#: following it. NavigationRail's own *expanded*-state label is not here:
+#: section 4.4 (the old drawer spec) states no typography, so it keeps a
+#: plain size rather than borrowing a role it was never given.
 LABEL_ROLE: Final = TYPE_SCALE["label-medium"]
 TITLE_ROLE: Final = TYPE_SCALE["title-large"]
 TAB_LABEL_ROLE: Final = TYPE_SCALE["title-small"]
@@ -143,14 +142,15 @@ class _SelectionContainer(_StyledMixin, Flex):
 
 
 class NavItemElement(_StyledMixin, Padding):
-    """One destination in a rail or drawer.
+    """One destination in a `NavigationRail`, collapsed or expanded.
 
     `text:` is the icon name and `supporting_text` the label. The icon's FILL
     axis goes to 1 when selected -- M3's own mechanism for expressing
     selection, rather than swapping to a different icon.
     """
 
-    #: "Navigation drawer (modal)" is level 1; the rail is level 0.
+    #: "Navigation drawer (modal)" -- the rail's own expanded anatomy -- is
+    #: elevation level 1; collapsed is level 0.
     RAIL_W: Final = 80.0
     RAIL_H: Final = 56.0
     INDICATOR_W: Final = 56.0
@@ -164,16 +164,26 @@ class NavItemElement(_StyledMixin, Padding):
         self.init_element(spec)
 
     @property
-    def _in_drawer(self) -> bool:
-        return isinstance(self.parent, NavigationDrawerElement)
+    def _expanded(self) -> bool:
+        """Row anatomy (icon+label side by side) once the parent's own
+        collapse/expand transform has crossed its halfway point; stacked
+        icon-over-label otherwise. Swaps rather than interpolates -- the
+        same precedent `AccordionElement`'s chevron already establishes for
+        a shape change with no continuous parameter to animate through
+        ("a glyph instance carries no rotation parameter... a mid-transition
+        swap would read as a glitch, not a rotation"); a `Flex` arrangement
+        has no interpolation parameter either.
+        """
+        parent = self.parent
+        return isinstance(parent, NavigationRailElement) and parent.progress() > 0.5
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
-        return (self.DRAWER_RADIUS,) * 4 if self._in_drawer else (self.INDICATOR_H / 2,) * 4
+        return (self.DRAWER_RADIUS,) * 4 if self._expanded else (self.INDICATOR_H / 2,) * 4
 
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
-        if self._in_drawer:
+        if self._expanded:
             width = outer.max_width if outer.has_bounded_width else 240.0
             return outer.constrain(Size(width, self.DRAWER_H))
         label = self._label_height()
@@ -201,7 +211,7 @@ class NavItemElement(_StyledMixin, Padding):
         )
         label_text = (self._supporting).strip()
 
-        if self._in_drawer:
+        if self._expanded:
             if t > 0.0:
                 _box(
                     ctx,
@@ -278,88 +288,53 @@ class NavItemElement(_StyledMixin, Padding):
 
 
 class NavigationRailElement(_SelectionContainer):
-    """M3 Navigation Rail: 80dp wide, vertical, 56x32dp active indicator."""
+    """M3 Navigation Rail: collapsed (80dp, icon-only) or expanded (240-360dp,
+    icon+label) -- one component with two states that transform into each
+    other, per M3 Expressive's own merger of the old Rail/Drawer split
+    (`COMPONENT_NAVIGATION_RAIL.md`: "the expanded nav rail is meant to
+    replace the [modal] navigation drawer"; "collapsed and expanded
+    navigation rails... can easily transform into each other when the menu
+    button is selected"). Never hidden by its own state -- "the collapsed
+    navigation rail should not be hidden" -- an application that wants it
+    fully gone does so through ordinary view composition, not this widget.
+    """
 
-    WIDTH: Final = 80.0
+    COLLAPSED_W: Final = 80.0
+    EXPANDED_DEFAULT_W: Final = 300.0
+    EXPANDED_MAX_W: Final = 360.0
     axis = Axis.VERTICAL
 
-    def paint(self, ctx: PaintContext, origin: Offset) -> None:
-        #: Needed for `collapsed:` to actually collapse anything visually --
-        #: a zero-size *clip* rect is this codebase's own sentinel for "no
-        #: clip at all" (`tree/element.py`'s `_NO_CLIP = (0, 0, 0, 0)`), so
-        #: clipping to this element's own now-zero-width rect would have
-        #: clipped to *nothing being clipped*, not to nothing being visible
-        #: -- tried first, confirmed wrong by looking at the actual pixels. A
-        #: `NavItem`'s text/icon shrink-wrap to their natural ink size
-        #: regardless of the 0-width constraint `perform_layout` gives them,
-        #: so they would otherwise paint right past this element's own rect.
-        #: Skipping the paint outright, the same way `_culled` already does
-        #: for anything off-screen, is what actually makes it disappear.
-        if self.collapsed:
-            self._skipped = True
-            return
-        super().paint(ctx, origin)
-
-    def perform_layout(self, constraints: Constraints) -> Size:
-        #: `constrain_width` is not optional here -- a layout node must
-        #: return a size its constraints permit (`layout/node.py` asserts
-        #: this). Found the hard way: squeezing a `Horizontal` containing this
-        #: widget below 80dp raised instead of shrinking, since the old
-        #: code built `inner` from the unclamped M3 width outright. See
-        #: `_resolved_width`'s sibling docstring in `overlays.py` for the
-        #: same reasoning applied to Menu/Dialog/Popover/the sheets.
-        #:
-        #: `collapsed:` (WidgetSpec, not style -- `style.width` cannot be
-        #: `{{ }}`-bound) asks for exactly 0 instead, for an application
-        #: swapping a rail for a drawer as a signal flips.
-        w = constraints.constrain_width(0.0 if self.collapsed else self.WIDTH)
-        inner = constraints.copy_with(min_width=w, max_width=w)
-        return super().perform_layout(inner)
-
-    def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
-        _box(
-            ctx,
-            absolute.x,
-            absolute.y,
-            self.size.width,
-            self.size.height,
-            token=ctx.palette.index(self.style.background or "surface"),
-            radius=0.0,
+    def progress(self) -> float:
+        """0 (collapsed) to 1 (expanded) -- drives the animated width, the
+        same `animated(..., invalidates="layout")` pattern `AccordionElement`
+        uses for its own expand/collapse. Relayouts every frame of the
+        transition (`animated()`'s own documented cost), affordable here
+        since M3 itself caps a rail at "3-7 navigation items". `NavItem`
+        also reads this (via `self.parent.progress()`) to pick its anatomy.
+        """
+        return self.animated(
+            "expanded",
+            0.0 if self.collapsed else 1.0,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
+            invalidates="layout",
         )
 
-
-class NavigationDrawerElement(_SelectionContainer):
-    """M3 Navigation Drawer: 240-360dp wide, 56dp items, full-radius active pill."""
-
-    DEFAULT_W: Final = 300.0
-    MAX_W: Final = 360.0
-    axis = Axis.VERTICAL
-
-    def paint(self, ctx: PaintContext, origin: Offset) -> None:
-        #: See `NavigationRailElement`'s identical override -- same reason
-        #: (a zero-size *clip* rect means "unclipped" in this codebase, not
-        #: "clip away everything"), same fix, needed by the same
-        #: `collapsed:` field.
-        if self.collapsed:
-            self._skipped = True
-            return
-        super().paint(ctx, origin)
-
     def perform_layout(self, constraints: Constraints) -> Size:
-        width = min(self.MAX_W, self.DEFAULT_W)
-        w = _resolved_width(self.style, constraints, width)
         #: `constrain_width` is not optional here -- a layout node must
         #: return a size its constraints permit (`layout/node.py` asserts
         #: this). `_resolved_width`'s own "no explicit width" fallback
-        #: returns the flat M3 default with no regard for how much room
-        #: was actually offered, so a `Horizontal` squeezed narrower than 300dp
-        #: raised instead of shrinking. See `overlays.py`'s sibling
-        #: `_resolved_width` for the same reasoning applied to
-        #: Menu/Dialog/Popover/the sheets.
-        #:
-        #: `collapsed:` (WidgetSpec, not style -- see `NavigationRailElement`'s
-        #: own comment) overrides all of that to exactly 0.
-        w = constraints.constrain_width(0.0 if self.collapsed else w)
+        #: returns the flat M3 default with no regard for how much room was
+        #: actually offered, so a `Horizontal` squeezed narrower than the
+        #: expanded default would raise instead of shrink. See
+        #: `overlays.py`'s sibling `_resolved_width` for the same reasoning
+        #: applied to Menu/Dialog/Popover/the sheets.
+        expanded_w = min(
+            self.EXPANDED_MAX_W,
+            _resolved_width(self.style, constraints, self.EXPANDED_DEFAULT_W),
+        )
+        width = self.COLLAPSED_W + (expanded_w - self.COLLAPSED_W) * self.progress()
+        w = constraints.constrain_width(width)
         inner = constraints.copy_with(min_width=w, max_width=w)
         return super().perform_layout(inner)
 
@@ -370,7 +345,7 @@ class NavigationDrawerElement(_SelectionContainer):
             absolute.y,
             self.size.width,
             self.size.height,
-            token=ctx.palette.index(self.style.background or "surface_container_low"),
+            token=ctx.palette.index(self.style.background or "surface_container"),
             radius=0.0,
         )
 
@@ -1049,7 +1024,7 @@ class TreeItemElement(_StyledMixin, LayoutNode):
     @property
     def depth(self) -> int:
         """Nesting level, derived from ancestry rather than stored -- the
-        same idiom `NavItemElement._in_drawer` uses for its own context."""
+        same idiom `NavItemElement._expanded` uses for its own context."""
         depth = 0
         node = self.parent
         while node is not None:

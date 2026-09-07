@@ -51,7 +51,7 @@ Every node accepts these. Only `widget` is required.
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
-| `collapsed` | string | Whether `NavigationRail`/`NavigationDrawer` collapses to zero width. Templated like `disabled`. Meaningless on anything else. |
+| `collapsed` | string | Whether `NavigationRail` shows its narrow, icon-only anatomy (true) or its wide, labelled one (false, default). Templated like `disabled`. Meaningless on anything else. |
 | `indeterminate` | string | `Checkbox`'s third M3 state — a dash instead of a checkmark, for a parent whose children are only partly checked. Templated like `disabled`. Takes precedence over `value` for which glyph paints. Meaningless on anything else. |
 | `path` | string | An `Image`'s file to decode. Templated like `value`. See [Image](#image). |
 | `inputs`, `outputs` | string or list | A `Node`'s named ports. Meaningless outside `NodeGraph`. See [Node graph](#node-graph). |
@@ -1157,8 +1157,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `TreeView` + `TreeItem` | Same M3 gap as `Accordion`, applied recursively. A `TreeItem` with `children:` is a branch (chevron, `value:` for open/closed); with none it's a leaf. `TreeView`'s own `value:` names the selected item by `name` at any depth. |
 | `TopAppBar` | 64dp small, 112dp `medium`, 152dp `large`. |
 | `StatusBar` | 24dp, `surface_container`. No M3 component or even the phrase "status bar" anywhere in M3's own vocabulary — the docked *toolbar* it might sound like is a row of action buttons, a different thing. A plain `Horizontal` a view populates freely; a `Spacer` splits it into leading/trailing groups. |
-| `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator. `collapsed: "{{ }}"` shrinks it to 0dp. |
-| `NavigationDrawer` | 240–360dp, 56dp items. `collapsed: "{{ }}"` shrinks it to 0dp — the pair is how a real app builds a collapsible rail, since `style.width` cannot be bound. |
+| `NavigationRail` + `NavItem` | One widget, two states, animated between them: collapsed (80dp, 56×32dp indicator, icon-only) and expanded (240–360dp, 56dp items, full-radius pill, with labels) — `collapsed: "{{ }}"` switches between them (default false, so an unset rail starts expanded). M3 Expressive's own merger of the old, separate NavigationDrawer into this widget's expanded state. |
 | `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. `style: {multi_select: true}` selects M3's multi-select form — `value:` becomes a comma-separated set instead of one name. |
 | `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |

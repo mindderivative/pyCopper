@@ -39,5 +39,5 @@ children:
         style: {color: on_surface, font_size: 16}
 
       - widget: Text
-        text: "The rail on the left is real navigation, not a decoration: it's built from the same PageHost, NavigationRail, and NavigationDrawer widgets a real pyCopper application would use. Click the menu icon at its top to expand it into a labelled drawer; click Settings, pinned to the bottom, to see the current theme and flip between light and dark."
+        text: "The rail on the left is real navigation, not a decoration: it's built from the same PageHost and NavigationRail widgets a real pyCopper application would use. Click the menu icon at its top to expand it into its labelled form; click Settings, pinned to the bottom, to see the current theme and flip between light and dark."
         style: {color: on_surface, font_size: 16}

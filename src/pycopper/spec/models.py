@@ -58,7 +58,6 @@ class WidgetKind(StrEnum):
     FAB = "Fab"
     BADGE = "Badge"
     NAVIGATION_RAIL = "NavigationRail"
-    NAVIGATION_DRAWER = "NavigationDrawer"
     NAV_ITEM = "NavItem"
     TOP_APP_BAR = "TopAppBar"
     TABS = "Tabs"
@@ -387,9 +386,9 @@ class StyleSpec(_Frozen):
     #: Off by default, preserving the one-`value:`-names-one-child model
     #: every `_SelectionContainer` already uses. On, `value:` is instead a
     #: comma-separated set of selected names, and more than one child can be
-    #: marked selected at once. Meaningless on `Tabs`/`NavigationRail`/
-    #: `NavigationDrawer` -- M3 does not describe a multi-select form of any
-    #: of those -- though nothing stops a view from setting it there too.
+    #: marked selected at once. Meaningless on `Tabs`/`NavigationRail` -- M3
+    #: does not describe a multi-select form of either -- though nothing
+    #: stops a view from setting it there too.
     multi_select: bool = False
     #: `name` of the ScrollView a TopAppBar collapses with. Without it a
     #: medium or large bar simply stays expanded.
@@ -632,12 +631,13 @@ class WidgetSpec(_Frozen):
     #: colours and a view should be able to drive it from validation rather
     #: than restyle it. Only `TextField` reads it.
     error: str | None = None
-    #: Whether `NavigationRail`/`NavigationDrawer` collapses to zero width.
-    #: Templated like `disabled:`, for the same reason it lives here rather
-    #: than on `StyleSpec`: `style.width` is a load-time value (confirmed by
-    #: trying it), not something a `{{ }}` binding can drive, so swapping a
-    #: rail for a drawer as a signal flips needs a **state** field, not a
-    #: style one. Meaningless on anything else.
+    #: Whether `NavigationRail` shows its narrow, icon-only anatomy (true)
+    #: or its wide, labelled one (false, default) -- M3 Expressive's own
+    #: "collapsed"/"expanded" states of one component, not two. Templated
+    #: like `disabled:`, for the same reason it lives here rather than on
+    #: `StyleSpec`: `style.width` is a load-time value (confirmed by
+    #: trying it), not something a `{{ }}` binding can drive, and this is
+    #: state a signal should flip. Meaningless on anything else.
     collapsed: str | None = None
     #: `Checkbox`'s third M3 state -- a dash instead of a checkmark, for a
     #: parent whose children are only partly checked. Templated like

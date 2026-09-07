@@ -1720,12 +1720,11 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 
 | Widget | M3 spec | Notes |
 |---|---|---|
-| `NavigationRail` + `NavItem` | 80dp wide, 56×32dp indicator | icon FILL 0→1 marks the active destination. `collapsed:` (`WidgetSpec`, not `style` — `style.width` is a load-time value, confirmed not `{{ }}`-bindable) shrinks it to 0dp; `perform_layout` clamps to it and `paint` is skipped outright rather than clipped to it, since a zero-size *clip* rect is this codebase's own sentinel for "unclipped" |
-| `NavigationDrawer` | 240–360dp, 56dp items, 28dp pill | shares `NavItem`; same `collapsed:` mechanism as `NavigationRail` — together they are how a real application builds one collapsible rail/drawer pair (`examples/gallery`'s own nav shell) rather than animating a width |
+| `NavigationRail` + `NavItem` | collapsed: 80dp, 56×32dp indicator. Expanded: 240–360dp, 56dp items, 28dp pill | icon FILL 0→1 marks the active destination. `collapsed:` (`WidgetSpec`, not `style` — `style.width` is a load-time value, confirmed not `{{ }}`-bindable; default false, so an unset rail starts expanded) animates continuously between the two widths (`animated(..., invalidates="layout")`, the same pattern `Accordion` uses), never hides the widget — M3 Expressive folded the old, separate `NavigationDrawer` into this widget's own expanded state ("the expanded nav rail is meant to replace the [modal] navigation drawer"), so there is no longer a second widget kind. `NavItem`'s row-vs-stacked anatomy *swaps*, not morphs, at the transition's halfway point — the same "swap don't interpolate" precedent `Accordion`'s chevron already establishes for a shape change with no continuous parameter |
 | `TopAppBar` | 64dp small, 112dp medium, 152dp large | medium and large collapse on scroll (§5.19) |
 | `StatusBar` | 24dp, `surface_container`, 16dp horizontal padding | no M3 component, and the phrase does not appear anywhere in M3's own vocabulary either; the docked *toolbar* is a different thing (action buttons, not information). Fixes a real gap `TopAppBar` shares: extending `Flex` directly, not `_FlexElement`, means a `Spacer` styled `width: expand` is invisible to the base `flex_of` and starves whatever comes after it — `StatusBar` overrides `flex_of` to recognise it, the same way `_FlexElement` already does for `Horizontal`/`Vertical` |
 | `Tabs` + `Tab` | 48dp, 3dp indicator | primary rounds the indicator, secondary is flat |
-| `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment. `style.multi_select` (M3 names both a single- and multi-select form) is `_SelectionContainer.apply_selection`'s own shared switch -- `value:` becomes a comma-separated set instead of one name, off by default so `Tabs`/`NavigationRail`/`NavigationDrawer` (which share the same base class but have no M3 multi-select form of their own) are unaffected |
+| `SegmentedButton` + `Segment` | 40dp, 20dp outer corners | checkmark on the active segment. `style.multi_select` (M3 names both a single- and multi-select form) is `_SelectionContainer.apply_selection`'s own shared switch -- `value:` becomes a comma-separated set instead of one name, off by default so `Tabs`/`NavigationRail` (which share the same base class but have no M3 multi-select form of their own) are unaffected |
 | `ListItem` | 56 / 72 / 88dp | headline plus bindable `supporting_text` |
 | `Accordion` | 56 / 72dp header, `ListItem`'s anatomy | M3 has no component for this — only Lists' "expand and collapse" behaviour statement; disclosure state is `value:`, animated height reveal clipped like `ScrollView`, chevron **swaps** `expand_more`/`expand_less` rather than rotating (a glyph instance has no rotation parameter) |
 | `TreeView` + `TreeItem` | Accordion's mechanism, recursive | same M3 gap, same reveal/clip/chevron-swap machinery, applied to a `TreeItem` that nests further `TreeItem`s; a leaf has no chevron. Two things a single level of nesting never needed: per-level **indentation** (one chevron-width per depth, not M3-sourced — no tree page exists to source it from) and a **clip that intersects its ancestor's** rather than replacing it, since — unlike Accordion or `ScrollView` — a tree item is routinely nested inside its own kind, so collapsing a node must hide every descendant regardless of which of them are individually expanded. The intersection's own degenerate case needed a further fix, covered in §5.8.6. `TreeView` generalises `_SelectionContainer`'s `value:`-names-the-selected-child shape to select at any depth |
@@ -3289,9 +3288,9 @@ navigation elsewhere (WPF's `Frame`, for one).
 No M3-sourced role exists (no M3 component to source one from); ARIA
 convention has no single role for "a container that shows one of several
 things," so it is treated as a plain `"group"`, the same as `Container`/
-`Horizontal`/`Vertical`/`Stack` -- not silenced the way `NavigationRail`/
-`NavigationDrawer` are, since those have a stated "role is not announced"
-in M3 itself and `PageHost` has no such statement to point to.
+`Horizontal`/`Vertical`/`Stack` -- not silenced the way `NavigationRail` is,
+since it has a stated "role is not announced" in M3 itself and `PageHost`
+has no such statement to point to.
 
 ### 5.28 Slider — `widgets/slider.py`
 

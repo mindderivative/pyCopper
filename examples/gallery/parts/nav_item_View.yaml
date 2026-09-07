@@ -1,10 +1,8 @@
 # One navigation destination: an icon plus its label, wired to the gallery's
 # single generic navigation handler (`select_nav`). Included once per rail
-# destination and once per drawer destination in gallery_View.yaml -- each
-# inclusion supplies its own `name:`, since Rail and Drawer are independent
-# selection containers that both live in the same view file and therefore
-# share one name-uniqueness requirement (see gallery_View.yaml's own comment
-# on the `d_` prefix this forces on the drawer's copies).
+# destination in gallery_View.yaml -- each inclusion supplies its own
+# `name:` (`nav_`-prefixed), since PageHost's own pages further down share
+# the same view file and therefore the same name-uniqueness requirement.
 params: [icon, label]
 widget: NavItem
 text: "{{ icon }}"

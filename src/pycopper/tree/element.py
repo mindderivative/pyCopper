@@ -513,8 +513,9 @@ class ElementMixin:
 
     @property
     def collapsed(self) -> bool:
-        """Whether `NavigationRail`/`NavigationDrawer` collapses to zero
-        width. Meaningless on anything else -- only those two read it."""
+        """Whether `NavigationRail` shows its narrow, icon-only anatomy
+        (true) or its wide, labelled one (false, default). Meaningless on
+        anything else -- only `NavigationRail` reads it."""
         return self._collapsed.strip().lower() in ("true", "1", "yes")
 
     @property
@@ -556,7 +557,7 @@ class ElementMixin:
     def selected(self) -> bool:
         """Whether a parent container has marked this item as the active one.
 
-        Set by NavigationRail/Drawer, Tabs and SegmentedButton on their
+        Set by NavigationRail, Tabs and SegmentedButton on their
         children during layout, so an item renders its own selected appearance
         without reaching back up the tree.
         """

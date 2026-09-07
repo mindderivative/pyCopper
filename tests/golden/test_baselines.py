@@ -418,6 +418,7 @@ def test_navigation_baseline(render_scene, assert_golden) -> None:
                 "name": "rail",
                 "widget": "NavigationRail",
                 "value": "{{ dest.get() }}",
+                "collapsed": "true",
                 "style": {"spacing": 8, "padding": [0, 12]},
                 "children": [
                     {
@@ -1259,6 +1260,7 @@ def test_indicators_baseline(render_scene, assert_golden) -> None:
                     "name": "rail",
                     "widget": "NavigationRail",
                     "value": "{{ nav.get() }}",
+                    "collapsed": "true",
                     "children": [
                         {
                             "name": "n1",

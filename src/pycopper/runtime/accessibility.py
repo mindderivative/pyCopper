@@ -157,7 +157,7 @@ ROLES: Final[dict[str, str]] = {
     # No M3 component -- see PageHostElement's own docstring. Structurally a
     # plain box holding one child at a time, the same shape as Container/
     # Horizontal/Vertical/Stack above, not a navigation container with a stated "not
-    # announced" role like NavigationRail/Drawer below -- so it gets the same
+    # announced" role like NavigationRail below -- so it gets the same
     # generic "group" those get, rather than being silenced.
     "PageHost": "group",
 }
@@ -170,7 +170,6 @@ SILENT: Final[frozenset[str]] = frozenset(
         "Spacer",
         "Icon",
         "NavigationRail",
-        "NavigationDrawer",
         # "Button groups are invisible containers" (COMPONENT_BUTTON_GROUPS.md)
         # and "the button group container is not a focusable element" -- its
         # buttons carry the meaning, the same reasoning as the nav container

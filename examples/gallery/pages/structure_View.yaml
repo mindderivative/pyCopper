@@ -73,7 +73,7 @@ children:
         text: "Navigation"
         style: {text_style: title-medium, color: primary}
       - widget: Text
-        text: "TopAppBar anchors a screen's title (small/medium/large per M3's three heights); Tabs switch between peer views at the same level. NavigationRail (80dp, M3's desktop-first pattern) and NavigationDrawer (240-360dp, its expanded form) are what this gallery's own sidebar is built from -- both take the same NavItem children and the same value:-by-name selection convention Tabs uses. StatusBar is pyCopper's own addition: M3's own vocabulary has no 'status bar' component at all, only a docked toolbar of action buttons, which is a different thing."
+        text: "TopAppBar anchors a screen's title (small/medium/large per M3's three heights); Tabs switch between peer views at the same level. NavigationRail is one widget with two states -- collapsed (80dp, icon-only) and expanded (240-360dp, with labels) -- that transform into each other; this gallery's own sidebar is built from it. Both states take the same NavItem children and the same value:-by-name selection convention Tabs uses. StatusBar is pyCopper's own addition: M3's own vocabulary has no 'status bar' component at all, only a docked toolbar of action buttons, which is a different thing."
         style: {color: on_surface, font_size: 15}
       - {name: navigation_div, widget: Divider, style: {width: expand}}
       - name: top_app_bar_demo
@@ -95,14 +95,16 @@ children:
           - name: rail_demo
             widget: NavigationRail
             value: "{{ rail.get() }}"
+            collapsed: "true"
             style: {height: expand}
             children:
               - {name: r0, widget: NavItem, text: home,     supporting_text: "Home",     handlers: {on_click: select_rail}}
               - {name: r1, widget: NavItem, text: search,   supporting_text: "Search",   handlers: {on_click: select_rail}}
               - {name: r2, widget: NavItem, text: settings, supporting_text: "Settings", handlers: {on_click: select_rail}}
           - name: drawer_demo
-            widget: NavigationDrawer
+            widget: NavigationRail
             value: "{{ rail.get() }}"
+            collapsed: "false"
             style: {height: expand}
             children:
               - {name: d0, widget: NavItem, text: home,     supporting_text: "Home",     handlers: {on_click: select_rail}}

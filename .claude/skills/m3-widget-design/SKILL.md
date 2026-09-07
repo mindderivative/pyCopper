@@ -224,7 +224,7 @@ several in a Horizontal or Vertical.
 **Widgets today (39 kinds):** primitives — Container, Horizontal, Vertical, Stack,
 Spacer, Text, Icon, ScrollView. M3 components — Button (5 variants), Card,
 Divider, Checkbox, Radio, Switch, Chip, IconButton, Fab, Badge,
-NavigationRail, NavigationDrawer, NavItem, TopAppBar, Tabs, Tab,
+NavigationRail, NavItem, TopAppBar, Tabs, Tab,
 SegmentedButton, Segment, ListItem, LinearProgress, CircularProgress,
 Carousel, CarouselItem, **TextField**. Overlays — Dialog, Menu, MenuItem,
 Tooltip, Snackbar, BottomSheet, SideSheet.

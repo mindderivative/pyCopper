@@ -17,7 +17,7 @@ children:
 
       - name: summary
         widget: Text
-        text: "M3's navigation rail: an 80dp-wide vertical strip of destinations. collapsed: shrinks it to nothing, for swapping with a NavigationDrawer."
+        text: "M3's navigation rail: one widget, two states -- collapsed (80dp, icon-only) and expanded (240-360dp, with labels) -- that transform into each other."
         style: {text_style: body-large, color: on_surface_variant}
 
       - {name: div1, widget: Divider, style: {width: expand}}
@@ -25,14 +25,19 @@ children:
       - name: explanation
         widget: Text
         text: |
-          80dp wide, a 56x32dp active indicator. `text:` on each `NavItem`
-          is the icon glyph, `supporting_text:` the label. `collapsed:`
-          shrinks the rail without changing which item is selected.
+          M3 Expressive folded the old, separate "Navigation Drawer" into
+          this widget's own expanded state: "the expanded nav rail is
+          meant to replace the [modal] navigation drawer" entirely.
+          `text:` on each `NavItem` is the icon glyph, `supporting_text:`
+          the label. `collapsed:` (default false, so an unset rail starts
+          expanded) switches between the two -- animated, not instant --
+          without changing which item is selected.
 
           Use cases, from the spec: the navigation rail can display
           navigation items, a menu, and a FAB in a vertical orientation.
-          There are two variants, collapsed and expanded, which can
-          transform into each other when the menu button is selected.
+          "Collapsed and expanded navigation rails... can easily transform
+          into each other when the menu button is selected" -- quoted
+          directly.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}

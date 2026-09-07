@@ -832,7 +832,6 @@ def _material_registry() -> dict[WidgetKind, type]:
         WidgetKind.PAGINATION: m.PaginationElement,
         WidgetKind.ACCORDION: m.AccordionElement,
         WidgetKind.NAVIGATION_RAIL: n.NavigationRailElement,
-        WidgetKind.NAVIGATION_DRAWER: n.NavigationDrawerElement,
         WidgetKind.NAV_ITEM: n.NavItemElement,
         WidgetKind.TOP_APP_BAR: n.TopAppBarElement,
         WidgetKind.STATUS_BAR: n.StatusBarElement,

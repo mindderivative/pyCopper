@@ -50,7 +50,6 @@ def test_a_navigation_container_is_not_announced() -> None:
     """M3: "the role is not announced". Its items carry the meaning, and a
     reader stopping on the container first would only add noise."""
     assert role_for("NavigationRail") is None
-    assert role_for("NavigationDrawer") is None
 
 
 def test_decoration_is_not_announced() -> None:

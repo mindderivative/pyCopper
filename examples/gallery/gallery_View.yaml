@@ -1,23 +1,18 @@
 # pyCopper widget gallery: a real navigation shell.
 #
 # `root` is a fixed header above a body Horizontal: a collapsible navigation
-# rail/drawer on the left, `PageHost` on the right showing exactly one page
-# at a time. Each page is its own file under pages/, each wrapped in its own
+# rail on the left, `PageHost` on the right showing exactly one page at a
+# time. Each page is its own file under pages/, each wrapped in its own
 # ScrollView -- content is grouped by what it's for, not crammed into one
 # long scroll the way earlier revisions of this gallery were.
 #
-# M3 itself treats "collapsed" and "expanded" as two states of one
-# navigation control (COMPONENT_NAVIGATION_RAIL.md): NavigationRail is the
-# collapsed form, NavigationDrawer its expanded form. Both are always
-# present -- `style.width` is a load-time value, not something a `{{ }}`
-# binding can drive (confirmed by trying it), so `collapsed:` (WidgetSpec,
-# state rather than style, added for exactly this) is what makes whichever
-# one `nav_expanded` says not to show collapse to zero width instead. Both
-# the rail's and the drawer's own NavItem children, and `content`'s own page
-# children, all live in this one static document at once regardless of
-# which is visible at runtime -- so all three sets need distinct names.
-# `select_nav`'s r_/d_ prefixes (see gallery_ViewModel.py) are what let one
-# generic handler still drive all three from the same `current_page` signal.
+# M3 Expressive treats "collapsed" and "expanded" as two states of ONE
+# navigation control, not two separate widgets (COMPONENT_NAVIGATION_RAIL.md:
+# "the expanded nav rail is meant to replace the [modal] navigation
+# drawer"). `nav_rail` below is a single `NavigationRail`, `collapsed:`
+# bound to `nav_expanded` -- `style.width` is a load-time value, not
+# something a `{{ }}` binding can drive (confirmed by trying it), which is
+# why `collapsed:` (WidgetSpec, state rather than style) exists at all.
 styles:
   - source: theme.yaml
 
@@ -52,33 +47,25 @@ root:
 
             - name: nav_rail
               widget: NavigationRail
-              value: "{{ 'r_' + current_page.get() }}"
-              collapsed: "{{ nav_expanded.get() }}"
-              style: {height: expand}
-              children:
-                - {name: r_home,        source: parts/nav_item_View.yaml, with: {icon: home,       label: Home}}
-                - {name: r_foundations, source: parts/nav_item_View.yaml, with: {icon: widgets,     label: Foundations}}
-                - {name: r_structure,   source: parts/nav_item_View.yaml, with: {icon: navigation,  label: Structure}}
-                - {name: r_input,       source: parts/nav_item_View.yaml, with: {icon: keyboard,    label: Input}}
-                - {name: r_media,       source: parts/nav_item_View.yaml, with: {icon: grid_view,   label: Media}}
-                - {name: r_advanced,    source: parts/nav_item_View.yaml, with: {icon: code,        label: Advanced}}
-                - {name: nav_rail_spacer, widget: Spacer, style: {height: expand}}
-                - {name: r_settings,    source: parts/nav_item_View.yaml, with: {icon: settings,    label: Settings}}
-
-            - name: nav_drawer
-              widget: NavigationDrawer
-              value: "{{ 'd_' + current_page.get() }}"
+              value: "{{ 'nav_' + current_page.get() }}"
               collapsed: "{{ not nav_expanded.get() }}"
               style: {height: expand}
               children:
-                - {name: d_home,        source: parts/nav_item_View.yaml, with: {icon: home,       label: Home}}
-                - {name: d_foundations, source: parts/nav_item_View.yaml, with: {icon: widgets,     label: Foundations}}
-                - {name: d_structure,   source: parts/nav_item_View.yaml, with: {icon: navigation,  label: "Structure & navigation"}}
-                - {name: d_input,       source: parts/nav_item_View.yaml, with: {icon: keyboard,    label: "Input & overlays"}}
-                - {name: d_media,       source: parts/nav_item_View.yaml, with: {icon: grid_view,   label: "Layout & media"}}
-                - {name: d_advanced,    source: parts/nav_item_View.yaml, with: {icon: code,        label: Advanced}}
-                - {name: nav_drawer_spacer, widget: Spacer, style: {height: expand}}
-                - {name: d_settings,    source: parts/nav_item_View.yaml, with: {icon: settings,    label: Settings}}
+                # `nav_`-prefixed: PageHost's own pages beneath already use
+                # these same bare names ("home", "foundations", ...), and a
+                # view file's names must all be unique -- one prefix now,
+                # not the old rail+drawer pair's `r_`/`d_` two. Short labels
+                # (the old rail's, not the old drawer's more descriptive
+                # ones) -- the same label now has to fit the narrow
+                # collapsed anatomy too, which the longer ones overflowed.
+                - {name: nav_home,        source: parts/nav_item_View.yaml, with: {icon: home,       label: Home}}
+                - {name: nav_foundations, source: parts/nav_item_View.yaml, with: {icon: widgets,     label: Foundations}}
+                - {name: nav_structure,   source: parts/nav_item_View.yaml, with: {icon: navigation,  label: Structure}}
+                - {name: nav_input,       source: parts/nav_item_View.yaml, with: {icon: keyboard,    label: Input}}
+                - {name: nav_media,       source: parts/nav_item_View.yaml, with: {icon: grid_view,   label: Media}}
+                - {name: nav_advanced,    source: parts/nav_item_View.yaml, with: {icon: code,        label: Advanced}}
+                - {name: nav_rail_spacer, widget: Spacer, style: {height: expand}}
+                - {name: nav_settings,    source: parts/nav_item_View.yaml, with: {icon: settings,    label: Settings}}
 
         - name: content
           widget: PageHost

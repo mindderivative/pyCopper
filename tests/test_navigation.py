@@ -68,7 +68,6 @@ RAIL = [
     "kind",
     [
         "NavigationRail",
-        "NavigationDrawer",
         "NavItem",
         "TopAppBar",
         "Tabs",
@@ -96,10 +95,24 @@ def test_every_kind_is_registered() -> None:
 # ------------------------------------------------------ M3 dimensions (dp)
 
 
-def test_rail_is_eighty_wide() -> None:
-    """M3 4.5."""
-    e = laid_out({"name": "w", "widget": "NavigationRail", "children": RAIL})
+def test_a_collapsed_rail_is_eighty_wide() -> None:
+    """M3 4.5. Also M3 Expressive's own point: NavigationRail and
+    NavigationDrawer are one component, collapsed and expanded states of
+    the same widget -- collapsed no longer means "hidden," it means the
+    narrow, icon-only form, and "the collapsed navigation rail should not
+    be hidden.\""""
+    e = laid_out({"name": "w", "widget": "NavigationRail", "collapsed": "true", "children": RAIL})
     assert e.size.width == 80.0
+
+
+def test_an_expanded_rail_is_within_the_m3_drawer_range() -> None:
+    """M3 4.4: the expanded rail replaces the old drawer's own 240-360dp
+    range entirely -- `collapsed: false` is also the default, so an unset
+    rail is expanded, not collapsed."""
+    e = laid_out({"name": "w", "widget": "NavigationRail", "collapsed": "false", "children": RAIL})
+    assert 240.0 <= e.size.width <= 360.0
+    default = laid_out({"name": "w", "widget": "NavigationRail", "children": RAIL})
+    assert 240.0 <= default.size.width <= 360.0
 
 
 def test_top_app_bar_is_sixty_four_high() -> None:
@@ -146,46 +159,40 @@ def test_list_item_heights(spec: dict, expected: float) -> None:
     assert e.size.height == expected
 
 
-def test_drawer_width_is_within_the_m3_range() -> None:
-    """M3 4.4: 240-360dp."""
-    e = laid_out({"name": "w", "widget": "NavigationDrawer", "children": RAIL})
-    assert 240.0 <= e.size.width <= 360.0
-
-
-def test_drawer_shrinks_below_its_m3_minimum_rather_than_raising() -> None:
+def test_an_expanded_rail_shrinks_below_its_m3_minimum_rather_than_raising() -> None:
     """A layout node must return a size its own constraints permit
     (`layout/node.py` asserts this) -- M3's 240dp minimum is an aspiration,
     not something a narrower parent has to honour. Real crash this session:
     squeezing a Horizontal containing this widget below 300dp raised instead of
     shrinking, because the old code built its inner constraints from the
     unclamped M3 width outright."""
-    e = laid_out({"name": "w", "widget": "NavigationDrawer", "children": RAIL}, width=143.0)
+    e = laid_out(
+        {"name": "w", "widget": "NavigationRail", "collapsed": "false", "children": RAIL},
+        width=143.0,
+    )
     assert e.size.width == 143.0
 
 
 def test_rail_shrinks_below_its_fixed_width_rather_than_raising() -> None:
     """The same crash, one widget over: `NavigationRailElement` had the
-    identical unclamped-width bug."""
-    e = laid_out({"name": "w", "widget": "NavigationRail", "children": RAIL}, width=40.0)
+    identical unclamped-width bug. No `collapsed:` needed -- the collapsed
+    target (80dp) is itself clamped down to whatever room is offered."""
+    e = laid_out(
+        {"name": "w", "widget": "NavigationRail", "collapsed": "true", "children": RAIL},
+        width=40.0,
+    )
     assert e.size.width == 40.0
 
 
 # ----------------------------------------------------------------- collapsed
 
 
-def test_a_collapsed_rail_is_zero_wide() -> None:
-    """`collapsed:` is what a real app swaps a rail for a drawer with --
-    `style.width` cannot be bound, so this is a WidgetSpec field, not style."""
-    e = laid_out({"name": "w", "widget": "NavigationRail", "collapsed": "true", "children": RAIL})
-    assert e.size.width == 0.0
-
-
-def test_a_collapsed_drawer_is_zero_wide() -> None:
-    e = laid_out({"name": "w", "widget": "NavigationDrawer", "collapsed": "true", "children": RAIL})
-    assert e.size.width == 0.0
-
-
 def test_collapsed_is_bindable() -> None:
+    """Layout-invalidating `animated()` retargets but does not jump on the
+    first `update()` -- same two-step as `TreeItem`'s own
+    `test_expand_state_is_bindable`, driven by `app.motion.tick`. `collapsed:`
+    now animates a width instead of snapping to zero, so this needs the same
+    treatment."""
     view = {
         "name": "root",
         "widget": "Vertical",
@@ -203,31 +210,110 @@ def test_collapsed_is_bindable() -> None:
     a.expose(hide=hide)
     a.mount()
     a.update()
-    assert a.root.find("c").size.width == 80.0
+    expanded = a.root.find("c").size.width
+    assert expanded > 80.0
+
     hide.set(True)
     a.update()
-    assert a.root.find("c").size.width == 0.0
+    assert a.root.find("c").size.width == expanded
+
+    # `Animation.tick` clamps dt to MAX_FRAME_DELTA (0.1s) per call, so a
+    # 0.2s transition needs more than one tick to fully settle.
+    for _ in range(4):
+        a.motion.tick(1.0)
+        a.update()
+    assert a.root.find("c").size.width == 80.0
 
 
-@pytest.mark.parametrize("widget", ["NavigationRail", "NavigationDrawer"])
-def test_a_collapsed_rail_or_drawer_paints_nothing(widget: str) -> None:
-    """The actual point of `collapsed:`, proven at the pixel level, not just
-    the layout level: a zero-size *clip* rect is this codebase's own
-    sentinel for "no clip" (`tree/element.py`'s `_NO_CLIP`), so clipping a
-    collapsed rail/drawer to its own now-zero-width rect would clip to
-    *nothing being clipped* -- a real mistake made and caught in this
-    session. Skipping the paint outright is what actually removes it."""
+def test_the_rail_width_interpolates_mid_transition() -> None:
+    """Not just eventually-correct: a partial tick should land strictly
+    between the two targets, not jump straight to either one."""
     view = {
         "name": "root",
         "widget": "Vertical",
         "children": [
-            {"name": "c", "widget": widget, "value": "r1", "collapsed": "true", "children": RAIL}
+            {
+                "name": "c",
+                "widget": "NavigationRail",
+                "collapsed": "{{ hide.get() }}",
+                "children": RAIL,
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    hide = Signal(False)
+    a.expose(hide=hide)
+    a.mount()
+    a.update()
+    expanded = a.root.find("c").size.width
+
+    hide.set(True)
+    a.update()
+    a.motion.tick(0.05)
+    a.update()
+    mid = a.root.find("c").size.width
+    assert 80.0 < mid < expanded
+
+
+def test_a_collapsed_rail_still_paints_its_items() -> None:
+    """Unlike the old zero-width collapse, a collapsed rail is still
+    visible -- narrower, not absent. M3: "the collapsed navigation rail
+    should not be hidden.\""""
+    view = {
+        "name": "root",
+        "widget": "Vertical",
+        "children": [
+            {
+                "name": "c",
+                "widget": "NavigationRail",
+                "value": "r1",
+                "collapsed": "true",
+                "children": RAIL,
+            }
         ],
     }
     a = App(view, theme=Theme(dark=True))
     a.mount()
     a.update()
-    assert paint(a).view.shape[0] == 0
+    assert paint(a).view.shape[0] > 0
+
+
+def test_nav_item_swaps_anatomy_once_past_the_halfway_point() -> None:
+    """`NavItemElement`'s row-vs-stacked anatomy swaps discretely at the
+    parent's progress crossing 0.5, mirroring Accordion's chevron swap --
+    not a continuous morph."""
+    view = {
+        "name": "root",
+        "widget": "Vertical",
+        "children": [
+            {
+                "name": "c",
+                "widget": "NavigationRail",
+                "collapsed": "{{ hide.get() }}",
+                "children": RAIL,
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True))
+    hide = Signal(True)
+    a.expose(hide=hide)
+    a.mount()
+    a.update()
+    item = a.root.find("r0")
+    collapsed_height = item.size.height
+
+    hide.set(False)
+    a.update()
+    a.motion.tick(0.001)
+    a.update()
+    assert item.size.height == collapsed_height, "barely started -- still the collapsed anatomy"
+
+    # `Animation.tick` clamps dt to MAX_FRAME_DELTA (0.1s) per call, so a
+    # 0.2s transition needs more than one tick to fully settle.
+    for _ in range(4):
+        a.motion.tick(1.0)
+        a.update()
+    assert item.size.height != collapsed_height, "past the midpoint -- now the expanded anatomy"
 
 
 # ---------------------------------------------------------------- selection
