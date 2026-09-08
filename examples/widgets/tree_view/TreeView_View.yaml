@@ -41,7 +41,7 @@ children:
 
       - name: live_heading
         widget: Text
-        text: "Live example"
+        text: "Live example -- click src or widgets/ to collapse them"
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
@@ -52,14 +52,14 @@ children:
           - name: src
             widget: TreeItem
             text: "src"
-            value: "true"
-            handlers: {on_click: select}
+            value: "{{ src_expanded.get() }}"
+            handlers: {on_click: toggle_src}
             children:
               - name: widgets_dir
                 widget: TreeItem
                 text: "widgets/"
-                value: "true"
-                handlers: {on_click: select}
+                value: "{{ widgets_expanded.get() }}"
+                handlers: {on_click: toggle_widgets}
                 children:
                   - {name: base_py, widget: TreeItem, text: "base.py", handlers: {on_click: select}}
                   - {name: material_py, widget: TreeItem, text: "material.py", handlers: {on_click: select}}
