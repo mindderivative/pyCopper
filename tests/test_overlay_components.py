@@ -289,9 +289,28 @@ def test_tooltip_width_follows_its_label_plus_8dp_each_side() -> None:
     assert short.size.width > TooltipElement.PAD_X * 2
 
 
-def test_tooltip_uses_inverse_colour_roles() -> None:
-    """M3: container `inverse surface`, label `inverse on surface`."""
+def test_tooltip_uses_the_same_surface_roles_as_menu_and_popover() -> None:
+    """Deliberate departure from M3's stated inverse pair (`inverse_surface`/
+    `inverse_on_surface`), overridden on request: a plain tooltip inverting
+    relative to every other overlay in the same window read as inconsistent
+    rather than as the intentional M3 distinction it is. `style.background`/
+    `style.color` can still ask for the spec's own inverse pair per instance."""
     dl = painted({"widget": "Tooltip", "text": "Save"})
+    tokens = tokens_in(dl)
+    assert PALETTE.index("surface_container_high") in tokens
+    assert PALETTE.index("on_surface_variant") in tokens
+    assert PALETTE.index("inverse_surface") not in tokens
+    assert PALETTE.index("inverse_on_surface") not in tokens
+
+
+def test_tooltip_can_still_opt_back_into_the_spec_s_inverse_colours() -> None:
+    dl = painted(
+        {
+            "widget": "Tooltip",
+            "text": "Save",
+            "style": {"background": "inverse_surface", "color": "inverse_on_surface"},
+        }
+    )
     tokens = tokens_in(dl)
     assert PALETTE.index("inverse_surface") in tokens
     assert PALETTE.index("inverse_on_surface") in tokens

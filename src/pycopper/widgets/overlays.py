@@ -620,11 +620,19 @@ class MenuItemElement(_StyledMixin, Padding):
 
 
 class TooltipElement(_StyledMixin, Padding):
-    """M3 plain tooltip: 24dp minimum height, 8dp padding, inverse colours.
+    """M3 plain tooltip: 24dp minimum height, 8dp padding.
 
     From `COMPONENT_TOOLTIPS.md`: container `inverse_surface`, label
-    `inverse_on_surface`. Never modal and never scrimmed -- a tooltip explains
-    what is underneath it, so covering that would defeat it.
+    `inverse_on_surface`, 24dp/8dp anatomy. Never modal and never scrimmed --
+    a tooltip explains what is underneath it, so covering that would defeat it.
+
+    **Deliberate departure from that spec**: the default colours here are
+    `surface_container_high`/`on_surface_variant` -- the same tokens
+    `Menu`/`Popover` use -- not the inverse pair M3 states. Overridden on
+    request: a plain tooltip inverting relative to every other overlay in the
+    same window read as visually inconsistent rather than as the intentional
+    M3 distinction it is. `style.background`/`style.color` still override
+    per instance, including back to the spec's own inverse pair.
     """
 
     RADIUS: Final = 4.0
@@ -663,7 +671,7 @@ class TooltipElement(_StyledMixin, Padding):
             ctx,
             absolute,
             self.size,
-            token=ctx.palette.index(style.background or "inverse_surface"),
+            token=ctx.palette.index(style.background or "surface_container_high"),
             radii=self.effective_radii,
         )
         label = self._text.strip()
@@ -676,7 +684,7 @@ class TooltipElement(_StyledMixin, Padding):
             absolute.y + (self.size.height - metrics.height) / 2,
             label,
             self.LABEL,
-            content_token(ctx, style, "inverse_on_surface"),
+            content_token(ctx, style, "on_surface_variant"),
         )
 
 
