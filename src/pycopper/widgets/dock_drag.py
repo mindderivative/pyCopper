@@ -369,7 +369,13 @@ def _drop_as_split(
     new_group.insert_child(0, panel)
     new_group._value = panel.name or ""
 
-    first, second = (new_group, target) if zone in ("left", "top") else (target, new_group)
+    # "left": new pane first (left); "right"/"bottom": existing content
+    # first, new pane second (right/below). "top" was removed as a
+    # reachable zone entirely (see _classify) -- this used to still
+    # mention it here as dead code in the condition, correct by accident
+    # only because "right" and "bottom" both want the same (target, new)
+    # order the old catch-all `else` happened to produce.
+    first, second = (new_group, target) if zone == "left" else (target, new_group)
     new_split.insert_child(0, first)
     new_split.insert_child(1, second)
     parent.insert_child(index, new_split)
@@ -420,11 +426,16 @@ def paint_drop_zone(
     `DockGroupElement.paint_self` (passing its own `TAB_HEIGHT`) and
     `DockSplitElement.paint_self` (which never sees zone `"tab"` at all, so
     its default `tab_height=0.0` is never read), reading
-    `self.state.data["drag_highlight"]`. A single `LINE_THICKNESS`-wide bar
-    in the `primary` token, at the edge where the new pane's boundary would
-    land: the tab strip's own bottom edge for `"tab"`, the target's left/
-    right edge for a horizontal split, or the `BOTTOM_BAND` boundary for a
-    vertical one -- never a filled region, and never a per-zone color.
+    `self.state.data["drag_highlight"]`. A single `LINE_THICKNESS`-wide
+    border in the `primary` token, always at an actual edge of the target
+    -- never a filled region, an internal zone-boundary line, or a
+    per-zone color. phil's own exact spec: "make the bottom border of the
+    panel the accent color and 4px [zone 4]... make the left border [zone
+    2]... make the right border [zone 3]... the tab strip bottom border
+    [zone 1]." Found live: `"bottom"` used to draw at the `BOTTOM_BAND`
+    zone *threshold* (2/3 down) rather than the panel's actual bottom
+    edge, the one case that was not a true border -- inconsistent with the
+    other three, and part of why it was hard to see.
     """
     dpr = ctx.pixel_ratio
     t = LINE_THICKNESS
@@ -435,7 +446,7 @@ def paint_drop_zone(
     elif zone == "right":
         lx, ly, lw, lh = x + width - t, y, t, height
     else:  # "bottom"
-        lx, ly, lw, lh = x, y + height * (1.0 - BOTTOM_BAND), width, t
+        lx, ly, lw, lh = x, y + height - t, width, t
     ctx.display_list.add_box(
         lx * dpr,
         ly * dpr,
