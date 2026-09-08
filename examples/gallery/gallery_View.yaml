@@ -159,5 +159,9 @@ overlays:
         widget: Vertical
         style: {padding: 16, spacing: 8, width: expand}
         children:
-          - {name: side_sheet_title, widget: Text, text: "Side sheet", style: {font_size: 18, color: on_surface}}
+          - widget: Horizontal
+            style: {main_alignment: space_between, cross_alignment: center}
+            children:
+              - {name: side_sheet_title, widget: Text, text: "Side sheet", style: {font_size: 18, color: on_surface}}
+              - {name: side_sheet_close, widget: IconButton, text: "close", style: {variant: standard}, handlers: {on_click: close_side_sheet}}
           - {name: side_sheet_body_text, widget: Text, text: "Anchored to the trailing edge of the window.", style: {color: on_surface_variant}}
