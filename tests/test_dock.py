@@ -502,6 +502,25 @@ def test_a_click_after_a_cancelled_drag_does_not_switch_tabs() -> None:
     assert right._active_name() == "terminal", "the drag's own drop, not a click, decides this"
 
 
+def test_the_content_area_has_exactly_the_four_zones_phil_specified() -> None:
+    """phil's own spec, confirmed with an annotated screenshot: tab strip
+    (covered separately, not by `_classify`), the lower third of the
+    content area always means "split vertically", and everything above
+    that means "split horizontally" on whichever side (left or right of
+    center) the point is on. No "top" zone exists at all."""
+    from pycopper.widgets.dock_drag import _classify
+
+    w, h = 400.0, 300.0
+    assert _classify(50.0, 10.0, w, h) == "left"
+    assert _classify(350.0, 10.0, w, h) == "right"
+    assert _classify(50.0, h - 10.0, w, h) == "bottom", "bottom band overrides side"
+    assert _classify(350.0, h - 10.0, w, h) == "bottom", "bottom band overrides side"
+    # Just above vs. just inside the bottom third -- the boundary itself.
+    boundary = h * (2.0 / 3.0)
+    assert _classify(50.0, boundary - 5.0, w, h) == "left"
+    assert _classify(50.0, boundary + 5.0, w, h) == "bottom"
+
+
 def test_dropping_directly_on_another_groups_tab_strip_always_inserts_a_tab() -> None:
     """Found live: dropping onto another group's own tab strip -- the
     intuitive, standard way to land two tabs next to each other, exactly

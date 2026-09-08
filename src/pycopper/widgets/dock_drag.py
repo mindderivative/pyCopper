@@ -53,7 +53,15 @@ __all__ = ["DRAG_THRESHOLD", "begin_drag", "cancel_drag", "end_drag", "update_dr
 #: codebase -- chosen to distinguish an intentional drag from click jitter.
 DRAG_THRESHOLD: Final = 8.0
 
-Zone = Literal["tab", "left", "right", "top", "bottom"]
+Zone = Literal["tab", "left", "right", "bottom"]
+
+#: Fraction of a target's content-area height, measured from the bottom,
+#: that means "split vertically" regardless of horizontal position -- phil's
+#: own spec: "If I am on the lower 1/3 of the area I want it split
+#: vertically, if I am on the left or right in between the tab strip and
+#: the lower drop zone it splits horizontally." No "top" zone at all --
+#: deliberately not a symmetric four-way design.
+BOTTOM_BAND: Final = 1.0 / 3.0
 
 #: The ghost's own fixed size -- a label-sized rectangle, not a live
 #: re-render of the dragged panel's content (which could be a Terminal or
@@ -64,24 +72,24 @@ _GHOST_SIZE: Final = (140.0, 32.0)
 def _classify(local_x: float, local_y: float, width: float, height: float) -> Zone:
     """Which split zone of a `width` x `height` rect a point falls in.
 
-    Found live: the original design centered a "tab" zone here too (a
-    25%-75% band on both axes), which put a target's real content area
-    mostly into thin, hard-to-hit split margins that did not match what
-    `paint_drop_zone` actually highlights (a clean half-rect) -- phil:
-    "I think the hard part is knowing when I drop if it is going to be a
-    split horizontally or vertically... make the regions obvious." Tab
-    insertion is now handled entirely by the caller's own tab-strip check
-    before this ever runs (`find_drop_target`), so every point here is a
-    split -- simplified to the standard four-way diagonal cross every real
-    docking IDE uses: whichever axis the point sits further from center on
-    decides the side, splitting the rect cleanly in half exactly the way
-    the highlight already shows it.
+    Found live, twice: the original design centered a "tab" zone here too
+    (a 25%-75% band on both axes), which put the real content area mostly
+    into thin, hard-to-hit split margins that did not match the highlight;
+    replacing that with a symmetric four-way diagonal cross was still not
+    right -- phil: "Adding drop space below the tabs visual area makes it
+    confusing" about a reachable "top" zone that doubled up with the tab
+    strip's own "insert as a tab" meaning. Tab insertion is handled
+    entirely by the caller's own tab-strip check before this ever runs
+    (`find_drop_target`), so every point here is a split, and there is no
+    "top" case at all: the bottom `BOTTOM_BAND` fraction always means
+    "split vertically"; everything above that, left or right of center,
+    means "split horizontally" on that side.
     """
-    fx = (local_x / width if width > 0 else 0.5) - 0.5
-    fy = (local_y / height if height > 0 else 0.5) - 0.5
-    if abs(fx) >= abs(fy):
-        return "left" if fx < 0.0 else "right"
-    return "top" if fy < 0.0 else "bottom"
+    fy = local_y / height if height > 0 else 0.5
+    if fy >= 1.0 - BOTTOM_BAND:
+        return "bottom"
+    fx = local_x / width if width > 0 else 0.5
+    return "left" if fx < 0.5 else "right"
 
 
 def find_drop_target(source: Any, x: float, y: float) -> tuple[Any, Zone] | None:
@@ -339,38 +347,52 @@ def _wire_new_subtree(reference: Any, subtree: Any) -> None:
     reference.mounter(subtree)
 
 
-#: Not sourced -- there is no M3 page for this -- a translucent tint over
-#: the target zone, the same visual idea every IDE's own docking drop
-#: indicator uses. Matches this file's own tab-hover state-layer opacity
-#: order of magnitude rather than inventing an unrelated value.
-HIGHLIGHT_OPACITY: Final = 0.24
+#: Not sourced -- there is no M3 page for this. A full-fill translucent
+#: tint (this file's original design) did not read clearly against the
+#: zone it was over -- phil: "Instead of full fill highlight, I want a
+#: thick clear line... The colors of the line should all be the same as
+#: the accent color." One line, one token (`primary`, this codebase's own
+#: accent role), at every zone -- never a per-zone color.
+LINE_THICKNESS: Final = 4.0
 
 
-def paint_drop_zone(ctx: Any, x: float, y: float, width: float, height: float, zone: Zone) -> None:
-    """Paint the current drop-zone highlight -- called from both
-    `DockGroupElement.paint_self` and `DockSplitElement.paint_self`, reading
-    `self.state.data["drag_highlight"]`. `"tab"` tints the whole rect
-    (insert as a tab, no split edge to single out); an edge zone tints the
-    half of the rect on that side -- the pane the drop would create there.
+def paint_drop_zone(
+    ctx: Any,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    zone: Zone,
+    *,
+    tab_height: float = 0.0,
+) -> None:
+    """Paint the current drop-zone indicator -- called from both
+    `DockGroupElement.paint_self` (passing its own `TAB_HEIGHT`) and
+    `DockSplitElement.paint_self` (which never sees zone `"tab"` at all, so
+    its default `tab_height=0.0` is never read), reading
+    `self.state.data["drag_highlight"]`. A single `LINE_THICKNESS`-wide bar
+    in the `primary` token, at the edge where the new pane's boundary would
+    land: the tab strip's own bottom edge for `"tab"`, the target's left/
+    right edge for a horizontal split, or the `BOTTOM_BAND` boundary for a
+    vertical one -- never a filled region, and never a per-zone color.
     """
     dpr = ctx.pixel_ratio
+    t = LINE_THICKNESS
     if zone == "tab":
-        hx, hy, hw, hh = x, y, width, height
+        lx, ly, lw, lh = x, y + tab_height - t, width, t
     elif zone == "left":
-        hx, hy, hw, hh = x, y, width / 2.0, height
+        lx, ly, lw, lh = x, y, t, height
     elif zone == "right":
-        hx, hy, hw, hh = x + width / 2.0, y, width / 2.0, height
-    elif zone == "top":
-        hx, hy, hw, hh = x, y, width, height / 2.0
+        lx, ly, lw, lh = x + width - t, y, t, height
     else:  # "bottom"
-        hx, hy, hw, hh = x, y + height / 2.0, width, height / 2.0
+        lx, ly, lw, lh = x, y + height * (1.0 - BOTTOM_BAND), width, t
     ctx.display_list.add_box(
-        hx * dpr,
-        hy * dpr,
-        hw * dpr,
-        hh * dpr,
+        lx * dpr,
+        ly * dpr,
+        lw * dpr,
+        lh * dpr,
         token=ctx.palette.index("primary"),
-        color=(1.0, 1.0, 1.0, HIGHLIGHT_OPACITY),
+        color=(1.0, 1.0, 1.0, 1.0),
         clip=ctx.clip,
         clip_radii=ctx.clip_radii,
     )

@@ -314,7 +314,13 @@ class DockGroupElement(_StyledMixin, LayoutNode):
         zone = self.state.data.get("drag_highlight")
         if zone is not None:
             dock_drag.paint_drop_zone(
-                ctx, absolute.x, absolute.y, self.size.width, self.size.height, zone
+                ctx,
+                absolute.x,
+                absolute.y,
+                self.size.width,
+                self.size.height,
+                zone,
+                tab_height=self.TAB_HEIGHT,
             )
 
 
