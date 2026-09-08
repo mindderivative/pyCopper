@@ -53,11 +53,6 @@ __all__ = ["DRAG_THRESHOLD", "begin_drag", "cancel_drag", "end_drag", "update_dr
 #: codebase -- chosen to distinguish an intentional drag from click jitter.
 DRAG_THRESHOLD: Final = 8.0
 
-#: Fraction of a target's own width/height that counts as its center zone
-#: (insert as a tab) rather than an edge zone (split). Generous on purpose,
-#: biasing toward tabbing over splitting the way most docking IDEs default.
-CENTER_BAND: Final = 0.25
-
 Zone = Literal["tab", "left", "right", "top", "bottom"]
 
 #: The ghost's own fixed size -- a label-sized rectangle, not a live
@@ -67,29 +62,26 @@ _GHOST_SIZE: Final = (140.0, 32.0)
 
 
 def _classify(local_x: float, local_y: float, width: float, height: float) -> Zone:
-    """Which zone of a `width` x `height` rect a point falls in.
+    """Which split zone of a `width` x `height` rect a point falls in.
 
-    Center (`CENTER_BAND`..`1-CENTER_BAND` on both axes) means "insert as a
-    tab"; otherwise whichever margin the point is furthest into, by
-    proportional distance past its own band edge, wins as the split edge.
+    Found live: the original design centered a "tab" zone here too (a
+    25%-75% band on both axes), which put a target's real content area
+    mostly into thin, hard-to-hit split margins that did not match what
+    `paint_drop_zone` actually highlights (a clean half-rect) -- phil:
+    "I think the hard part is knowing when I drop if it is going to be a
+    split horizontally or vertically... make the regions obvious." Tab
+    insertion is now handled entirely by the caller's own tab-strip check
+    before this ever runs (`find_drop_target`), so every point here is a
+    split -- simplified to the standard four-way diagonal cross every real
+    docking IDE uses: whichever axis the point sits further from center on
+    decides the side, splitting the rect cleanly in half exactly the way
+    the highlight already shows it.
     """
-    fx = local_x / width if width > 0 else 0.5
-    fy = local_y / height if height > 0 else 0.5
-    if CENTER_BAND <= fx <= 1.0 - CENTER_BAND and CENTER_BAND <= fy <= 1.0 - CENTER_BAND:
-        return "tab"
-    # Distance past each band's own edge -- whichever margin is pierced
-    # deepest wins, so a point near a corner still resolves to one edge.
-    left_depth = CENTER_BAND - fx
-    right_depth = fx - (1.0 - CENTER_BAND)
-    top_depth = CENTER_BAND - fy
-    bottom_depth = fy - (1.0 - CENTER_BAND)
-    depths: list[tuple[float, Zone]] = [
-        (left_depth, "left"),
-        (right_depth, "right"),
-        (top_depth, "top"),
-        (bottom_depth, "bottom"),
-    ]
-    return max(depths, key=lambda pair: pair[0])[1]
+    fx = (local_x / width if width > 0 else 0.5) - 0.5
+    fy = (local_y / height if height > 0 else 0.5) - 0.5
+    if abs(fx) >= abs(fy):
+        return "left" if fx < 0.0 else "right"
+    return "top" if fy < 0.0 else "bottom"
 
 
 def find_drop_target(source: Any, x: float, y: float) -> tuple[Any, Zone] | None:

@@ -478,7 +478,9 @@ def test_dragging_a_tab_onto_another_groups_strip_inserts_it_as_a_tab() -> None:
     right = a.root.find("right")
     start = (left.absolute_rect().x + 20, left.absolute_rect().y + 20)
     target_rect = right.absolute_rect()
-    drop = (target_rect.x + target_rect.width / 2, target_rect.y + target_rect.height / 2)
+    # Within right's own tab strip (TAB_HEIGHT) -- the only zone that means
+    # "insert as a tab" now; the content area is always a split.
+    drop = (target_rect.x + target_rect.width / 2, target_rect.y + 20.0)
     drag(a, start, (start[0] + 20, start[1] + 5), drop)
 
     right2 = a.root.find("right")
@@ -587,7 +589,8 @@ def test_dragging_onto_a_group_nested_two_levels_deep_finds_that_group() -> None
     # "readme" is editor_group's 2nd tab -- start past "editor"'s own width.
     start = (editor_group.absolute_rect().x + 90, editor_group.absolute_rect().y + 20)
     target_rect = terminal_group.absolute_rect()
-    drop = (target_rect.x + target_rect.width / 2, target_rect.y + target_rect.height / 2)
+    # Within terminal_group's own tab strip -- "insert as a tab" zone.
+    drop = (target_rect.x + target_rect.width / 2, target_rect.y + 20.0)
     drag(a, start, (start[0] + 10, start[1] + 5), drop)
 
     assert a.root.find("readme") is not None, "moved, not orphaned by a crash mid-drop"
@@ -631,11 +634,9 @@ def test_an_emptied_group_collapses_its_parent_split() -> None:
     mid = a.root.find("mid")
     start = (empties.absolute_rect().x + 20, empties.absolute_rect().y + 20)
     target_rect = mid.absolute_rect()
-    # Dead center of `mid`'s own rect -- inside the center band on both
-    # axes, so it classifies as zone "tab" (a drop that does NOT itself
-    # create a new split -- the invariant below must hold regardless of
-    # which valid zone a drop happens to land in, exact pixel geometry is
-    # not what this test is about).
+    # Dead center of `mid`'s own rect -- classifies as some split zone
+    # (exactly which one is not what this test is about); the invariant
+    # below must hold regardless of which valid zone a drop lands in.
     drop = (target_rect.x + target_rect.width / 2, target_rect.y + target_rect.height / 2)
     drag(a, start, (start[0] - 20, start[1] + 5), drop)
 
