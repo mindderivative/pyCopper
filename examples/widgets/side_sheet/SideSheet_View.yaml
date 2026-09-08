@@ -29,7 +29,14 @@ root:
             `surface_container_low`, 24dp start/end padding, a 400dp max
             width, 16dp corner radius. Which corners round depends on the
             edge it's docked to, taken from `placement:` -- a right-hand
-            sheet rounds its left corners and vice versa.
+            sheet rounds its left corners and vice versa. A standard side
+            sheet has no scrim and isn't dismissed by clicking outside it --
+            unlike a modal one, it's meant to stay open alongside the page,
+            so M3's own anatomy names a close icon button as the way out,
+            composed here as an ordinary child rather than a built-in part
+            of the widget. There's no drag handle: that's a `BottomSheet`
+            convention tied to its vertical slide, not something M3
+            describes for a side sheet.
 
             Use cases, from the spec: side sheets display content without
             blocking access to the screen's primary content, such as an
@@ -80,5 +87,9 @@ overlays:
       - widget: Vertical
         style: {padding: 24, spacing: 12}
         children:
-          - {widget: Text, text: "Now playing", style: {text_style: title-medium, color: on_surface}}
+          - widget: Horizontal
+            style: {main_alignment: space_between, cross_alignment: center}
+            children:
+              - {widget: Text, text: "Now playing", style: {text_style: title-medium, color: on_surface}}
+              - {name: close_btn, widget: IconButton, text: "close", style: {variant: standard}, handlers: {on_click: close_sheet}}
           - {widget: Text, text: "A track, docked at the side without covering the page.", style: {color: on_surface_variant}}
