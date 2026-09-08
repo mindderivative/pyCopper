@@ -190,6 +190,113 @@ def test_dialog_paints_the_m3_container_token() -> None:
     assert PALETTE.index("surface_container_high") in tokens_in(dl)
 
 
+def _paint_dialog(spec: dict) -> tuple[Any, DisplayList]:
+    """A Dialog painted as a plain child, not inside an overlay -- simpler
+    for glyph-position assertions than `hosted()`'s full overlay/scrim
+    setup, which this feature needs none of."""
+    view = {
+        "name": "root",
+        "widget": "Vertical",
+        "style": {"background": "surface"},
+        "children": [{"name": "dlg", **spec}],
+    }
+    app = App(view, theme=Theme(dark=True))
+    app.mount()
+    app.update()
+    dl = DisplayList()
+    app.paint(dl)
+    return app.root.find("dlg"), dl
+
+
+def test_a_dialog_icon_grows_the_measured_height() -> None:
+    """ "Icon size: 24dp", "Padding between icon and title: 16dp" -- added
+    on top of the existing text block, not swapped in for part of it."""
+    without, _ = _paint_dialog({"widget": "Dialog", "text": "Title", "style": {"width": 400}})
+    with_icon, _ = _paint_dialog(
+        {"widget": "Dialog", "text": "Title", "icon": "home", "style": {"width": 400}}
+    )
+    grew = with_icon.size.height - without.size.height
+    assert grew == pytest.approx(DialogElement.ICON + DialogElement.GAP_ICON_TITLE)
+
+
+def test_dialog_headline_stays_start_aligned_without_an_icon() -> None:
+    from pycopper.paint import Kind
+
+    dialog, dl = _paint_dialog({"widget": "Dialog", "text": "Hi", "style": {"width": 400}})
+    xs = [float(s["rect"][0]) for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    rect = dialog.absolute_rect()
+    assert min(xs) == pytest.approx(rect.x + DialogElement.PADDING, abs=2.0)
+
+
+def _rows(glyphs: list) -> list[list]:
+    """Group glyph instances into visual rows by y-proximity.
+
+    Individual glyphs in one line of shaped text do NOT all share an
+    identical y -- ascenders/descenders/caps give each glyph its own
+    bounding-box top (found live: a naive exact-y grouping picked out a
+    single lowercase "y" descender as its own "row"). Clustering on a gap
+    in the sorted y values is what real line grouping needs instead.
+    """
+    ordered = sorted(glyphs, key=lambda s: float(s["rect"][1]))
+    rows: list[list] = []
+    for g in ordered:
+        y = float(g["rect"][1])
+        if rows and y - float(rows[-1][-1]["rect"][1]) < 10.0:
+            rows[-1].append(g)
+        else:
+            rows.append([g])
+    return rows
+
+
+def test_a_dialog_icon_centers_the_headline() -> None:
+    """`COMPONENT_DIALOGS.md`: "Alignment with icon: Center-aligned" --
+    confirmed against the actual annotated example (fetched live), not
+    just the table row alone. Icon and headline paint at different y
+    (stacked), which is what lets their glyphs be told apart here."""
+    from pycopper.paint import Kind
+
+    dialog, dl = _paint_dialog(
+        {"widget": "Dialog", "text": "Hi", "icon": "home", "style": {"width": 400}}
+    )
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    rows = _rows(glyphs)
+    assert len(rows) == 2, "icon row and headline row"
+    headline_row = rows[1]
+    left = min(float(s["rect"][0]) for s in headline_row)
+    right = max(float(s["rect"][0]) + float(s["rect"][2]) for s in headline_row)
+    rect = dialog.absolute_rect()
+    assert (left + right) / 2 == pytest.approx(rect.x + rect.width / 2, abs=1.0)
+
+
+def test_dialog_supporting_text_stays_start_aligned_even_with_an_icon() -> None:
+    """The diagram's own body paragraph is left-flush directly under a
+    centred title -- only the headline centres, not the supporting text."""
+    from pycopper.paint import Kind
+
+    dialog, dl = _paint_dialog(
+        {
+            "widget": "Dialog",
+            "text": "Hi",
+            "icon": "home",
+            "supporting_text": "Body copy here.",
+            "style": {"width": 400},
+        }
+    )
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    rect = dialog.absolute_rect()
+    rows = _rows(glyphs)
+    assert len(rows) == 3, "icon, headline, and body rows"
+    body_left = min(float(s["rect"][0]) for s in rows[-1])
+    assert body_left == pytest.approx(rect.x + DialogElement.PADDING, abs=2.0)
+
+
+def test_a_dialog_icon_paints_with_the_secondary_token() -> None:
+    """The one colour role in COMPONENT_DIALOGS.md's own list not already
+    claimed by the container, headline, supporting text, buttons, or scrim."""
+    dl = painted({"widget": "Dialog", "text": "Title", "icon": "home"})
+    assert PALETTE.index("secondary") in tokens_in(dl)
+
+
 # -------------------------------------------------------------------- menu
 
 

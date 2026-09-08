@@ -159,7 +159,22 @@ class DialogElement(_StyledMixin, Padding):
 
     Anatomy, from `COMPONENT_DIALOGS.md`: an optional 24dp icon, a headline
     (`text:`), supporting text (`supporting_text:`), and an actions area --
-    supplied as the single child, normally a Horizontal of buttons.
+    supplied as the single child, normally a Horizontal of buttons. `icon:`
+    needed no schema change -- already a generic `TEMPLATED_FIELDS` entry
+    (`spec/models.py`) from the earlier Icon/IconButton/Fab/NavItem/
+    SearchBar migration.
+
+    **The icon changes more than just adding a glyph.** The Measurements
+    table states it outright: "Alignment with icon: Center-aligned" /
+    "Alignment without icon: Start-aligned" -- confirmed against the actual
+    annotated example (`m3.material.io`, fetched live, not recalled): with
+    an icon, the icon AND the headline are both horizontally centred as a
+    column; the supporting text stays start-aligned regardless -- the
+    diagram's own body paragraph is clearly left-flush even directly under
+    a centred title. Icon colour is `secondary` -- the one colour role in
+    this page's own list ("Surface container high, Secondary, On surface,
+    On surface variant, Primary, Scrim") not already claimed by the
+    container, headline, supporting text, buttons, or scrim.
 
     The dialog **shrink-wraps its height** ("Container height: Dynamic") and
     clamps its width to 280-560dp. That is the point of having the widget: the
@@ -179,6 +194,10 @@ class DialogElement(_StyledMixin, Padding):
     GAP_TITLE_BODY: Final = 16.0
     #: "Padding between body and actions: 24dp"
     GAP_BODY_ACTIONS: Final = 24.0
+    #: "Icon size: 24dp".
+    ICON: Final = 24.0
+    #: "Padding between icon and title: 16dp".
+    GAP_ICON_TITLE: Final = 16.0
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
@@ -197,6 +216,10 @@ class DialogElement(_StyledMixin, Padding):
     def configure(self) -> None:
         self._padding = self._insets(self.style)
 
+    @property
+    def _has_icon(self) -> bool:
+        return bool(self._icon.strip())
+
     def _width(self, constraints: Constraints) -> float:
         return _clamped_width(
             constraints,
@@ -207,7 +230,7 @@ class DialogElement(_StyledMixin, Padding):
         )
 
     def _blocks(self, inner_width: float) -> tuple[float, float]:
-        """Measured heights of the headline and supporting text."""
+        """Measured heights of the (icon +) headline and supporting text."""
         engine = self.text_engine
         head = self._text.strip()
         body = self._supporting.strip()
@@ -216,6 +239,8 @@ class DialogElement(_StyledMixin, Padding):
             if head
             else 0.0
         )
+        if self._has_icon:
+            head_h += self.ICON + self.GAP_ICON_TITLE
         body_h = (
             measure_text(body, self.BODY, engine=engine, max_width=inner_width).height
             if body
@@ -268,22 +293,42 @@ class DialogElement(_StyledMixin, Padding):
         inner_width = max(0.0, self.size.width - pad.horizontal)
         x = absolute.x + pad.left
         y = absolute.y + pad.top
+        has_icon = self._has_icon
         head = self._text.strip()
         body = self._supporting.strip()
 
+        if has_icon:
+            ctx.text.emit_icon(
+                ctx.display_list,
+                self._icon.strip(),
+                x=absolute.x + (self.size.width - self.ICON) / 2,
+                y=y,
+                size=self.ICON,
+                pixel_ratio=ctx.pixel_ratio,
+                token=ctx.palette.index("secondary"),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+            y += self.ICON + self.GAP_ICON_TITLE
+
         if head:
+            head_size = measure_text(
+                head, self.HEADLINE, engine=self.text_engine, max_width=inner_width
+            )
+            # Centred as a column with the icon when one is present; the
+            # ordinary start-aligned headline otherwise -- COMPONENT_DIALOGS.
+            # md's own "Alignment with/without icon" row, made concrete.
+            head_x = absolute.x + (self.size.width - head_size.width) / 2 if has_icon else x
             paint_text(
                 ctx,
-                x,
+                head_x,
                 y,
                 head,
                 self.HEADLINE,
                 content_token(ctx, style, "on_surface"),
                 max_width=inner_width,
             )
-            y += measure_text(
-                head, self.HEADLINE, engine=self.text_engine, max_width=inner_width
-            ).height
+            y += head_size.height
         if body:
             if head:
                 y += self.GAP_TITLE_BODY

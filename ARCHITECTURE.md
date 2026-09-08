@@ -1742,7 +1742,7 @@ placement, scrim, modality and dismissal. A Dialog does not know it is centred.
 
 | Widget | M3 spec | Notes |
 |---|---|---|
-| `Dialog` | 28dp radius, 24dp padding, 280–560dp wide, height **dynamic** | headline + `supporting_text` + actions as its child |
+| `Dialog` | 28dp radius, 24dp padding, 280–560dp wide, height **dynamic** | headline + `supporting_text` + actions as its child; optional `icon:` (24dp, `secondary`) centres itself and the headline as a column -- confirmed against the actual M3 annotated example, fetched live, that the supporting text stays start-aligned regardless |
 | `Popover` | M3's persistent rich tooltip; 12dp radius, max 320dp, **shrink-to-fit** width | subhead + `supporting_text` + actions as its child; `surface_container_high`; defaults to `placement: anchor` |
 | `Menu` | 4dp radius, 112–280dp wide, 8dp vertical padding | `surface_container` |
 | `MenuItem` | 48dp high, 12dp side padding | denser than `ListItem`'s 56/72/88dp; `supporting_text` is the trailing shortcut. `style.has_submenu` swaps that trailing slot for a `chevron_right` instead (mutually exclusive with the shortcut) — the submenu is a second `Menu` overlay anchored to the item's `name`, positioned beside it rather than below it ("Submenus should open next to the parent menu item without overlapping it"). Anchoring to something inside *another* overlay is the one case `OverlayHost._anchored` falls back past `root` |

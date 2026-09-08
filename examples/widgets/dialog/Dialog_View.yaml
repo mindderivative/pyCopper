@@ -28,10 +28,14 @@ root:
           text: |
             An optional 24dp icon, a headline (`text:`), supporting text
             (`supporting_text:`), and an actions area supplied as the
-            single child, normally a Horizontal of buttons. Modality itself is
-            the overlay host's job -- `open:` drives whether it's shown,
-            `on_dismiss` fires when it closes (click outside, Escape, or a
-            button inside it choosing to close).
+            single child, normally a Horizontal of buttons. With an icon,
+            it AND the headline centre as a column (M3's own "Alignment
+            with icon: Center-aligned" rule, confirmed against the actual
+            annotated example) -- the supporting text stays start-aligned
+            either way. Modality itself is the overlay host's job --
+            `open:` drives whether it's shown, `on_dismiss` fires when it
+            closes (click outside, Escape, or a button inside it choosing
+            to close).
 
             Use cases, from the spec: a dialog is a modal window that
             appears in front of app content to provide critical
@@ -81,6 +85,7 @@ overlays:
     widget: Dialog
     open: "{{ dialog_open.get() }}"
     text: "Delete this item?"
+    icon: delete
     supporting_text: "This action cannot be undone."
     handlers: {on_dismiss: close_dialog}
     children:
