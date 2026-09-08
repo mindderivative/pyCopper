@@ -183,12 +183,12 @@ SILENT: Final[frozenset[str]] = frozenset(
     }
 )
 
-#: Kinds whose `text:` is a Material Symbols glyph name rather than a label.
-#: Announcing "home" instead of "Home" is the sort of bug that only shows up
-#: when someone actually listens to it, so the label comes from
-#: `supporting_text:` for these and the icon name is never read aloud.
-#: "Icon" itself is not listed: it is in `SILENT`, so `_node_for` never calls
-#: `_label_of` on one at all.
+#: Kinds with a dedicated `label:` field, read as the accessible name instead
+#: of `text:`. These widgets' `text:` used to double as a Material Symbols
+#: glyph name (fixed by giving them their own `icon:` field) -- announcing
+#: "home" instead of "Home" was the sort of bug that only shows up when
+#: someone actually listens to it. "Icon" itself is not listed: it is in
+#: `SILENT`, so `_node_for` never calls `_label_of` on one at all.
 ICON_NAMED: Final[frozenset[str]] = frozenset({"IconButton", "Fab", "NavItem"})
 
 #: Kinds whose `checked` is meaningful. Anything else reports None, which is
@@ -273,12 +273,13 @@ def _label_of(element: Any) -> str:
     Never the view file's `name:` -- that is a developer handle, and announcing
     "sw_primary" would be worse than silence.
 
-    For an icon-bearing control `text:` holds the *glyph name*, so the label
-    comes from `supporting_text:` instead. An icon-only control with no
-    supporting text therefore has no accessible name at all, and reports one
-    rather than reading "chevron_right" at somebody.
+    For an icon-bearing control `text:` no longer carries anything at all
+    (its glyph name moved to `icon:`), so the label comes from `label:`
+    instead. An icon-only control with no `label:` therefore has no
+    accessible name at all, and reports one rather than reading
+    "chevron_right" at somebody.
     """
-    order = ("supporting",) if str(element.spec.widget) in ICON_NAMED else ("text", "supporting")
+    order = ("label",) if str(element.spec.widget) in ICON_NAMED else ("text", "supporting")
     for attr in order:
         value = getattr(element, attr, "") or ""
         if isinstance(value, str) and value.strip():

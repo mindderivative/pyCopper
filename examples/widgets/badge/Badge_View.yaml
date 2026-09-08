@@ -54,13 +54,13 @@ children:
             widget: Stack
             style: {width: 40, height: 40}
             children:
-              - {widget: IconButton, text: "notifications", style: {variant: standard}}
+              - {widget: IconButton, icon: "notifications", style: {variant: standard}}
               - {name: dot, widget: Badge, style: {align_x: 1.0, align_y: 0.0}}
           - name: count_host
             widget: Stack
             style: {width: 40, height: 40}
             children:
-              - {widget: IconButton, text: "mail", style: {variant: standard}}
+              - {widget: IconButton, icon: "mail", style: {variant: standard}}
               - {name: count, widget: Badge, value: "{{ unread.get() }}", style: {align_x: 1.0, align_y: 0.0}}
           - {widget: Button, text: "+1 unread", style: {variant: outlined}, handlers: {on_click: increment}}
 

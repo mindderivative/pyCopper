@@ -28,7 +28,7 @@ children:
           Small (40dp, 12dp radius), standard (56dp, 16dp radius), medium
           (80dp, 20dp radius), large (96dp, 28dp radius), and extended (56dp
           tall like standard, but a dynamic width fitting an icon and a
-          `supporting_text:` label side by side). Defaults to
+          `label:` label side by side). Defaults to
           `primary_container` on `on_primary_container`. M3 rests a FAB at
           elevation level 3, alongside modal dialogs -- the highest resting
           level any component uses.
@@ -52,28 +52,28 @@ children:
         children:
           - name: fab_small
             widget: Fab
-            text: "add"
+            icon: "add"
             style: {variant: small}
             handlers: {on_click: press}
           - name: fab_standard
             widget: Fab
-            text: "add"
+            icon: "add"
             style: {variant: standard}
             handlers: {on_click: press}
           - name: fab_medium
             widget: Fab
-            text: "add"
+            icon: "add"
             style: {variant: medium}
             handlers: {on_click: press}
           - name: fab_large
             widget: Fab
-            text: "add"
+            icon: "add"
             style: {variant: large}
             handlers: {on_click: press}
           - name: fab_extended
             widget: Fab
-            text: "add"
-            supporting_text: "Compose"
+            icon: "add"
+            label: "Compose"
             style: {variant: extended}
             handlers: {on_click: press}
 

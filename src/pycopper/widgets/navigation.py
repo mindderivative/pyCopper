@@ -144,8 +144,8 @@ class _SelectionContainer(_StyledMixin, Flex):
 class NavItemElement(_StyledMixin, Padding):
     """One destination in a `NavigationRail`, collapsed or expanded.
 
-    `text:` is the icon name and `supporting_text` the label. The icon's FILL
-    axis goes to 1 when selected -- M3's own mechanism for expressing
+    `icon:` is the icon name and `label:` the destination's label. The icon's
+    FILL axis goes to 1 when selected -- M3's own mechanism for expressing
     selection, rather than swapping to a different icon.
     """
 
@@ -190,9 +190,9 @@ class NavItemElement(_StyledMixin, Padding):
         return outer.constrain(Size(self.RAIL_W, self.INDICATOR_H + label + 4.0))
 
     def _label_height(self) -> float:
-        if not (self._supporting).strip():
+        if not (self._label).strip():
             return 0.0
-        return measure_text(self._supporting, LABEL_ROLE, engine=self.text_engine).height
+        return measure_text(self._label, LABEL_ROLE, engine=self.text_engine).height
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         selected = self.selected
@@ -209,7 +209,7 @@ class NavItemElement(_StyledMixin, Padding):
             self.style,
             "on_secondary_container" if selected else "on_surface_variant",
         )
-        label_text = (self._supporting).strip()
+        label_text = (self._label).strip()
 
         if self._expanded:
             if t > 0.0:
@@ -225,10 +225,10 @@ class NavItemElement(_StyledMixin, Padding):
                 )
             _emit_state_layer(ctx, self, absolute, content, self.effective_radii)
             x = absolute.x + self.DRAWER_PAD
-            if self._text.strip():
+            if self._icon.strip():
                 ctx.text.emit_icon(
                     ctx.display_list,
-                    self._text.strip(),
+                    self._icon.strip(),
                     x=x,
                     y=absolute.y + (size.height - ICON) / 2,
                     size=ICON,
@@ -262,10 +262,10 @@ class NavItemElement(_StyledMixin, Padding):
                 alpha=t,
             )
         _emit_state_layer(ctx, self, absolute, content, self.effective_radii)
-        if self._text.strip():
+        if self._icon.strip():
             ctx.text.emit_icon(
                 ctx.display_list,
-                self._text.strip(),
+                self._icon.strip(),
                 x=absolute.x + (size.width - ICON) / 2,
                 y=absolute.y + (self.INDICATOR_H - ICON) / 2,
                 size=ICON,

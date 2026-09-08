@@ -29,7 +29,7 @@ children:
           as a component with its own catalogue page -- there is no
           "Icons" entry in the component index to cite. pyCopper bundles a
           218-icon subset of Material Symbols with the `FILL` (0-1) and
-          `wght` (100-700) axes live; the glyph name goes in `text:`, and
+          `wght` (100-700) axes live; the glyph name goes in `icon:`, and
           `icon_size` / `icon_fill` / `icon_weight` control the rest. FILL is
           how M3 expresses selected versus unselected on nav items and
           toggles -- reach for it instead of swapping to a visually different
@@ -56,17 +56,17 @@ children:
         children:
           - name: icon_outlined
             widget: Icon
-            text: "home"
+            icon: "home"
             style: {icon_size: 40, icon_fill: 0}
           - {widget: Text, text: "FILL: 0", style: {color: on_surface_variant}}
           - name: icon_filled
             widget: Icon
-            text: "home"
+            icon: "home"
             style: {icon_size: 40, icon_fill: 1}
           - {widget: Text, text: "FILL: 1", style: {color: on_surface_variant}}
-          - {name: icon_weight_light, widget: Icon, text: "favorite", style: {icon_size: 32, icon_weight: 300}}
+          - {name: icon_weight_light, widget: Icon, icon: "favorite", style: {icon_size: 32, icon_weight: 300}}
           - {widget: Text, text: "wght: 300", style: {color: on_surface_variant}}
-          - {name: icon_weight_bold, widget: Icon, text: "favorite", style: {icon_size: 32, icon_weight: 700}}
+          - {name: icon_weight_bold, widget: Icon, icon: "favorite", style: {icon_size: 32, icon_weight: 700}}
           - {widget: Text, text: "wght: 700", style: {color: on_surface_variant}}
 
       - {name: div3, widget: Divider, style: {width: expand}}

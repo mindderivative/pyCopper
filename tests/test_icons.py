@@ -178,13 +178,13 @@ ICON_VIEW = {
         {
             "name": "a",
             "widget": "Icon",
-            "text": "home",
+            "icon": "home",
             "style": {"color": "on_surface", "icon_size": 24},
         },
         {
             "name": "b",
             "widget": "Icon",
-            "text": "{{ 'star' if on.get() else 'star_border' }}",
+            "icon": "{{ 'star' if on.get() else 'star_border' }}",
             "style": {"color": "primary", "icon_size": 32},
         },
     ],
@@ -214,11 +214,11 @@ def test_icon_widget_paints() -> None:
 
 
 def test_icon_name_is_bindable() -> None:
-    """`text:` carries the name, so an icon switches with state like a label."""
+    """`icon:` carries the name, so an icon switches with state like a label."""
     app, on = make_app()
-    assert app.root.find("b").text == "star_border"
+    assert app.root.find("b").icon == "star_border"
     on.set(True)
-    assert app.root.find("b").text == "star"
+    assert app.root.find("b").icon == "star"
 
 
 def test_unknown_icon_in_a_view_is_reported() -> None:
@@ -228,7 +228,7 @@ def test_unknown_icon_in_a_view_is_reported() -> None:
             {
                 "name": "x",
                 "widget": "Icon",
-                "text": "nope_not_real",
+                "icon": "nope_not_real",
                 "style": {"color": "on_surface"},
             }
         ],

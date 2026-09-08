@@ -5,6 +5,6 @@
 # the same view file and therefore the same name-uniqueness requirement.
 params: [icon, label]
 widget: NavItem
-text: "{{ icon }}"
-supporting_text: "{{ label }}"
+icon: "{{ icon }}"
+label: "{{ label }}"
 handlers: {on_click: select_nav}

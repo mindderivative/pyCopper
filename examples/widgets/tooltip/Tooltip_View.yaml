@@ -52,7 +52,7 @@ root:
           children:
             - name: trigger
               widget: IconButton
-              text: "delete"
+              icon: "delete"
               style: {variant: standard}
               handlers: {on_pointer_enter: show, on_pointer_leave: close}
 

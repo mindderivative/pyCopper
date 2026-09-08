@@ -4,6 +4,7 @@ from .expressions import Expression, ExpressionError, Template
 from .include import IncludeError, resolve_includes
 from .loader import SpecError, load_view, parse_view
 from .models import (
+    TEMPLATED_FIELDS,
     BorderSpec,
     ShadowSpec,
     SizeSpec,
@@ -15,6 +16,7 @@ from .models import (
 )
 
 __all__ = [
+    "TEMPLATED_FIELDS",
     "BorderSpec",
     "Expression",
     "ExpressionError",

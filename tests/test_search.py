@@ -198,7 +198,7 @@ def test_a_trailing_icon_paints_more_glyph_instances() -> None:
         return sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)
 
     without = painted(bar(value=""))
-    with_icon = painted(bar(value="", text="mic"))
+    with_icon = painted(bar(value="", icon="mic"))
     assert glyphs(with_icon) > glyphs(without)
 
 

@@ -49,22 +49,22 @@ children:
         children:
           - name: ib_standard
             widget: IconButton
-            text: "favorite"
+            icon: "favorite"
             style: {variant: standard}
             handlers: {on_click: press}
           - name: ib_filled
             widget: IconButton
-            text: "favorite"
+            icon: "favorite"
             style: {variant: filled}
             handlers: {on_click: press}
           - name: ib_tonal
             widget: IconButton
-            text: "favorite"
+            icon: "favorite"
             style: {variant: filled_tonal}
             handlers: {on_click: press}
           - name: ib_outlined
             widget: IconButton
-            text: "favorite"
+            icon: "favorite"
             style: {variant: outlined}
             handlers: {on_click: press}
           - widget: Text

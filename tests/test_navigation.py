@@ -56,7 +56,7 @@ TABS = [
     for i, n in enumerate(("Overview", "Details", "History"))
 ]
 RAIL = [
-    {"name": f"r{i}", "widget": "NavItem", "text": ic, "supporting_text": lb}
+    {"name": f"r{i}", "widget": "NavItem", "icon": ic, "label": lb}
     for i, (ic, lb) in enumerate([("home", "Home"), ("search", "Search"), ("settings", "Settings")])
 ]
 

@@ -25,7 +25,7 @@ children:
       - name: explanation
         widget: Text
         text: |
-          `text:` is the icon name, `supporting_text:` the label. The
+          `icon:` is the icon name, `label:` the destination's label. The
           icon's FILL axis goes to 1 when selected -- M3's own mechanism
           for expressing selection, rather than swapping to a visually
           different icon. A NavItem only makes sense inside a
@@ -50,9 +50,9 @@ children:
             value: "{{ selected.get() }}"
             style: {height: 200}
             children:
-              - {name: home, widget: NavItem, text: "home", supporting_text: "Home", handlers: {on_click: select}}
-              - {name: search, widget: NavItem, text: "search", supporting_text: "Search", handlers: {on_click: select}}
-              - {name: settings, widget: NavItem, text: "settings", supporting_text: "Settings", handlers: {on_click: select}}
+              - {name: home, widget: NavItem, icon: "home", label: "Home", handlers: {on_click: select}}
+              - {name: search, widget: NavItem, icon: "search", label: "Search", handlers: {on_click: select}}
+              - {name: settings, widget: NavItem, icon: "settings", label: "Settings", handlers: {on_click: select}}
           - widget: Text
             text: "Selected: {{ selected.get() }}"
             style: {color: on_surface_variant}

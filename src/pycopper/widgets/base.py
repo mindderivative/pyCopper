@@ -757,8 +757,9 @@ class TextElement(_StyledMixin, Padding):
 class IconElement(_StyledMixin, Padding):
     """A Material Symbols icon.
 
-    The icon name comes from `text:`, so binding expressions work on it -- an
-    icon can switch with state exactly the way a label can.
+    The icon name comes from `icon:`, so binding expressions work on it -- an
+    icon can switch with state exactly the way a label can:
+    `icon: "{{ 'star' if saved.get() else 'star_border' }}"`.
     """
 
     def __init__(self, spec: WidgetSpec) -> None:
@@ -776,7 +777,7 @@ class IconElement(_StyledMixin, Padding):
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         super().paint_self(ctx, absolute)
-        name = self._text.strip()
+        name = self._icon.strip()
         if not name:
             return
         style = self.style

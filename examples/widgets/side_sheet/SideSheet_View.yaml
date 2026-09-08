@@ -91,5 +91,5 @@ overlays:
             style: {main_alignment: space_between, cross_alignment: center}
             children:
               - {widget: Text, text: "Now playing", style: {text_style: title-medium, color: on_surface}}
-              - {name: close_btn, widget: IconButton, text: "close", style: {variant: standard}, handlers: {on_click: close_sheet}}
+              - {name: close_btn, widget: IconButton, icon: "close", style: {variant: standard}, handlers: {on_click: close_sheet}}
           - {widget: Text, text: "A track, docked at the side without covering the page.", style: {color: on_surface_variant}}

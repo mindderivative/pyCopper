@@ -41,7 +41,7 @@ root:
           children:
             - name: nav_toggle
               widget: IconButton
-              text: "{{ 'menu_open' if nav_expanded.get() else 'menu' }}"
+              icon: "{{ 'menu_open' if nav_expanded.get() else 'menu' }}"
               style: {variant: standard}
               handlers: {on_click: toggle_nav}
 
@@ -163,5 +163,5 @@ overlays:
             style: {main_alignment: space_between, cross_alignment: center}
             children:
               - {name: side_sheet_title, widget: Text, text: "Side sheet", style: {font_size: 18, color: on_surface}}
-              - {name: side_sheet_close, widget: IconButton, text: "close", style: {variant: standard}, handlers: {on_click: close_side_sheet}}
+              - {name: side_sheet_close, widget: IconButton, icon: "close", style: {variant: standard}, handlers: {on_click: close_side_sheet}}
           - {name: side_sheet_body_text, widget: Text, text: "Anchored to the trailing edge of the window.", style: {color: on_surface_variant}}

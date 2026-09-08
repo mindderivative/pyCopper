@@ -159,7 +159,7 @@ def test_fab_sizes(variant: str, side: float) -> None:
 
 def test_extended_fab_is_fifty_six_high_like_standard() -> None:
     """COMPONENT_EXTENDED_FABS.md: "Container height 56dp"."""
-    e = laid_out(widget="Fab", text="add", supporting_text="Compose", style={"variant": "extended"})
+    e = laid_out(widget="Fab", icon="add", label="Compose", style={"variant": "extended"})
     assert e.size.height == 56.0
 
 
@@ -170,11 +170,11 @@ def test_extended_fab_with_no_content_is_the_eighty_dp_floor() -> None:
 
 
 def test_extended_fab_widens_for_a_longer_label() -> None:
-    short = laid_out(widget="Fab", text="add", supporting_text="Go", style={"variant": "extended"})
+    short = laid_out(widget="Fab", icon="add", label="Go", style={"variant": "extended"})
     long = laid_out(
         widget="Fab",
-        text="add",
-        supporting_text="Compose a much longer message",
+        icon="add",
+        label="Compose a much longer message",
         style={"variant": "extended"},
     )
     assert long.size.width > short.size.width
@@ -182,20 +182,16 @@ def test_extended_fab_widens_for_a_longer_label() -> None:
 
 def test_extended_fab_with_an_icon_is_wider_than_label_only() -> None:
     """The icon reserves 24dp plus an 8dp gap on top of the label alone."""
-    label_only = laid_out(widget="Fab", supporting_text="Compose", style={"variant": "extended"})
-    with_icon = laid_out(
-        widget="Fab", text="add", supporting_text="Compose", style={"variant": "extended"}
-    )
+    label_only = laid_out(widget="Fab", label="Compose", style={"variant": "extended"})
+    with_icon = laid_out(widget="Fab", icon="add", label="Compose", style={"variant": "extended"})
     assert with_icon.size.width - label_only.size.width == pytest.approx(24.0 + 8.0)
 
 
 def test_extended_fab_paints_both_icon_and_label() -> None:
     """Icons and text both emit as GLYPH -- distinguished here by count, not
     kind: adding the icon must add glyph instances on top of the label alone."""
-    label_only = painted(widget="Fab", supporting_text="Compose", style={"variant": "extended"})
-    with_icon = painted(
-        widget="Fab", text="add", supporting_text="Compose", style={"variant": "extended"}
-    )
+    label_only = painted(widget="Fab", label="Compose", style={"variant": "extended"})
+    with_icon = painted(widget="Fab", icon="add", label="Compose", style={"variant": "extended"})
     glyphs = lambda dl: sum(1 for s in dl.view if s["flags"][0] == Kind.GLYPH)  # noqa: E731
     assert glyphs(with_icon) > glyphs(label_only) > 0
 
@@ -356,14 +352,14 @@ def test_fab_defaults_to_primary_container() -> None:
     from pycopper.theme import Palette
 
     pal = Palette(Theme(dark=True))
-    assert pal.index("primary_container") in tokens_in(painted(widget="Fab", text="add"))
+    assert pal.index("primary_container") in tokens_in(painted(widget="Fab", icon="add"))
 
 
 def test_explicit_background_overrides_the_variant_default() -> None:
     from pycopper.theme import Palette
 
     pal = Palette(Theme(dark=True))
-    dl = painted(widget="Fab", text="add", style={"background": "tertiary"})
+    dl = painted(widget="Fab", icon="add", style={"background": "tertiary"})
     assert pal.index("tertiary") in tokens_in(dl)
 
 
@@ -408,7 +404,7 @@ def test_outlined_card_has_a_border() -> None:
 
 def test_fab_is_elevated() -> None:
     """M3 1.2: resting elevation level 3."""
-    assert any(s["flags"][0] == Kind.SHADOW for s in painted(widget="Fab", text="add").view)
+    assert any(s["flags"][0] == Kind.SHADOW for s in painted(widget="Fab", icon="add").view)
 
 
 def test_filter_chip_shows_a_checkmark_when_selected() -> None:

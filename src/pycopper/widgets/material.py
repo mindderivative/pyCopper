@@ -1056,10 +1056,10 @@ class IconButtonElement(_StyledMixin, Padding):
         _emit_state_layer(ctx, self, absolute, content_tok, (radius,) * 4)
 
         icon = style.icon_size or DEFAULT_ICON_SIZE
-        if self._text.strip():
+        if self._icon.strip():
             ctx.text.emit_icon(
                 ctx.display_list,
-                self._text.strip(),
+                self._icon.strip(),
                 x=absolute.x + (self.size.width - icon) / 2,
                 y=absolute.y + (self.size.height - icon) / 2,
                 size=icon,
@@ -1081,15 +1081,13 @@ class FabElement(_StyledMixin, Padding):
 
     `variant: extended` is the fifth M3 size, and the odd one out: 56dp tall
     like `standard` and the same 16dp radius, but a **dynamic width** (80dp
-    minimum) driven by its content rather than a fixed square -- icon plus a
-    text label, 16dp padding on every side, an 8dp gap between them
-    (`COMPONENT_EXTENDED_FABS.md`'s own measurements: "Container height 56dp,
-    Container width Dynamic, 80dp min, Padding 16dp"). `text:` is already
-    spoken for (the icon glyph name, same as every other size), so the label
-    reuses `supporting_text:` -- the same "second bit of text" role it plays
-    on `ListItem`/`Accordion`. An extended FAB with no label just measures as
-    an icon-only pill at the 80dp floor, which is a legitimate fallback
-    rather than a special case to guard against.
+    minimum) driven by its content rather than a fixed square -- icon (`icon:`)
+    plus a text label (`label:`), 16dp padding on every side, an 8dp gap
+    between them (`COMPONENT_EXTENDED_FABS.md`'s own measurements: "Container
+    height 56dp, Container width Dynamic, 80dp min, Padding 16dp"). An
+    extended FAB with no label just measures as an icon-only pill at the
+    80dp floor, which is a legitimate fallback rather than a special case to
+    guard against.
     """
 
     RESTING_ELEVATION = 3
@@ -1121,7 +1119,7 @@ class FabElement(_StyledMixin, Padding):
         return self.SIZES.get(variant, self.SIZES["standard"])
 
     def _label_width(self) -> float:
-        label = self._supporting.strip()
+        label = self._label.strip()
         if not label:
             return 0.0
         return measure_text(label, self.style.font_size, engine=self.text_engine).width
@@ -1129,7 +1127,7 @@ class FabElement(_StyledMixin, Padding):
     def perform_layout(self, constraints: Constraints) -> Size:
         height, _, icon = self._geometry()
         if self.style.variant == "extended":
-            has_icon = bool(self._text.strip())
+            has_icon = bool(self._icon.strip())
             label_width = self._label_width()
             content = (icon if has_icon else 0.0) + (
                 self.EXTENDED_GAP + label_width if has_icon and label_width else label_width
@@ -1167,10 +1165,10 @@ class FabElement(_StyledMixin, Padding):
 
         if style.variant == "extended":
             self._paint_extended(ctx, absolute, icon, content)
-        elif self._text.strip():
+        elif self._icon.strip():
             ctx.text.emit_icon(
                 ctx.display_list,
-                self._text.strip(),
+                self._icon.strip(),
                 x=absolute.x + (self.size.width - icon) / 2,
                 y=absolute.y + (self.size.height - icon) / 2,
                 size=icon,
@@ -1184,8 +1182,8 @@ class FabElement(_StyledMixin, Padding):
 
     def _paint_extended(self, ctx: PaintContext, absolute: Any, icon: float, content: int) -> None:
         style = self.style
-        label = self._supporting.strip()
-        has_icon = bool(self._text.strip())
+        label = self._label.strip()
+        has_icon = bool(self._icon.strip())
         label_width = self._label_width()
         total = (icon if has_icon else 0.0) + (
             self.EXTENDED_GAP + label_width if has_icon and label else label_width
@@ -1196,7 +1194,7 @@ class FabElement(_StyledMixin, Padding):
         if has_icon:
             ctx.text.emit_icon(
                 ctx.display_list,
-                self._text.strip(),
+                self._icon.strip(),
                 x=x,
                 y=y_center - icon / 2,
                 size=icon,
@@ -1654,18 +1652,21 @@ class BadgeElement(_StyledMixin, Padding):
         self.init_element(spec)
 
     @property
-    def _label(self) -> str:
+    def _displayed(self) -> str:
+        """`value:` if set, else `text:`. Not the framework's `label:`
+        binding -- Badge has no icon+label anatomy, just one displayed
+        string with two possible sources."""
         return self._value.strip() or self._text.strip()
 
     @property
     def _is_dot(self) -> bool:
-        return self.style.variant == "dot" or not self._label
+        return self.style.variant == "dot" or not self._displayed
 
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
         if self._is_dot:
             return outer.constrain(Size(self.DOT, self.DOT))
-        label = measure_text(self._label, self.LABEL_SIZE, engine=self.text_engine)
+        label = measure_text(self._displayed, self.LABEL_SIZE, engine=self.text_engine)
         width = max(self.HEIGHT, label.width + self.PAD_X * 2)
         return outer.constrain(Size(width, self.HEIGHT))
 
@@ -1686,12 +1687,12 @@ class BadgeElement(_StyledMixin, Padding):
         )
         if self._is_dot:
             return
-        label = measure_text(self._label, self.LABEL_SIZE, engine=self.text_engine)
+        label = measure_text(self._displayed, self.LABEL_SIZE, engine=self.text_engine)
         paint_text(
             ctx,
             absolute.x + (self.size.width - label.width) / 2,
             absolute.y + (self.size.height - label.height) / 2,
-            self._label,
+            self._displayed,
             self.LABEL_SIZE,
             content,
         )

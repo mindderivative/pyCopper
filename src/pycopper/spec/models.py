@@ -500,8 +500,8 @@ class StyleSpec(_Frozen):
     thickness: float = Field(default=1.0, gt=0)
     inset: float = Field(default=0.0, ge=0)
 
-    # icons. `text:` carries the icon name, so a binding expression can switch
-    # icons at runtime -- e.g. text: "{{ 'star' if saved.get() else 'star_border' }}"
+    # icons. `icon:` carries the icon name, so a binding expression can switch
+    # icons at runtime -- e.g. icon: "{{ 'star' if saved.get() else 'star_border' }}"
     icon_size: float = Field(default=24.0, gt=0)
     #: 0 = outlined, 1 = filled. M3 uses this for selected/unselected states.
     icon_fill: float = Field(default=0.0, ge=0, le=1)
@@ -583,6 +583,28 @@ class EdgeSpec(_Frozen):
     target: Identifier
 
 
+#: Every field a view file may drive with a `{{ }}` binding, paired with the
+#: private attribute `ElementMixin` stores its rendered value under. This is
+#: the single place a new bindable field's *mechanism* cost lives --
+#: `WidgetSpec.templates()` and `ElementMixin.init_element`/`update_spec`/
+#: `bind` all loop over it instead of each needing a hand-written line per
+#: field. Declaring the field itself (below, on `WidgetSpec`) plus one entry
+#: here is the entire cost of adding a new one.
+TEMPLATED_FIELDS: Final[tuple[tuple[str, str], ...]] = (
+    ("text", "_text"),
+    ("value", "_value"),
+    ("supporting_text", "_supporting"),
+    ("open", "_open"),
+    ("disabled", "_disabled"),
+    ("error", "_error"),
+    ("collapsed", "_collapsed"),
+    ("indeterminate", "_indeterminate"),
+    ("path", "_path"),
+    ("icon", "_icon"),
+    ("label", "_label"),
+)
+
+
 class WidgetSpec(_Frozen):
     #: Positional identity, assigned by the loader from the node's path. Never
     #: written by an author -- it exists so every node has *some* identity for
@@ -610,6 +632,22 @@ class WidgetSpec(_Frozen):
     value: str | None = None
     #: A ListItem's second line. Content, not style, and templated like `text`.
     supporting_text: str | None = None
+    #: A Material Symbols glyph name. Templated like `text`, so
+    #: `icon: "{{ 'star' if saved.get() else 'star_border' }}"` switches the
+    #: icon with state. `Icon`, `IconButton`, `Fab`, `NavItem`, and
+    #: `SearchBar`'s trailing icon read this -- `text:` used to double as the
+    #: glyph name for these widgets, which is why `docs/view-reference.md`
+    #: says "an icon name is never announced": `text:` is normally read aloud
+    #: as a control's name, so it had to be excluded specifically for them.
+    #: With the glyph in its own field, `text:` no longer needs that carve-out
+    #: for any of them. Meaningless on a widget with no icon anatomy.
+    icon: str | None = None
+    #: A widget's own visible/accessible label, distinct from `text:`'s
+    #: primary-content role -- `IconButton`'s and `Fab`'s accessible name,
+    #: `Fab`'s extended-variant visible text, and `NavItem`'s destination
+    #: label. Templated like `text`. Meaningless on a widget with no label
+    #: anatomy of its own.
+    label: str | None = None
     #: `PageHost`'s fallback child name, used whenever `value:` resolves to a
     #: name that doesn't match any declared child (unset, a typo, a Signal
     #: not yet initialised). **Not templated** -- unlike `value:`, this names
@@ -680,33 +718,23 @@ class WidgetSpec(_Frozen):
                 raise ValueError(f"handler key {event!r} must start with 'on_'")
         return value
 
-    def template(self) -> Template | None:
-        """Compiled text template, or None for a widget with no text."""
-        return Template(self.text) if self.text is not None else None
+    def templates(self) -> dict[str, Template | None]:
+        """Compiled template per rendered-value attribute, keyed the same
+        way `ElementMixin` stores them -- see `TEMPLATED_FIELDS`.
 
-    def value_template(self) -> Template | None:
-        return Template(self.value) if self.value is not None else None
-
-    def open_template(self) -> Template | None:
-        return Template(self.open) if self.open is not None else None
-
-    def disabled_template(self) -> Template | None:
-        return Template(self.disabled) if self.disabled is not None else None
-
-    def error_template(self) -> Template | None:
-        return Template(self.error) if self.error is not None else None
-
-    def collapsed_template(self) -> Template | None:
-        return Template(self.collapsed) if self.collapsed is not None else None
-
-    def indeterminate_template(self) -> Template | None:
-        return Template(self.indeterminate) if self.indeterminate is not None else None
-
-    def supporting_template(self) -> Template | None:
-        return Template(self.supporting_text) if self.supporting_text is not None else None
-
-    def path_template(self) -> Template | None:
-        return Template(self.path) if self.path is not None else None
+        Adding a new `{{ }}`-bindable field to this spec is now just that
+        field's declaration above plus one entry in `TEMPLATED_FIELDS`:
+        `ElementMixin.init_element`/`update_spec`/`bind` all loop over
+        this dict rather than each needing a hand-written line per field --
+        the previous shape, where a new field meant a matching
+        `<field>_template()` method here *and* three more hand-maintained
+        spots in `tree/element.py`, was exactly how `disabled:` once went
+        missing from `update_spec` (see that method's own comment).
+        """
+        return {
+            attr: Template(value) if (value := getattr(self, field)) is not None else None
+            for field, attr in TEMPLATED_FIELDS
+        }
 
     def walk(self) -> Any:
         yield self

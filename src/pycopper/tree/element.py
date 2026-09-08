@@ -26,7 +26,7 @@ from ..paint import NO_TOKEN, DisplayList
 from ..paint.display_list import Kind
 from ..render.atlas import ImageAtlas
 from ..runtime.signals import Effect
-from ..spec import StyleSpec, Template, WidgetSpec
+from ..spec import TEMPLATED_FIELDS, StyleSpec, Template, WidgetSpec
 from ..text import TextEngine
 from ..theme import Palette
 
@@ -202,24 +202,26 @@ class ElementMixin:
     state: WidgetState
     handlers: dict[str, Callable[[Any], None]]
     _effect: Effect | None
+    #: One compiled `Template` per rendered-value attribute below, keyed by
+    #: attribute name -- see `TEMPLATED_FIELDS`. `init_element`/`update_spec`/
+    #: `bind` all loop over this instead of each carrying a hand-written line
+    #: per field. The rendered values themselves stay real named attributes
+    #: (not further entries in a dict) because widget code across
+    #: `widgets/*.py` reads e.g. `self._text`/`self._value`/`self._supporting`
+    #: directly, at many call sites -- only the *bookkeeping* around them is
+    #: generic, not their storage.
+    _templates: dict[str, Template | None]
     _text: str
-    _template: Template | None
-    _value_template: Template | None
     _value: str
-    _supporting_template: Template | None
     _supporting: str
-    _open_template: Template | None
     _open: str
-    _disabled_template: Template | None
     _disabled: str
-    _error_template: Template | None
     _error: str
-    _collapsed_template: Template | None
     _collapsed: str
-    _indeterminate_template: Template | None
     _indeterminate: str
-    _path_template: Template | None
     _path: str
+    _icon: str
+    _label: str
     _cached: np.ndarray | None
     #: Everything the cached slice was built from. Compared whole, because a
     #: cached slice holds *resolved physical geometry* -- if any of these
@@ -242,24 +244,9 @@ class ElementMixin:
         self.state = WidgetState()
         self.handlers = {}
         self._effect = None
-        self._template = spec.template()
-        self._text = spec.text or ""
-        self._value_template = spec.value_template()
-        self._value = spec.value or ""
-        self._supporting_template = spec.supporting_template()
-        self._supporting = spec.supporting_text or ""
-        self._open_template = spec.open_template()
-        self._open = spec.open or ""
-        self._disabled_template = spec.disabled_template()
-        self._disabled = spec.disabled or ""
-        self._error_template = spec.error_template()
-        self._error = spec.error or ""
-        self._collapsed_template = spec.collapsed_template()
-        self._collapsed = spec.collapsed or ""
-        self._indeterminate_template = spec.indeterminate_template()
-        self._indeterminate = spec.indeterminate or ""
-        self._path_template = spec.path_template()
-        self._path = spec.path or ""
+        self._templates = spec.templates()
+        for field_name, attr in TEMPLATED_FIELDS:
+            setattr(self, attr, getattr(spec, field_name) or "")
         self._cached = None
         self._cached_key = None
         #: Bounding box of everything this subtree actually painted, in
@@ -294,35 +281,17 @@ class ElementMixin:
         operation -- this is why editing a view file does not lose focus."""
         self.spec = spec
         self._read_hit_style()
-        self._template = spec.template()
-        if self._template is None or self._template.is_static:
-            self._text = spec.text or ""
-        self._value_template = spec.value_template()
-        if self._value_template is None or self._value_template.is_static:
-            self._value = spec.value or ""
-        self._supporting_template = spec.supporting_template()
-        if self._supporting_template is None or self._supporting_template.is_static:
-            self._supporting = spec.supporting_text or ""
-        self._open_template = spec.open_template()
-        if self._open_template is None or self._open_template.is_static:
-            self._open = spec.open or ""
-        # `disabled:` was missing here: a reload that changed it updated the
-        # spec and kept the old value, because only `init_element` read it.
-        self._disabled_template = spec.disabled_template()
-        if self._disabled_template is None or self._disabled_template.is_static:
-            self._disabled = spec.disabled or ""
-        self._error_template = spec.error_template()
-        if self._error_template is None or self._error_template.is_static:
-            self._error = spec.error or ""
-        self._collapsed_template = spec.collapsed_template()
-        if self._collapsed_template is None or self._collapsed_template.is_static:
-            self._collapsed = spec.collapsed or ""
-        self._indeterminate_template = spec.indeterminate_template()
-        if self._indeterminate_template is None or self._indeterminate_template.is_static:
-            self._indeterminate = spec.indeterminate or ""
-        self._path_template = spec.path_template()
-        if self._path_template is None or self._path_template.is_static:
-            self._path = spec.path or ""
+        self._templates = spec.templates()
+        for field_name, attr in TEMPLATED_FIELDS:
+            tpl = self._templates[attr]
+            # A field missing from this loop once meant a reload that
+            # changed it updated the spec but kept the old rendered value
+            # (`disabled:` did exactly this) -- looping `TEMPLATED_FIELDS`
+            # instead of hand-listing each field here makes that class of
+            # bug structurally impossible: there is no second list to fall
+            # out of sync with the first.
+            if tpl is None or tpl.is_static:
+                setattr(self, attr, getattr(spec, field_name) or "")
         self.configure()
         self.mark_needs_layout()
 
@@ -554,6 +523,17 @@ class ElementMixin:
         return self._path
 
     @property
+    def icon(self) -> str:
+        """Rendered `icon:` binding -- a Material Symbols glyph name."""
+        return self._icon
+
+    @property
+    def label(self) -> str:
+        """Rendered `label:` binding -- a widget's own visible/accessible
+        label, distinct from `text:`'s primary-content role."""
+        return self._label
+
+    @property
     def selected(self) -> bool:
         """Whether a parent container has marked this item as the active one.
 
@@ -614,18 +594,8 @@ class ElementMixin:
         the fine-grained half of fine-grained reactivity.
         """
         bound: list[tuple[str, Template]] = [
-            (name, tpl)
-            for name, tpl in (
-                ("_text", self._template),
-                ("_value", self._value_template),
-                ("_supporting", self._supporting_template),
-                ("_open", self._open_template),
-                ("_disabled", self._disabled_template),
-                ("_error", self._error_template),
-                ("_collapsed", self._collapsed_template),
-                ("_indeterminate", self._indeterminate_template),
-                ("_path", self._path_template),
-            )
+            (attr, tpl)
+            for attr, tpl in self._templates.items()
             if tpl is not None and not tpl.is_static
         ]
         # `mount()` re-binds every element on every hot reload, not only newly

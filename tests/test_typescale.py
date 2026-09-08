@@ -319,7 +319,7 @@ def _paint_once(spec: dict[str, object], width: float, height: float) -> tuple[A
     ("spec", "label"),
     [
         ({"name": "b", "widget": "Button", "text": "Confirm"}, "Confirm"),
-        ({"name": "n", "widget": "NavItem", "text": "home", "supporting_text": "Home"}, "Home"),
+        ({"name": "n", "widget": "NavItem", "icon": "home", "label": "Home"}, "Home"),
         ({"name": "t", "widget": "Tab", "text": "Overview"}, "Overview"),
         ({"name": "s", "widget": "Segment", "text": "Weekly"}, "Weekly"),
         (

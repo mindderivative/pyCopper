@@ -30,11 +30,11 @@ token is not in the scraped tokens table (an interactive image, the same gap
 `value:` is the typed query, the same convention `TextField` uses;
 `supporting_text:` is a placeholder shown only while empty (M3's own
 anatomy names this "Supporting text"), not a caption below the field the
-way `TextField`'s is. `text:`, unused for the query itself, names an
-optional trailing icon (M3: "A search bar should have one or two trailing
-icons") -- unset means no trailing icon at all, matching M3's own "can
-contain a non-functional search icon" baseline of a leading icon alone.
-`on_change` fires on every edit, identically to `TextField`.
+way `TextField`'s is. `icon:` names an optional trailing icon (M3: "A
+search bar should have one or two trailing icons") -- unset means no
+trailing icon at all, matching M3's own "can contain a non-functional
+search icon" baseline of a leading icon alone. `on_change` fires on every
+edit, identically to `TextField`.
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ class SearchBarElement(_StyledMixin, Padding):
     # --------------------------------------------------------------- layout
 
     def _has_trailing_icon(self) -> bool:
-        return bool(self._text.strip())
+        return bool(self._icon.strip())
 
     def _content_x(self) -> float:
         return self.PAD_X + self.ICON + self.GAP
@@ -226,7 +226,7 @@ class SearchBarElement(_StyledMixin, Padding):
         if self._has_trailing_icon():
             ctx.text.emit_icon(
                 ctx.display_list,
-                self._text.strip(),
+                self._icon.strip(),
                 x=absolute.x + self.size.width - self.PAD_X - self.ICON,
                 y=absolute.y + (self.size.height - self.ICON) / 2,
                 size=self.ICON,

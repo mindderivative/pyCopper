@@ -54,16 +54,16 @@ children:
         widget: Horizontal
         style: {height: 40, spacing: 14, width: expand, cross_alignment: center}
         children:
-          - {name: ic_home,   widget: Icon, text: home,     style: {color: on_surface, icon_size: 24}}
-          - {name: ic_search, widget: Icon, text: search,   style: {color: on_surface, icon_size: 24}}
-          - {name: ic_set,    widget: Icon, text: settings, style: {color: on_surface_variant, icon_size: 24}}
+          - {name: ic_home,   widget: Icon, icon: home,     style: {color: on_surface, icon_size: 24}}
+          - {name: ic_search, widget: Icon, icon: search,   style: {color: on_surface, icon_size: 24}}
+          - {name: ic_set,    widget: Icon, icon: settings, style: {color: on_surface_variant, icon_size: 24}}
           - name: ic_fav
             widget: Icon
-            text: "{{ 'favorite' if clicks.get() else 'favorite_border' }}"
+            icon: "{{ 'favorite' if clicks.get() else 'favorite_border' }}"
             style: {color: error, icon_size: 28, icon_fill: 1.0}
-          - {name: ic_heavy,  widget: Icon, text: bolt, style: {color: tertiary, icon_size: 24, icon_weight: 700}}
+          - {name: ic_heavy,  widget: Icon, icon: bolt, style: {color: tertiary, icon_size: 24, icon_weight: 700}}
           - {name: ic_gap,    widget: Spacer, style: {width: expand}}
-          - {name: ic_check,  widget: Icon, text: check_circle, style: {color: primary, icon_size: 24, icon_fill: 1.0}}
+          - {name: ic_check,  widget: Icon, icon: check_circle, style: {color: primary, icon_size: 24, icon_fill: 1.0}}
 
       - name: stacked
         widget: Stack
@@ -102,13 +102,13 @@ children:
         widget: Horizontal
         style: {height: 56, spacing: 12, width: expand, cross_alignment: center}
         children:
-          - {name: ib_std,   widget: IconButton, text: favorite, style: {variant: standard}}
-          - {name: ib_fill,  widget: IconButton, text: star,     style: {variant: filled}}
-          - {name: ib_tonal, widget: IconButton, text: share,    style: {variant: filled_tonal}}
-          - {name: ib_out,   widget: IconButton, text: settings, style: {variant: outlined}}
+          - {name: ib_std,   widget: IconButton, icon: favorite, style: {variant: standard}}
+          - {name: ib_fill,  widget: IconButton, icon: star,     style: {variant: filled}}
+          - {name: ib_tonal, widget: IconButton, icon: share,    style: {variant: filled_tonal}}
+          - {name: ib_out,   widget: IconButton, icon: settings, style: {variant: outlined}}
           - {name: fab_gap,  widget: Spacer, style: {width: expand}}
-          - {name: fab_sm,   widget: Fab, text: add,  style: {variant: small}}
-          - {name: fab_std,  widget: Fab, text: edit, style: {variant: standard}}
+          - {name: fab_sm,   widget: Fab, icon: add,  style: {variant: small}}
+          - {name: fab_std,  widget: Fab, icon: edit, style: {variant: standard}}
 
       # ============================================================
       # Selection controls

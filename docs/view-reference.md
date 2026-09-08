@@ -48,6 +48,8 @@ Every node accepts these. Only `widget` is required.
 | `value` | string | State binding — what a control *is*. See [Bindings](#bindings). |
 | `default` | string | `PageHost`'s fallback child name when `value:` matches none. **Not templated.** Meaningless outside `PageHost`. See [Page host](#page-host). |
 | `supporting_text` | string | Second line, trailing text, or action label, per widget. |
+| `icon` | string | A Material Symbols glyph name. Templated like `text`. Meaningless on a widget with no icon anatomy. |
+| `label` | string | A widget's own visible/accessible label, distinct from `text:`'s primary-content role. Templated like `text`. Meaningless on a widget with no label anatomy of its own. |
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
@@ -83,8 +85,8 @@ meaningless; for anything holding focus, scroll, or text, give it a name.
 
 ## Bindings
 
-`text`, `value`, `open`, `supporting_text`, and `path` accept `{{ expression }}`
-templates evaluated against signals exposed from Python:
+`text`, `value`, `open`, `supporting_text`, `path`, `icon`, and `label` accept
+`{{ expression }}` templates evaluated against signals exposed from Python:
 
 ```yaml
 - name: count
@@ -587,11 +589,13 @@ Three rules worth knowing when writing views:
 - **`name:` is never announced.** It is a developer handle; reading out
   `sw_primary` would be worse than silence. It travels as `key` so tests can
   still find a node by it.
-- **An icon name is never announced.** For `Icon`, `IconButton`, `Fab` and
-  `NavItem`, `text:` holds a Material Symbols glyph name, so the label comes
-  from `supporting_text:`. **An icon-only control with no `supporting_text:`
-  has no accessible name at all** — that is a real gap in a view, and the tree
-  reports an empty name rather than inventing one.
+- **An icon name is never announced.** For `IconButton`, `Fab` and `NavItem`,
+  the accessible name comes from `label:` rather than `text:` — `text:` no
+  longer carries anything for these widgets (their glyph name lives in
+  `icon:`). **An icon-only control with no `label:` has no accessible name at
+  all** — that is a real gap in a view, and the tree reports an empty name
+  rather than inventing one. Plain `Icon` is never announced at all, since it
+  is decorative.
 - **Layout and decoration disappear.** A `Spacer` is dropped entirely and a
   silent container's children are lifted into its place, so a reader never
   walks through a level that says only "group".
@@ -725,11 +729,11 @@ everything.
 `value:` is the typed query, the same convention `TextField` uses.
 `supporting_text:` is a placeholder shown only while the field is empty and
 unfocused — M3's own "Supporting text" anatomy element, not a caption below
-the field the way `TextField`'s `supporting_text:` is. `text:` is unused for
-the query itself and instead names an optional trailing icon (M3: "A search
-bar should have one or two trailing icons"); leaving it unset means no
-trailing icon, just the leading search glyph. Width is clamped to M3's own
-360–720dp range regardless of what a view asks for.
+the field the way `TextField`'s `supporting_text:` is. `icon:` names an
+optional trailing icon (M3: "A search bar should have one or two trailing
+icons"); leaving it unset means no trailing icon, just the leading search
+glyph. Width is clamped to M3's own 360–720dp range regardless of what a
+view asks for.
 
 **The expanded "Search View" — a results list shown below the bar — is not
 a second widget.** It is the same shape `Menu`/`MenuItem` already solve: an
@@ -1104,7 +1108,7 @@ to dp 1:1, so an M3 `40dp` control is `height: 40`.
 | `Spacer` | Empty space. `width: expand` pushes siblings apart. |
 | `ScrollView` | A clipped viewport. **Must** have a bounded size on its scroll axis. |
 | `TextField` | The editable one. 56dp, `filled` or `outlined`. See [Text fields](#text-fields). |
-| `SearchBar` | M3's search bar: a 56dp pill, 360–720dp wide, a fixed leading search icon. `value:` is the typed query, `supporting_text:` a placeholder shown while empty, `text:` an optional trailing icon. See [Search bar](#search-bar). |
+| `SearchBar` | M3's search bar: a 56dp pill, 360–720dp wide, a fixed leading search icon. `value:` is the typed query, `supporting_text:` a placeholder shown while empty, `icon:` an optional trailing icon. See [Search bar](#search-bar). |
 | `CodeEditor` | Multi-line, line-numbered, optionally syntax-highlighted. No M3 component. See [Code editor](#code-editor). |
 | `Terminal` | A real shell, spawned and parsed internally. No M3 component. See [Terminal](#terminal). |
 
@@ -1117,7 +1121,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | Widget | Notes |
 |---|---|
 | `Text` | Shaped, kerned, wrapped. `font_size` in dp. |
-| `Icon` | Material Symbols. Name goes in `text:`; `icon_size`, `icon_fill`, `icon_weight`. |
+| `Icon` | Material Symbols. Name goes in `icon:`; `icon_size`, `icon_fill`, `icon_weight`. |
 | `Divider` | 1dp `outline_variant`. `full_bleed` / `inset`. |
 | `Shape` | A regular polygon: `sides`, `rotation`, `corner_radius`, `background`, `border`. 48dp unless sized. Drawn as a distance field, not a rasterised path, so every one of those is **free to animate**. |
 | `Image` | A decoded raster image. `path:` names the file; `style: {fit}` controls how it fills a differently-shaped box. No M3 component — see [Image](#image) below. |
@@ -1129,8 +1133,8 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 |---|---|
 | `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
 | `ButtonGroup` | An invisible container spacing `Button` children: `standard` (default, 8dp gaps, each button stays fully rounded) or `connected` (2dp gaps, only the group's two outer ends stay fully rounded, every touching corner squares to 8dp). M size only; the press/selection shape-morph animation and the XS/S/L/XL size ladder are real M3 behaviour not built here. |
-| `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. |
-| `Fab` | 56dp standard, 40 small, 80 medium, 96 large, plus `extended` — same 56dp height, a dynamic width (80dp floor) fitting an icon and a `supporting_text:` label side by side. |
+| `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. Icon name in `icon:`, accessible name in `label:`. |
+| `Fab` | 56dp standard, 40 small, 80 medium, 96 large, plus `extended` — same 56dp height, a dynamic width (80dp floor) fitting an icon (`icon:`) and a `label:` label side by side. |
 | `Checkbox` | 18dp box, 2dp radius. `indeterminate:` shows a dash instead of a checkmark, M3's third state for a partly-checked group. |
 | `Radio` | 20dp outer, 10dp dot. |
 | `Switch` | 52×32dp track. |

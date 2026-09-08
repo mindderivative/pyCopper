@@ -98,18 +98,18 @@ children:
             collapsed: "true"
             style: {height: expand}
             children:
-              - {name: r0, widget: NavItem, text: home,     supporting_text: "Home",     handlers: {on_click: select_rail}}
-              - {name: r1, widget: NavItem, text: search,   supporting_text: "Search",   handlers: {on_click: select_rail}}
-              - {name: r2, widget: NavItem, text: settings, supporting_text: "Settings", handlers: {on_click: select_rail}}
+              - {name: r0, widget: NavItem, icon: home,     label: "Home",     handlers: {on_click: select_rail}}
+              - {name: r1, widget: NavItem, icon: search,   label: "Search",   handlers: {on_click: select_rail}}
+              - {name: r2, widget: NavItem, icon: settings, label: "Settings", handlers: {on_click: select_rail}}
           - name: drawer_demo
             widget: NavigationRail
             value: "{{ rail.get() }}"
             collapsed: "false"
             style: {height: expand}
             children:
-              - {name: d0, widget: NavItem, text: home,     supporting_text: "Home",     handlers: {on_click: select_rail}}
-              - {name: d1, widget: NavItem, text: search,   supporting_text: "Search",   handlers: {on_click: select_rail}}
-              - {name: d2, widget: NavItem, text: settings, supporting_text: "Settings", handlers: {on_click: select_rail}}
+              - {name: d0, widget: NavItem, icon: home,     label: "Home",     handlers: {on_click: select_rail}}
+              - {name: d1, widget: NavItem, icon: search,   label: "Search",   handlers: {on_click: select_rail}}
+              - {name: d2, widget: NavItem, icon: settings, label: "Settings", handlers: {on_click: select_rail}}
           - name: status_bar_demo
             widget: Vertical
             style: {width: expand, height: expand}

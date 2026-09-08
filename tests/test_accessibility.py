@@ -142,14 +142,14 @@ def test_selected_and_unselected_are_distinguishable() -> None:
                     {
                         "name": "home",
                         "widget": "NavItem",
-                        "text": "home",
-                        "supporting_text": "Home",
+                        "icon": "home",
+                        "label": "Home",
                     },
                     {
                         "name": "settings",
                         "widget": "NavItem",
-                        "text": "settings",
-                        "supporting_text": "Settings",
+                        "icon": "settings",
+                        "label": "Settings",
                     },
                 ],
             },
@@ -195,7 +195,7 @@ def test_silent_nodes_do_not_bury_their_children() -> None:
                 "name": "rail",
                 "widget": "NavigationRail",
                 "children": [
-                    {"name": "home", "widget": "NavItem", "text": "home", "supporting_text": "Home"}
+                    {"name": "home", "widget": "NavItem", "icon": "home", "label": "Home"}
                 ],
             },
         ],
@@ -206,21 +206,22 @@ def test_silent_nodes_do_not_bury_their_children() -> None:
 
 
 def test_an_icon_name_is_never_announced_as_a_label() -> None:
-    """For icon-bearing controls `text:` is a Material Symbols glyph name. A
-    nav item said "home" rather than "Home" until this was written, which is a
-    bug nobody sees until they listen to it."""
+    """For icon-bearing controls `icon:` is a Material Symbols glyph name,
+    separate from `label:`. A nav item said "home" rather than "Home" until
+    this distinction existed, which is a bug nobody sees until they listen
+    to it."""
     view = {
         "name": "root",
         "widget": "Horizontal",
         "children": [
-            {"name": "n", "widget": "NavItem", "text": "home", "supporting_text": "Home"},
-            {"name": "i", "widget": "IconButton", "text": "chevron_right"},
+            {"name": "n", "widget": "NavItem", "icon": "home", "label": "Home"},
+            {"name": "i", "widget": "IconButton", "icon": "chevron_right"},
         ],
     }
     tree = tree_of(view)
     assert tree.find(role="tab").name == "Home"
     assert tree.find(key="i").name == "", (
-        "an icon-only control with no supporting text has no name to give, and "
+        "an icon-only control with no label: has no name to give, and "
         "reporting none is better than reading 'chevron_right' at somebody"
     )
 

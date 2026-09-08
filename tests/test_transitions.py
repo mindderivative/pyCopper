@@ -524,8 +524,8 @@ TABS = [
     {"name": "t3", "widget": "Tab", "text": "Three"},
 ]
 NAV = [
-    {"name": "n1", "widget": "NavItem", "text": "home", "supporting_text": "Home"},
-    {"name": "n2", "widget": "NavItem", "text": "search", "supporting_text": "Search"},
+    {"name": "n1", "widget": "NavItem", "icon": "home", "label": "Home"},
+    {"name": "n2", "widget": "NavItem", "icon": "search", "label": "Search"},
 ]
 SEGS = [
     {"name": "s1", "widget": "Segment", "text": "Day"},

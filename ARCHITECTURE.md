@@ -614,8 +614,8 @@ Two facts worth recording, both found by measurement:
   alongside it. The licence test therefore asserts per font rather than
   assuming one licence across the bundle.
 
-The `Icon` widget takes its name from `text:`, so binding expressions work on
-it: `text: "{{ 'star' if saved.get() else 'star_border' }}"` switches the icon
+The `Icon` widget takes its name from `icon:`, so binding expressions work on
+it: `icon: "{{ 'star' if saved.get() else 'star_border' }}"` switches the icon
 with state exactly the way a label does.
 
 #### 5.7.9 SVG icons — `text/svgicons.py`
@@ -1257,12 +1257,13 @@ Three rules the tree enforces, each of which is a bug it prevents:
 - **A view file's `name:` is never announced.** It is a developer handle;
   "sw_primary" read aloud is worse than silence. It travels as `key` so tests
   can still find a node by it.
-- **An icon name is never announced.** For `Icon`, `IconButton`, `Fab` and
-  `NavItem`, `text:` holds a Material Symbols glyph name — a navigation item
-  announced itself as "home" rather than "Home" until a test caught it. The
-  label comes from `supporting_text:`, and an icon-only control without one
-  reports *no* name, which is a real gap in the view rather than something to
-  paper over.
+- **An icon name is never announced.** For `IconButton`, `Fab` and `NavItem`,
+  the accessible name comes from `label:` rather than `text:` — a navigation
+  item announced itself as "home" rather than "Home" back when `text:` did
+  double duty as the glyph name, until a test caught it. `text:` no longer
+  carries anything for these widgets at all (their glyph moved to `icon:`),
+  and an icon-only control with no `label:` reports *no* name, which is a
+  real gap in the view rather than something to paper over.
 - **Silent nodes do not bury their children.** A `Spacer` disappears and a
   navigation container's items are lifted into its place, so a reader never
   walks through a level that says only "group".
@@ -1711,7 +1712,7 @@ figures used directly, since layout runs in logical units and dp maps 1:1 (§7).
 | `Switch` | 52×32dp track, 16/24dp thumb | thumb grows when selected. M3's own interaction table names both "Tap" and "Drag"; tap already worked for free (the dispatcher's own generic click rule needs no widget-specific `on_click`), but dragging past the track's far edge needed `on_pointer_down`/`_up` added to recognise it as a distinct gesture and commit to that side |
 | `Chip` | 32dp high, 8dp radius, 18dp icon | filter variant shows a leading checkmark |
 | `IconButton` | 40dp container, 24dp icon | `standard` / `filled` / `filled_tonal` / `outlined` |
-| `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3. `variant: extended` (`COMPONENT_EXTENDED_FABS.md`) is the fifth size: 56dp tall like `standard` but a dynamic width (80dp floor) fitting an icon plus a `supporting_text:` label, 16dp padding, 8dp gap between them |
+| `Fab` | 56dp standard, 40 small, 96 large | `primary_container`, elevation level 3. `variant: extended` (`COMPONENT_EXTENDED_FABS.md`) is the fifth size: 56dp tall like `standard` but a dynamic width (80dp floor) fitting an icon plus a `label:` label, 16dp padding, 8dp gap between them |
 | `Badge` | 6dp dot, or 16dp-high pill | `value:` carries the count |
 | `SpinBox` | Two 40dp `IconButton`-anatomy regions (`remove`/`add`) flanking a number | No M3 component; named to dodge M3's own "Stepper" (a multi-step flow indicator). Grounded in the Sliders page's "icon buttons placed outside the slider" convention instead. `on_change` carries the new value already clamped to `style.min`/`max` and stepped by `style.step` |
 | `Pagination` | 40dp prev/next arrows around 40dp page-number buttons | No M3 component — "pagination" appears once in the whole reference library, as a prohibition on Cards. Windows around the current page, collapsing runs into `...`; below 8 total pages nothing is ever collapsed. The current page uses `Chip`/`Segment`'s own selected pairing (`secondary_container`/`on_secondary_container`) |
@@ -3373,9 +3374,9 @@ not an oversight.
 `value:` is the typed query, `TextField`'s own convention. `supporting_text:`
 is a placeholder shown only while empty and unfocused (M3's own anatomy
 names this "Supporting text"), not a caption below the field the way
-`TextField`'s is. `text:`, unused for the query, names an optional trailing
-icon -- M3: "A search bar should have one or two trailing icons" -- unset
-means the leading search glyph alone, M3's own stated baseline.
+`TextField`'s is. `icon:` names an optional trailing icon -- M3: "A search
+bar should have one or two trailing icons" -- unset means the leading
+search glyph alone, M3's own stated baseline.
 
 ARIA has a real, dedicated `"searchbox"` role, distinct from `TextField`'s
 plain `"textbox"`, used directly rather than approximated.

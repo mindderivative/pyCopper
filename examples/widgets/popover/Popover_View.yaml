@@ -55,7 +55,7 @@ root:
           children:
             - name: trigger
               widget: IconButton
-              text: "info"
+              icon: "info"
               style: {variant: standard}
               handlers: {on_click: open_popover}
 
