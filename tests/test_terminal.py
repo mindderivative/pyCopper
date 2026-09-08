@@ -242,6 +242,33 @@ def test_an_explicit_shell_style_wins(monkeypatch) -> None:
     assert element._command() == "bash -l"
 
 
+# --------------------------------------------------------------------- font
+
+
+def test_the_default_font_is_genuinely_monospace() -> None:
+    """Found live, 2026-09-08: defaulting to Roboto (proportional) left the
+    cursor visibly detached from typed text by several columns, since the
+    cell/cursor grid assumes every glyph shares one advance width. Assert
+    the fix directly rather than trusting a visual impression -- "M" and a
+    narrow letter like "i" must measure identically, and a short run like
+    "hello" must land exactly on `n * cell_width`, not merely close to it."""
+    element = terminal()
+    request = element._font_request()
+    assert request.family == "Noto Sans Mono"
+    engine = element.text_engine
+    cell = element._cell_size()
+    m_width = engine.measure("M", px=element.style.font_size, request=request).width
+    i_width = engine.measure("i", px=element.style.font_size, request=request).width
+    hello_width = engine.measure("hello", px=element.style.font_size, request=request).width
+    assert m_width == i_width == cell.width
+    assert hello_width == 5 * cell.width
+
+
+def test_an_explicit_font_family_overrides_the_monospace_default() -> None:
+    element = terminal(style={"font_family": "Roboto"})
+    assert element._font_request().family == "Roboto"
+
+
 # ------------------------------------------------------------------- colour
 
 

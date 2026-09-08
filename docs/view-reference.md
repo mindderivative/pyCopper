@@ -840,11 +840,15 @@ WTFPL, `pexpect` is ISC). Without them, or on Windows (not yet
 implemented — see the widget's own docstring for why), the terminal area
 shows a message explaining what is missing instead of a shell.
 
-**No monospace font ships with pyCopper**, the same gap
-[Code editor](#code-editor) documents. `style.font_family` names a face by
-family; without one, text still renders, proportionally, so columns and
-box-drawn tables will not line up — load a real monospace face with
-`app.text.db.load(path)` before the view mounts to fix that.
+**Defaults to a bundled monospace font (Noto Sans Mono)** when
+`style.font_family` is unset — [Code editor](#code-editor) still has the
+proportional-default gap this used to share. Found live, 2026-09-08: with
+the previous default (Roboto, proportional), the cursor visibly detached
+from typed text by several columns after a few keystrokes, since the
+cell/cursor grid assumes every glyph shares one advance width — confirmed
+by direct measurement, not just visual impression (see
+`assets/fonts/README.md`'s "Monospace" section). Set `style.font_family` to
+any other face to override.
 
 **No scrollback.** `bittty` (swapped in for `pyte` on 2026-09-08, after a
 real `pyte` parsing defect corrupted typed input under some shell prompt

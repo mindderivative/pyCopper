@@ -18,6 +18,7 @@ __all__ = [
     "FALLBACK_CHAIN",
     "FONT_DIR",
     "MEDIUM_FONT",
+    "MONOSPACE_FONT",
     "font_path",
 ]
 
@@ -32,6 +33,13 @@ MEDIUM_FONT: Final = FONT_DIR / "Roboto-Medium.ttf"
 #: Resolution order for FontDB. Mirrors M3's Roboto -> Noto Sans chain;
 #: Roboto Flex is excluded because M3 states it is not part of the typescale.
 FALLBACK_CHAIN: Final = (DEFAULT_FONT, FONT_DIR / "NotoSans-Regular.ttf")
+
+#: Not part of M3's type scale (M3 has no concept of a monospace role) --
+#: bundled specifically for Terminal/CodeEditor, whose cell/cursor grid math
+#: assumes every glyph has the same advance width. Deliberately NOT in
+#: `FALLBACK_CHAIN`: an ordinary `Text` widget has no reason to ever silently
+#: fall back to a monospace face. See `fonts/README.md` for provenance.
+MONOSPACE_FONT: Final = FONT_DIR / "NotoSansMono-Regular.ttf"
 
 
 def font_path(name: str) -> Path:

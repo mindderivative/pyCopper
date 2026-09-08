@@ -52,6 +52,7 @@ EXPECTED_LICENCES = {
     "Roboto-Regular.ttf": ("OFL 1.1", "Open Font License"),
     "Roboto-Medium.ttf": ("OFL 1.1", "Open Font License"),
     "NotoSans-Regular.ttf": ("OFL 1.1", "Open Font License"),
+    "NotoSansMono-Regular.ttf": ("OFL 1.1", "Open Font License"),
     "MaterialSymbolsOutlined-Subset.ttf": ("Apache-2.0", None),
 }
 
@@ -61,6 +62,7 @@ LICENCE_FILES = {
     "Roboto-Regular.ttf": "LICENSE-Roboto.txt",
     "Roboto-Medium.ttf": "LICENSE-Roboto.txt",
     "NotoSans-Regular.ttf": "LICENSE-NotoSans.txt",
+    "NotoSansMono-Regular.ttf": "LICENSE-NotoSansMono.txt",
     "MaterialSymbolsOutlined-Subset.ttf": "LICENSE-MaterialSymbols.txt",
 }
 
