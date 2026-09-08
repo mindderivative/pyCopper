@@ -436,15 +436,27 @@ def paint_drop_zone(
     zone *threshold* (2/3 down) rather than the panel's actual bottom
     edge, the one case that was not a true border -- inconsistent with the
     other three, and part of why it was hard to see.
+
+    `"left"`/`"right"` span only the *content* area, from `tab_height`
+    down -- not the full `(x, y, width, height)` passed in, which is the
+    whole `DockGroup` including its tab strip. Found live: phil noticed
+    the tab strip itself lighting up while hovering zones 2/3 -- because
+    the group's own tab strip sits inside that same rect, at its very
+    top, a left/right line spanning the full height necessarily runs
+    along the tab strip's own left/right edge too, reading as "the tab
+    strip is highlighted" even though it was really one continuous line
+    that happened to pass behind it.
     """
     dpr = ctx.pixel_ratio
     t = LINE_THICKNESS
+    content_y = y + tab_height
+    content_h = height - tab_height
     if zone == "tab":
         lx, ly, lw, lh = x, y + tab_height - t, width, t
     elif zone == "left":
-        lx, ly, lw, lh = x, y, t, height
+        lx, ly, lw, lh = x, content_y, t, content_h
     elif zone == "right":
-        lx, ly, lw, lh = x + width - t, y, t, height
+        lx, ly, lw, lh = x + width - t, content_y, t, content_h
     else:  # "bottom"
         lx, ly, lw, lh = x, y + height - t, width, t
     ctx.display_list.add_box(

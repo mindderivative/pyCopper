@@ -311,6 +311,17 @@ class DockGroupElement(_StyledMixin, LayoutNode):
                     token=ctx.palette.index("primary"),
                     radius=self.INDICATOR_H,
                 )
+
+    def paint_foreground(self, ctx: PaintContext, absolute: Any) -> None:
+        # Found live: painting the drop-zone highlight from `paint_self`
+        # (as the rest of this class's own chrome does) put it BEHIND the
+        # active `DockPanel` child's own content, which paints after and
+        # covers the group's full content area -- phil saw the left/right
+        # lines as "cutoff a little by the edges" when really only the
+        # thin seam right at the tab strip, painted before the panel's
+        # content began, was ever surviving underneath it. `paint_foreground`
+        # runs after every child, the same hook `ScrollView`'s thumb already
+        # uses to stay visible over scrolled-under content.
         zone = self.state.data.get("drag_highlight")
         if zone is not None:
             dock_drag.paint_drop_zone(
@@ -519,6 +530,12 @@ class DockSplitElement(_StyledMixin, LayoutNode):
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
             )
+
+    def paint_foreground(self, ctx: PaintContext, absolute: Any) -> None:
+        # Same reasoning as `DockGroupElement.paint_foreground`: this
+        # split's own two children fill its full rect (bar the divider),
+        # so painting the highlight from `paint_self` put it underneath
+        # whichever child paints there.
         zone = self.state.data.get("drag_highlight")
         if zone is not None:
             dock_drag.paint_drop_zone(

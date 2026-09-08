@@ -206,6 +206,56 @@ def test_the_selected_tabs_indicator_is_inset_and_rounded() -> None:
     assert float(bar["rect"][2]) == pytest.approx(tab_w - 2.0 * group.PRIMARY_INSET)
 
 
+def test_the_drop_zone_highlight_paints_over_the_active_panels_content() -> None:
+    """Found live: painted from `paint_self` (the rest of this class's own
+    chrome), the highlight sat BEHIND the active `DockPanel`'s own content --
+    a child always paints after its parent's `paint_self`, so an ordinary
+    opaque, full-rect panel background (`width: expand, height: expand`)
+    covered it almost entirely. phil saw this as the left/right/bottom lines
+    being "cutoff a little by the edges" -- only the thin seam right at the
+    tab strip, painted before the panel's own content began, ever showed.
+    Moved to `paint_foreground`, the same hook `ScrollView`'s own thumb uses
+    to stay visible over scrolled content -- this asserts draw order (index
+    order IS draw order, `paint/display_list.py`), not just that the
+    highlight was emitted at all."""
+    view = {
+        "name": "root",
+        "widget": "DockGroup",
+        "children": [
+            {
+                "name": "a",
+                "widget": "DockPanel",
+                "text": "A",
+                "children": [
+                    {
+                        "widget": "Container",
+                        "style": {
+                            "width": "expand",
+                            "height": "expand",
+                            "background": "surface_container_low",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+    a = app(view)
+    group = a.root
+    group.state.data["drag_highlight"] = "left"
+    group.mark_needs_paint()
+    data = paint(a).view
+
+    content_idx = next(
+        i for i, s in enumerate(data) if int(s["flags"][2]) == PAL.index("surface_container_low")
+    )
+    highlight_idx = next(
+        i
+        for i, s in enumerate(data)
+        if int(s["flags"][2]) == PAL.index("primary") and float(s["rect"][2]) == pytest.approx(4.0)
+    )
+    assert highlight_idx > content_idx, "index order is draw order -- the highlight must paint last"
+
+
 # -------------------------------------------------------------- DockSplit
 
 
