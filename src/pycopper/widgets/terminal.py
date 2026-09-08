@@ -42,6 +42,27 @@ against its own README), unlike `pyte.HistoryScreen`. Mouse-wheel scrollback
 is dropped for now; re-implementing it against `bittty` is tracked as a
 separate follow-up, not part of this fix.
 
+**A second, real corruption bug -- pyCopper's own, found live right after
+the `bittty` swap.** Switching VT libraries did not fix a garbled, doubled
+prompt with a spurious "%" line at startup, because that was never a VT
+parsing defect: this widget always spawned the shell at `DEFAULT_COLS`/
+`DEFAULT_ROWS` (80x24) from `set_ticker()`, then corrected it to the real
+size once `perform_layout` ran. By the time that correction landed, the
+shell had typically already drawn a full prompt at the wrong (80-column)
+width -- and many shells, zsh-syntax-highlighting among them, redraw badly
+when resized *after* they have already drawn a prompt, leaving stray
+wrapped remnants of the old-width draw plus zsh's own "incomplete line"
+marker (`%`). Reproduced with pyCopper's own code not even involved (bare
+`pexpect` + `bittty`): spawning directly at any target width from 30 to 80
+columns, with no resize at all, was clean every time; spawning at 80 and
+resizing to the real width milliseconds later -- before the shell could
+draw anything -- was also clean; spawning at 80, letting the shell fully
+draw its prompt, *then* resizing was corrupted every time, identically to
+what the real widget showed live. Fixed by deferring the actual spawn
+(`_ensure_started`) out of `set_ticker()` and into the first real
+`perform_layout` call, once `self._cols`/`self._rows` already hold the
+widget's true target grid -- see `perform_layout`'s own docstring.
+
 **Only POSIX is implemented and verified in this pass.** `pexpect.spawn`
 was exercised directly (spawn a shell, read its output through
 `read_nonblocking`, feed it to `bittty`, read the resulting cell grid back)
@@ -411,14 +432,10 @@ class TerminalElement(_StyledMixin, Padding):
         #: `perform_layout`/`_maybe_apply_pending_grid`.
         self._pending_grid: tuple[int, int] | None = None
         self._pending_grid_since = 0.0
-        #: Whether this element has ever completed one grid sizing. NOT the
-        #: same as "a board exists" -- `set_ticker()` creates the real
-        #: board (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very first
-        #: `perform_layout` call ever runs, so `self._board is not None` is
-        #: already true on that first call for any `App`-managed Terminal.
-        #: Debouncing that first sizing too would leave a freshly mounted
-        #: terminal showing the wrong grid for `GRID_SETTLE_SECONDS`, for no
-        #: benefit -- there is no prior content to protect from thrashing.
+        #: Whether this element has ever completed one grid sizing. Also
+        #: gates the PTY spawn itself -- see `_ensure_started` and the
+        #: module docstring on why the shell must never be spawned at
+        #: `DEFAULT_COLS`/`DEFAULT_ROWS` and corrected afterward.
         self._grid_settled_once = False
 
     # ------------------------------------------------------------- lifecycle
@@ -440,7 +457,21 @@ class TerminalElement(_StyledMixin, Padding):
         return os.environ.get("SHELL") or "/bin/sh"
 
     def _ensure_started(self) -> None:
-        if self._session is not None or not (_BITTTY_AVAILABLE and _PTY_AVAILABLE):
+        """Spawn the shell, but only once BOTH a ticker exists (`App`-managed,
+        not a bare `build_element(...).layout(...)`) AND the first real
+        `perform_layout` has already set `self._cols`/`self._rows` to the
+        widget's actual target grid -- see the module docstring on why
+        spawning at a placeholder size and correcting it after the shell has
+        already drawn a prompt is a real, confirmed corruption bug, not a
+        cosmetic one. Called from both `set_ticker()` and `perform_layout()`,
+        harmlessly, since either one may run first.
+        """
+        if (
+            self._session is not None
+            or self._ticker is None
+            or not self._grid_settled_once
+            or not (_BITTTY_AVAILABLE and _PTY_AVAILABLE)
+        ):
             return
         board = Board(command=self._command(), width=self._cols, height=self._rows)
         self._board = board
@@ -511,14 +542,24 @@ class TerminalElement(_StyledMixin, Padding):
         Debouncing only kicks in once a grid has already been sized once --
         the very first sizing applies immediately, since there is no prior
         content to keep stable against and nothing else would ever advance
-        a deferred target for a window that never resizes again. That is
-        `_grid_settled_once`, not "a board exists": `set_ticker()` creates
-        the real board (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very
-        first `perform_layout` call an `App`-managed Terminal ever gets, so
-        a board is already there on that first call too. See
-        `_maybe_apply_pending_grid` for why the countdown lives there and
-        not here. The returned `size` is never debounced; only the reflow
-        of an already-settled grid is, so surrounding layout stays exact.
+        a deferred target for a window that never resizes again. That first
+        sizing is also the moment the shell actually spawns (`_ensure_started`,
+        called below) -- **not** `set_ticker()`, and deliberately not at
+        `DEFAULT_COLS`/`DEFAULT_ROWS` either. Found live: spawning at that
+        placeholder size and correcting it once the real size is known,
+        which is what this widget used to do, reliably corrupted the
+        prompt -- many shells (zsh-syntax-highlighting among them) redraw
+        badly when resized *after* they have already drawn a full prompt at
+        the old width, leaving stray wrapped remnants and a spurious "%"
+        line. Reproduced with pyCopper's own code not even involved (bare
+        `pexpect`+`bittty`: spawn at 80 columns, wait for the prompt to
+        finish drawing, resize to the real width -- corrupted every time;
+        spawning directly at the real width from the start, or resizing
+        before the shell finishes its first draw, was clean every time).
+        See `_maybe_apply_pending_grid` for why the *later* debounce
+        countdown lives there and not here. The returned `size` is never
+        debounced; only the reflow of an already-settled grid is, so
+        surrounding layout stays exact.
         """
         outer = self.sized(constraints, self.style)
         cell = self._cell_size()
@@ -536,10 +577,13 @@ class TerminalElement(_StyledMixin, Padding):
         cols = max(1, int((size.width - 2 * self.PAD_X) / cell.width))
         rows = max(1, int((size.height - 2 * self.PAD_Y) / cell.height))
         target = (cols, rows)
-        if target == (self._cols, self._rows):
+        if not self._grid_settled_once:
+            self._cols, self._rows = target
+            self._grid_settled_once = True
             self._pending_grid = None
-        elif not self._grid_settled_once:
-            self._apply_grid(target)
+            self._ensure_started()
+        elif target == (self._cols, self._rows):
+            self._pending_grid = None
         elif target != self._pending_grid:
             self._pending_grid = target
             self._pending_grid_since = time.monotonic()

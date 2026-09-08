@@ -114,6 +114,43 @@ def test_never_started_shows_the_unavailable_message_not_a_crash() -> None:
     assert element._board is None
 
 
+def test_set_ticker_alone_does_not_spawn_either() -> None:
+    """Not just a bare `layout()` -- `set_ticker()` alone, before any real
+    `perform_layout` call, must not spawn a process either. Spawning only
+    happens once BOTH a ticker exists AND the real target grid is known --
+    see `perform_layout`'s own docstring on why the shell must never be
+    spawned at a placeholder size."""
+    element = build_element(parse_view({"name": "t", "widget": "Terminal"}).root)
+    element.set_ticker(Ticker())
+    assert element._session is None
+    assert element._board is None
+
+
+@pytest.mark.skipif(not REAL_PTY, reason="bittty/pexpect not available on this platform")
+def test_the_shell_spawns_at_the_real_target_grid_not_the_default() -> None:
+    """Found live: this widget used to spawn the shell at `DEFAULT_COLS`/
+    `DEFAULT_ROWS` (80x24) from `set_ticker()`, then correct the size once
+    `perform_layout` ran -- and by the time that correction landed, the
+    shell had typically already drawn a full prompt at the wrong width.
+    Many shells (zsh-syntax-highlighting among them) redraw badly when
+    resized *after* they have already drawn a prompt, leaving stray
+    wrapped remnants and a spurious "%" line -- reproduced with pyCopper's
+    own code not even involved (see the module docstring). The fix defers
+    the actual spawn to the first `perform_layout` call, once
+    `self._cols`/`self._rows` already hold the real target -- assert the
+    `Board` itself was constructed at that size, not the placeholder
+    default."""
+    element = terminal(width=300.0, height=150.0)  # narrow: real target != default
+    real_target = (element._cols, element._rows)
+    assert real_target != (TerminalElement.DEFAULT_COLS, TerminalElement.DEFAULT_ROWS)
+    element.set_ticker(Ticker())
+    try:
+        assert element._board is not None
+        assert (element._board.width, element._board.height) == real_target
+    finally:
+        element.dispose()
+
+
 # ------------------------------------------------------------------ layout
 
 
