@@ -1,4 +1,5 @@
-"""Tabs demo's logic: two independent selections, and the two source panels.
+"""Tabs demo's logic: three independent selections (primary, secondary, and
+icon+label), and the two source panels.
 
 See app.py in this directory for the entry point.
 """
@@ -17,6 +18,7 @@ class TabsDemo(ViewModel):
     def __init__(self) -> None:
         self.tab = Signal("t0", name="tab")
         self.tab2 = Signal("s0", name="tab2")
+        self.tab3 = Signal("i0", name="tab3")
 
         self.view_source = (Path(__file__).parent / "Tabs_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
@@ -26,3 +28,6 @@ class TabsDemo(ViewModel):
 
     def select_tab2(self, event: Any) -> None:
         self.tab2.set(event.target.name)
+
+    def select_tab3(self, event: Any) -> None:
+        self.tab3.set(event.target.name)

@@ -25,8 +25,10 @@ children:
       - name: explanation
         widget: Text
         text: |
-          48dp tall. Primary tabs anchor the indicator to the bottom edge with
-          rounded top corners; secondary tabs use a flat, full-width stroke.
+          48dp tall, or 64dp when any tab carries an `icon:` -- every tab in
+          one bar shares the taller height, even an icon-less sibling.
+          Primary tabs anchor the indicator to the bottom edge with rounded
+          top corners; secondary tabs use a flat, full-width stroke.
           `value:` on the container names the selected tab by id -- the same
           "one shared value, one click handler that writes the clicked
           child's name back into it" convention every selection container in
@@ -34,7 +36,8 @@ children:
 
           Use cases, from the spec: tabs organize groups of related content
           that are at the same level of hierarchy. Tab labels can include
-          icons and text; text labels should be short.
+          icons and text (stacked above the label, per M3's own diagram);
+          text labels should be short.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}
@@ -66,6 +69,15 @@ children:
               - {name: s0, widget: Tab, text: "Overview", handlers: {on_click: select_tab2}}
               - {name: s1, widget: Tab, text: "Specs", handlers: {on_click: select_tab2}}
               - {name: s2, widget: Tab, text: "Reviews", handlers: {on_click: select_tab2}}
+          - {widget: Text, text: "With icons -- grows to 64dp", style: {color: on_surface_variant}}
+          - name: tabs_icon
+            widget: Tabs
+            value: "{{ tab3.get() }}"
+            style: {width: expand}
+            children:
+              - {name: i0, widget: Tab, text: "Video", icon: videocam, handlers: {on_click: select_tab3}}
+              - {name: i1, widget: Tab, text: "Photos", icon: photo_camera, handlers: {on_click: select_tab3}}
+              - {name: i2, widget: Tab, text: "Audio", icon: music_note, handlers: {on_click: select_tab3}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

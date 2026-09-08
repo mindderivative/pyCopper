@@ -23,6 +23,7 @@ from ..layout import (
     INF,
     Axis,
     Constraints,
+    CrossAxisAlignment,
     EdgeInsets,
     Flex,
     LayoutNode,
@@ -605,39 +606,113 @@ class StatusBarElement(_StyledMixin, Flex):
 
 
 class TabElement(_StyledMixin, Padding):
-    """One tab. The active indicator is drawn by the parent Tabs container."""
+    """One tab. The active indicator is drawn by the parent Tabs container.
+
+    `icon:` is an optional leading icon, stacked above the label -- `label`
+    text (below) rather than beside it, per `COMPONENT_TABS.md`'s own
+    Measurements table naming this arrangement "stacked icon" (the "overlap
+    of badge on stacked icon" row) and its own diagram (`m3.material.io`,
+    fetched directly, not recalled): the icon sits centred above the label,
+    the pair vertically centred as one block in a 64dp container -- "Icon
+    and labels are now vertically centered within the container." A table
+    row also lists "padding between INLINE icon and text" (8dp), a second,
+    side-by-side arrangement the diagram gave no example of; not built here.
+
+    `icon:`/`label:` (via `self._icon`) needed no schema change -- both are
+    already generic `TEMPLATED_FIELDS` (`spec/models.py`) from the earlier
+    Icon/IconButton/Fab/NavItem/SearchBar migration. `text:` stays this
+    widget's own label (it never overloaded `text:` to mean an icon glyph
+    the way those five did before that migration), so only `icon:` is new
+    here.
+    """
 
     HEIGHT: Final = 48.0
+    #: `COMPONENT_TABS.md`'s own Measurements table: "Container height (icon
+    #: and label text): 64dp" -- read from the same table's "Container
+    #: height (label text only): 48dp" row above.
+    ICON_HEIGHT: Final = 64.0
     PAD_X: Final = 16.0
+    #: Gap between the icon and the label beneath it. Read directly from the
+    #: Measurements diagram (fetched live from `m3.material.io`, the scraped
+    #: text alone gives no number for this) -- a best-effort reading of the
+    #: diagram's own tick marks, not a scraped text figure quoted verbatim
+    #: the way the two heights above are.
+    ICON_GAP: Final = 6.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
 
+    @property
+    def _has_icon(self) -> bool:
+        return bool(self._icon.strip())
+
     def perform_layout(self, constraints: Constraints) -> Size:
-        label = measure_text(self._text, TAB_LABEL_ROLE, engine=self.text_engine)
+        label_text = self._text.strip()
+        label = measure_text(label_text, TAB_LABEL_ROLE, engine=self.text_engine)
+        has_icon = self._has_icon
+        content_width = max(label.width, ICON) if has_icon else label.width
+        height = self.ICON_HEIGHT if has_icon else self.HEIGHT
         return self.sized(constraints, self.style).constrain(
-            Size(label.width + self.PAD_X * 2, self.HEIGHT)
+            Size(content_width + self.PAD_X * 2, height)
         )
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
         token = content_token(ctx, self.style, "primary" if self.selected else "on_surface_variant")
         _emit_state_layer(ctx, self, absolute, token, (0.0,) * 4)
-        if not self._text.strip():
+        label_text = self._text.strip()
+        has_icon = self._has_icon
+        if not has_icon and not label_text:
             return
-        label = measure_text(self._text, TAB_LABEL_ROLE, engine=self.text_engine)
-        paint_text(
-            ctx,
-            absolute.x + (self.size.width - label.width) / 2,
-            absolute.y + (self.size.height - label.height) / 2,
-            self._text,
-            TAB_LABEL_ROLE,
-            token,
+        label = None
+        if label_text:
+            label = measure_text(label_text, TAB_LABEL_ROLE, engine=self.text_engine)
+        if not has_icon:
+            assert label is not None  # not has_icon and not label_text already returned above
+            paint_text(
+                ctx,
+                absolute.x + (self.size.width - label.width) / 2,
+                absolute.y + (self.size.height - label.height) / 2,
+                label_text,
+                TAB_LABEL_ROLE,
+                token,
+            )
+            return
+        # Stacked: icon above label, the pair vertically centred as one
+        # block ("vertically centered within the container" -- not two
+        # independently-centred halves, which is why this measures the
+        # whole block's height once rather than centring the icon and the
+        # label against the container separately).
+        block_height = ICON + (self.ICON_GAP + label.height if label is not None else 0.0)
+        top = absolute.y + (self.size.height - block_height) / 2
+        ctx.text.emit_icon(
+            ctx.display_list,
+            self._icon.strip(),
+            x=absolute.x + (self.size.width - ICON) / 2,
+            y=top,
+            size=ICON,
+            pixel_ratio=ctx.pixel_ratio,
+            token=token,
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
         )
+        if label is not None:
+            paint_text(
+                ctx,
+                absolute.x + (self.size.width - label.width) / 2,
+                top + ICON + self.ICON_GAP,
+                label_text,
+                TAB_LABEL_ROLE,
+                token,
+            )
 
 
 class TabsElement(_SelectionContainer):
-    """M3 Tabs: 48dp high.
+    """M3 Tabs: 48dp high, or 64dp if any tab carries an `icon:`.
+
+    "The container should always... be divided into equal sections" --
+    every tab in one bar shares the same height, so one iconed tab lifts
+    the whole strip to 64dp rather than sizing itself independently.
 
     Primary tabs anchor a 3dp, fully-rounded active indicator to the bottom
     edge, inset 2dp on each side so it does not touch the tab's own edges;
@@ -655,8 +730,31 @@ class TabsElement(_SelectionContainer):
     PRIMARY_INSET: Final = 2.0
     axis = Axis.HORIZONTAL
 
+    def __init__(self, spec: WidgetSpec) -> None:
+        # `_SelectionContainer.__init__` doesn't stretch its children --
+        # fine for Segment/NavItem, which are always uniform, but a mixed
+        # bar (one iconed 64dp tab next to a text-only 48dp one) needs
+        # every tab to fill the bar's own height, found live via
+        # `test_a_tab_with_an_icon_grows_the_whole_bar_to_sixty_four`: the
+        # bar itself grew to 64dp (forced via `perform_layout`'s own
+        # constraints below), but an icon-less sibling stayed at its own
+        # natural 48dp -- `Flex`'s `CrossAxisAlignment.STRETCH` is the
+        # existing primitive for exactly this, not a new one.
+        Flex.__init__(
+            self,
+            axis=self.axis,
+            spacing=spec.style.spacing,
+            cross_alignment=CrossAxisAlignment.STRETCH,
+        )
+        self.init_element(spec)
+
+    def _bar_height(self) -> float:
+        has_icon = any(isinstance(c, TabElement) and c._has_icon for c in self.children)
+        return TabElement.ICON_HEIGHT if has_icon else self.HEIGHT
+
     def perform_layout(self, constraints: Constraints) -> Size:
-        inner = constraints.copy_with(min_height=self.HEIGHT, max_height=self.HEIGHT)
+        height = self._bar_height()
+        inner = constraints.copy_with(min_height=height, max_height=height)
         return super().perform_layout(inner)
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:

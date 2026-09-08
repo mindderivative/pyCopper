@@ -10,6 +10,7 @@ from pycopper.paint import NO_TOKEN, DisplayList, Kind
 from pycopper.spec import WidgetKind, parse_view
 from pycopper.theme import Palette
 from pycopper.widgets import build_element
+from pycopper.widgets.navigation import TabElement
 
 PAL = Palette(Theme(dark=True))
 
@@ -125,6 +126,44 @@ def test_tabs_are_forty_eight_high() -> None:
     """M3 4.7."""
     e = laid_out({"name": "w", "widget": "Tabs", "children": TABS})
     assert e.size.height == 48.0
+
+
+def test_a_tab_with_an_icon_grows_the_whole_bar_to_sixty_four() -> None:
+    """`COMPONENT_TABS.md`'s own Measurements table: "Container height (icon
+    and label text): 64dp" -- and "the container should always... be
+    divided into equal sections", so one iconed tab lifts the WHOLE bar,
+    even an icon-less sibling next to it."""
+    children = [
+        {"name": "t0", "widget": "Tab", "text": "Overview", "icon": "home"},
+        {"name": "t1", "widget": "Tab", "text": "Details"},
+    ]
+    e = laid_out({"name": "w", "widget": "Tabs", "children": children})
+    assert e.size.height == 64.0
+    assert e.find("t1").size.height == 64.0
+
+
+def test_an_icon_only_tab_still_grows_the_bar_and_paints_one_glyph() -> None:
+    app = app_with([{"name": "t0", "widget": "Tab", "icon": "home"}])
+    tab = app.root.find("t0")
+    assert tab.size.height == TabElement.ICON_HEIGHT == 64.0
+    glyphs = [s for s in paint(app).view if s["flags"][0] == Kind.GLYPH]
+    assert len(glyphs) == 1
+
+
+def test_a_tabs_icon_paints_above_its_label() -> None:
+    """The M3 diagram (`m3.material.io`, fetched live) shows the icon
+    stacked above the label, the pair centred as one block -- not side by
+    side. The icon is the sole glyph well above the label's own cluster."""
+    app = app_with([{"name": "t0", "widget": "Tab", "text": "Home", "icon": "home"}], value="t0")
+    glyph_ys = sorted(float(s["rect"][1]) for s in paint(app).view if s["flags"][0] == Kind.GLYPH)
+    assert glyph_ys[0] < glyph_ys[1] - 10.0
+
+
+def test_a_text_only_tab_is_unaffected_by_the_icon_anatomy() -> None:
+    """No `icon:` at all -- the overwhelming majority of existing tabs --
+    must see zero change from this feature."""
+    e = laid_out({"name": "w", "widget": "Tab", "text": "Overview"})
+    assert e.size.height == TabElement.HEIGHT == 48.0
 
 
 def test_segmented_button_is_forty_high() -> None:
