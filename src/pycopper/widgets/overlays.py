@@ -696,7 +696,14 @@ class SnackbarElement(_StyledMixin, Padding):
     sourced.
 
     `supporting_text:` is the optional action label, drawn `inverse_primary` at
-    the trailing edge.
+    the trailing edge. It is a real control -- `handlers: {on_action: ...}`
+    fires when it is clicked, found and fixed during the widget-by-widget
+    review: `paint_self` drew it but nothing ever hit-tested it, so a view
+    reaching for the natural-looking `children: [{widget: Button, ...}]`
+    shape instead (every OTHER overlay's action area works that way) got a
+    child this class never lays out or paints at all -- an orphaned element
+    floating at whatever stale offset it last had. `supporting_text:` +
+    `on_action:` is the only shape this widget actually supports.
     """
 
     RADIUS: Final = 4.0
@@ -721,6 +728,25 @@ class SnackbarElement(_StyledMixin, Padding):
         if not action:
             return 0.0
         return measure_text(action, self.LABEL, engine=self.text_engine).width + self.PAD_X
+
+    def _on_action(self, x: float) -> bool:
+        action_w = self._action_width()
+        if action_w <= 0.0:
+            return False
+        local = x - self.absolute_rect().x
+        return bool(local >= self.size.width - action_w)
+
+    def cursor_at(self, x: float, y: float) -> str | None:
+        if self._on_action(x):
+            return "pointer"
+        return super().cursor_at(x, y)
+
+    def on_click(self, event: Any) -> None:
+        if self.effective_disabled or not self._on_action(event.x):
+            return
+        handler = self.handlers.get("on_action")
+        if handler is not None:
+            handler(event)
 
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)

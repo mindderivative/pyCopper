@@ -135,7 +135,7 @@ overlays:
     open: "{{ snackbar_open.get() }}"
     text: "Item archived"
     supporting_text: "Undo"
-    handlers: {on_dismiss: close_snackbar}
+    handlers: {on_dismiss: close_snackbar, on_action: close_snackbar}
 
   - name: bottom_sheet_demo
     widget: BottomSheet

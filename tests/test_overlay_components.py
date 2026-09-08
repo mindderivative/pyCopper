@@ -7,11 +7,14 @@ the spec has an obvious place to land.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from pycopper import App, Settings, Theme
 from pycopper.layout import INF, Constraints, Size
 from pycopper.paint import NO_TOKEN, DisplayList
+from pycopper.runtime.events import EventType, PointerEvent
 from pycopper.spec import WidgetKind, parse_view
 from pycopper.theme import Palette
 from pycopper.widgets import build_element
@@ -327,6 +330,57 @@ def test_snackbar_reserves_room_for_its_action() -> None:
     # Same container width, but less room for the message, so it wraps sooner.
     assert plain.size.width == with_action.size.width
     assert with_action.size.height >= plain.size.height
+
+
+def test_the_action_label_is_a_real_clickable_control() -> None:
+    """Found during the widget-by-widget review: `paint_self` drew the
+    action label but nothing ever hit-tested it, so `on_action:` never
+    fired -- a view reaching for `children: [Button]` instead (the shape
+    every other overlay's action area uses) got a child this class never
+    lays out or paints at all."""
+    calls: list[Any] = []
+    view = {
+        "root": {"name": "root", "widget": "Vertical", "style": {"background": "surface"}},
+        "overlays": [
+            {
+                "name": "bar",
+                "widget": "Snackbar",
+                "open": "true",
+                "text": "Email archived",
+                "supporting_text": "Undo",
+                "handlers": {"on_action": "undo"},
+            }
+        ],
+    }
+    a = App(view, theme=Theme(dark=True), settings=Settings(width=400, height=400))
+    a._handlers["undo"] = lambda e: calls.append(e)
+    a.mount()
+    a.update()
+    bar = a.root.find("bar") or next(
+        e.element for e in a.overlays.entries if e.element.name == "bar"
+    )
+    rect = bar.absolute_rect()
+    action_x = rect.x + rect.width - 5.0
+    y = rect.y + rect.height / 2
+
+    # Clicking the message half does nothing.
+    a.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=rect.x + 5.0, y=y))
+    a.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=rect.x + 5.0, y=y))
+    a.dispatcher.drain()
+    assert calls == []
+
+    # Clicking the action does.
+    a.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=action_x, y=y))
+    a.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=action_x, y=y))
+    a.dispatcher.drain()
+    assert len(calls) == 1
+
+
+def test_the_action_label_gives_a_pointer_cursor() -> None:
+    bar = laid_out({"widget": "Snackbar", "text": "Archived", "supporting_text": "Undo"})
+    action_x = bar.size.width - 5.0
+    assert bar.cursor_at(action_x, bar.size.height / 2) == "pointer"
+    assert bar.cursor_at(5.0, bar.size.height / 2) != "pointer"
 
 
 # ------------------------------------------------------------------ sheets
