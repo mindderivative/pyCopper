@@ -408,8 +408,10 @@ def _wire_new_subtree(reference: Any, subtree: Any) -> None:
 #: zone it was over -- phil: "Instead of full fill highlight, I want a
 #: thick clear line... The colors of the line should all be the same as
 #: the accent color." One line, one token (`primary`, this codebase's own
-#: accent role), at every zone -- never a per-zone color.
-LINE_THICKNESS: Final = 4.0
+#: accent role), at every zone -- never a per-zone color. Started at 4px;
+#: phil asked for 2px once the paint-order/tab-strip-bleed bugs were fixed
+#: and the line was actually visible in full.
+LINE_THICKNESS: Final = 2.0
 
 
 def paint_drop_zone(

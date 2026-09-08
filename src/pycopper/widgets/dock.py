@@ -36,6 +36,7 @@ from ..tree.element import PaintContext
 from . import dock_drag
 from .base import _StyledMixin, content_token, measure_text, paint_text
 from .material import HOVER, STATE_LAYER_CURVE, STATE_LAYER_MOTION, _box, _state_alpha
+from .navigation import INDICATOR_CURVE, INDICATOR_MOTION
 
 __all__ = ["DockGroupElement", "DockPanelElement", "DockSplitElement"]
 
@@ -271,6 +272,7 @@ class DockGroupElement(_StyledMixin, LayoutNode):
         )
         active = self._active_name()
         by_name = {c.name: c for c in self.children if c.name}
+        active_rect: tuple[float, float] | None = None
         for name, x, width in self._tab_rects():
             alpha = self._tab_alpha(name)
             if alpha > 0.001:
@@ -298,19 +300,43 @@ class DockGroupElement(_StyledMixin, LayoutNode):
                 token,
             )
             if selected:
-                # Primary Tabs anatomy, inset 2dp a side with a fully rounded
-                # corner radius -- COMPONENT_TABS.md's own measurements, the
-                # same fix `TabsElement`'s own indicator needed (it was found
-                # missing both here too: full tab width, square corners).
-                _box(
-                    ctx,
-                    absolute.x + x + self.PRIMARY_INSET,
-                    absolute.y + self.TAB_HEIGHT - self.INDICATOR_H,
-                    width - 2.0 * self.PRIMARY_INSET,
-                    self.INDICATOR_H,
-                    token=ctx.palette.index("primary"),
-                    radius=self.INDICATOR_H,
-                )
+                active_rect = (x, width)
+        if active_rect is not None:
+            # The indicator belongs to the group, not to any one tab, which
+            # is what lets it travel between them -- the same pattern (and
+            # the same reasoning) `TabsElement.paint_self` already
+            # establishes: both edges animate, so it stretches and settles
+            # rather than jumping. Found live: this used to be drawn
+            # per-tab, instantly, inside the loop above -- a real gap, not a
+            # regression (`dock.py` never had this animation; only its
+            # static anatomy -- inset, rounding -- was ever "reused" from
+            # `Tabs`), but phil expected the same travelling-indicator feel
+            # `Tabs` has, since this widget's own docstring already claims
+            # to reuse its anatomy.
+            tab_x, tab_w = active_rect
+            # Primary Tabs anatomy, inset 2dp a side with a fully rounded
+            # corner radius -- COMPONENT_TABS.md's own measurements.
+            ix = self.animated(
+                "indicator_x",
+                tab_x + self.PRIMARY_INSET,
+                duration=INDICATOR_MOTION,
+                curve=INDICATOR_CURVE,
+            )
+            iw = self.animated(
+                "indicator_w",
+                tab_w - 2.0 * self.PRIMARY_INSET,
+                duration=INDICATOR_MOTION,
+                curve=INDICATOR_CURVE,
+            )
+            _box(
+                ctx,
+                absolute.x + ix,
+                absolute.y + self.TAB_HEIGHT - self.INDICATOR_H,
+                iw,
+                self.INDICATOR_H,
+                token=ctx.palette.index("primary"),
+                radius=self.INDICATOR_H,
+            )
 
     def paint_foreground(self, ctx: PaintContext, absolute: Any) -> None:
         # Found live: painting the drop-zone highlight from `paint_self`

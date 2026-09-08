@@ -206,6 +206,55 @@ def test_the_selected_tabs_indicator_is_inset_and_rounded() -> None:
     assert float(bar["rect"][2]) == pytest.approx(tab_w - 2.0 * group.PRIMARY_INSET)
 
 
+def test_the_selected_tabs_indicator_slides_to_the_new_tab_not_jumps() -> None:
+    """phil: "the tab strips animation on selection change no longer
+    animates the bar under the tab title." It never had -- the indicator
+    used to be drawn instantly, per-tab, inside the tab-paint loop, with no
+    `animated()` call anywhere in this class's history (only per-tab hover
+    alpha was ever animated). Rebuilt on `TabsElement.paint_self`'s own
+    established pattern instead: one shared "indicator_x"/"indicator_w"
+    animated() pair, computed once for whichever tab is active, so it
+    travels between tabs -- tested with the same two-step `app.motion.tick`
+    drive every other animated() binding in this codebase is tested with
+    (e.g. `test_navigation.py::test_expand_state_is_bindable`)."""
+    view = {
+        "name": "root",
+        "widget": "Vertical",
+        "children": [_group(value="{{ tab.get() }}")],
+    }
+    tab = Signal("a")
+    a = app(view, tab=tab)
+    group = a.root.find("g")
+
+    def bar_x() -> float:
+        bar = next(
+            s
+            for s in paint(a).view
+            if abs(float(s["rect"][3]) - group.INDICATOR_H) < 0.01
+            and int(s["flags"][2]) == PAL.index("primary")
+        )
+        return float(bar["rect"][0])
+
+    x_on_a = bar_x()
+    tab.set("b")
+    a.update()
+    # Retargets but does not jump on the very next frame -- no motion time
+    # has elapsed yet for it to have travelled anywhere.
+    assert bar_x() == pytest.approx(x_on_a)
+
+    # A single huge tick is clamped to MAX_FRAME_DELTA by design
+    # (`motion/animation.py`) -- several small ticks, the same pattern
+    # `test_motion.py` uses, actually exhaust the transition.
+    for _ in range(20):
+        a.motion.tick(0.1)
+    a.update()
+    group2 = a.root.find("g")
+    _name, tab_b_x, _tab_b_w = next(r for r in group2._tab_rects() if r[0] == "b")
+    expected = group2.absolute_rect().x + tab_b_x + group2.PRIMARY_INSET
+    assert bar_x() == pytest.approx(expected)
+    assert bar_x() != pytest.approx(x_on_a)
+
+
 def test_the_drop_zone_highlight_paints_over_the_active_panels_content() -> None:
     """Found live: painted from `paint_self` (the rest of this class's own
     chrome), the highlight sat BEHIND the active `DockPanel`'s own content --
@@ -239,6 +288,8 @@ def test_the_drop_zone_highlight_paints_over_the_active_panels_content() -> None
             }
         ],
     }
+    from pycopper.widgets.dock_drag import LINE_THICKNESS
+
     a = app(view)
     group = a.root
     group.state.data["drag_highlight"] = "left"
@@ -251,7 +302,8 @@ def test_the_drop_zone_highlight_paints_over_the_active_panels_content() -> None
     highlight_idx = next(
         i
         for i, s in enumerate(data)
-        if int(s["flags"][2]) == PAL.index("primary") and float(s["rect"][2]) == pytest.approx(4.0)
+        if int(s["flags"][2]) == PAL.index("primary")
+        and float(s["rect"][2]) == pytest.approx(LINE_THICKNESS)
     )
     assert highlight_idx > content_idx, "index order is draw order -- the highlight must paint last"
 
