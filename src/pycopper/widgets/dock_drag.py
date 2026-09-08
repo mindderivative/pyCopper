@@ -210,9 +210,29 @@ def update_drag(source: DockGroupElement, x: float, y: float) -> None:
 
 
 def _pointer_offset(x: float, y: float) -> Any:
+    """Where the ghost sits relative to the cursor.
+
+    `OverlayHost._place`'s own `"pointer"` placement adds this to a base
+    position from `pointer_anchor` -- which is only ever updated on a
+    right-click/context-menu request (`events.py`, the `POINTER_DOWN` +
+    secondary-button branch), never on an ordinary drag's moves. It stays
+    `OFFSET_ZERO` throughout a whole drag, so this offset alone carries the
+    real cursor position (`_at_pointer`'s own contribution clamps to a
+    small, near-zero margin from that stale zero).
+
+    Found live: offsetting down-right of the cursor (this used to be
+    `Offset(x + 12, y + 12)`) put the ghost directly on top of the
+    `"bottom"` zone's own indicator line whenever the cursor was actually
+    in the bottom zone -- reaching that zone means the cursor is already
+    near the target's bottom edge, so pushing the ghost further down
+    pushed it onto the very line meant to be visible there. Above the
+    cursor, centered, stays clear of all four zone indicators in the
+    ordinary case instead.
+    """
     from ..layout import Offset
 
-    return Offset(x + 12.0, y + 12.0)
+    width, height = _GHOST_SIZE
+    return Offset(x - width / 2.0, y - height - 16.0)
 
 
 def end_drag(source: DockGroupElement) -> None:
