@@ -189,6 +189,51 @@ def test_a_horizontal_view_asks_for_the_other_axis() -> None:
     assert cursor_at(app, x + w / 2, y + 1) == "ew-resize"
 
 
+def dock_split_app(*, axis: str | None = None):
+    style = {"width": 300, "height": 200}
+    if axis is not None:
+        style["axis"] = axis
+    app = hosted(
+        [
+            {
+                "name": "ds",
+                "widget": "DockSplit",
+                "style": style,
+                "children": [
+                    {"name": "a", "widget": "Container", "style": {"background": "surface"}},
+                    {"name": "b", "widget": "Container", "style": {"background": "surface"}},
+                ],
+            }
+        ]
+    )
+    view = app.root.find("ds")
+    rect = view.absolute_rect()
+    return app, view, rect
+
+
+def test_a_dock_split_divider_asks_for_a_resize_cursor() -> None:
+    """Not "col-resize"/"row-resize" -- those are CSS names this backend's
+    own `CursorShape` does not recognise, which used to raise `ValueError`
+    from inside `App._sync_cursor()` and silently break cursor updates
+    entirely rather than just showing the wrong shape."""
+    app, view, rect = dock_split_app()
+    x = rect.x + view._divider_main + view.DIVIDER / 2
+    y = rect.y + rect.height / 2
+    assert cursor_at(app, x, y) == "ew-resize"
+
+
+def test_a_vertical_dock_split_asks_for_the_other_axis() -> None:
+    app, view, rect = dock_split_app(axis="vertical")
+    x = rect.x + rect.width / 2
+    y = rect.y + view._divider_main + view.DIVIDER / 2
+    assert cursor_at(app, x, y) == "ns-resize"
+
+
+def test_the_panes_beside_a_dock_split_divider_do_not_claim_the_cursor() -> None:
+    app, _view, rect = dock_split_app()
+    assert cursor_at(app, rect.x + 10, rect.y + rect.height / 2) == "default"
+
+
 def test_a_sheet_handle_asks_for_a_resize_cursor() -> None:
     app = App(
         {
@@ -250,3 +295,33 @@ def test_the_shape_is_pushed_only_when_it_changes() -> None:
     cursor_at(app, 280, 330)  # off it again
     app.update()
     assert pushed == ["pointer", "default"]
+
+
+def test_a_rejected_shape_is_retried_next_frame_rather_than_stuck() -> None:
+    """`self._cursor` must record success, not intent: DockSplit once
+    returned a name the backend rejected, and because the tracker was
+    updated before the (failing) call, the next frame's "unchanged, skip
+    it" guard saw no change and never tried again -- a single failure that
+    silently broke cursor updates forever, not per-frame."""
+    app = hosted([BUTTON])
+
+    class RejectingCanvas:
+        def set_cursor(self, shape: str) -> None:
+            raise ValueError(f"backend does not know {shape!r}")
+
+        def get_logical_size(self) -> tuple[int, int]:
+            return (300, 340)
+
+    class FakeEngine:
+        canvas = RejectingCanvas()
+        pixel_ratio = 1.0
+
+    app.engine = FakeEngine()
+    cursor_at(app, 50, 20)  # onto the button, cursor should become "pointer"
+
+    with pytest.raises(ValueError):
+        app.update()
+    assert app._cursor != "pointer", "recorded as applied despite the backend rejecting it"
+
+    with pytest.raises(ValueError):
+        app.update()  # still retried, not silently skipped as "unchanged"

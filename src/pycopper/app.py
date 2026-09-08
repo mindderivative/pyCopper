@@ -299,8 +299,15 @@ class App:
         shape = self.dispatcher.cursor
         if shape == self._cursor or self.engine is None:
             return
-        self._cursor = shape
+        # Recorded only after the backend actually accepts it -- a widget
+        # returning a name `rendercanvas.CursorShape` does not recognise
+        # would otherwise still update `self._cursor`, so the next frame's
+        # guard above sees no change and never retries. That is exactly how
+        # DockSplit's "col-resize"/"row-resize" (CSS names; the backend's
+        # own vocabulary is "ew-resize"/"ns-resize") went unnoticed: one
+        # failed call, then permanent, silent no-ops.
         self.engine.canvas.set_cursor(shape)
+        self._cursor = shape
 
     def paint(self, display_list: DisplayList) -> None:
         """Frame step 6: walk the element tree into the display list."""

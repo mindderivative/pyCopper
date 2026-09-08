@@ -366,7 +366,14 @@ class DockSplitElement(_StyledMixin, LayoutNode):
 
     def cursor_at(self, x: float, y: float) -> str | None:
         if self._on_divider(x, y):
-            return "col-resize" if self.horizontal else "row-resize"
+            # `rendercanvas.CursorShape` has no "col-resize"/"row-resize" --
+            # those are CSS names, not this backend's. `ew-resize`/`ns-resize`
+            # is the same vocabulary `ScrollView`'s own thumb cursor already
+            # uses. The wrong name did not just paint a bad cursor: it raised
+            # `ValueError` inside `App._sync_cursor()`, called every frame
+            # from `update()`, so hovering the divider silently broke the
+            # OS cursor updating at all rather than showing the wrong shape.
+            return "ew-resize" if self.horizontal else "ns-resize"
         return super().cursor_at(x, y)
 
     def on_pointer_down(self, event: Any) -> None:
