@@ -506,16 +506,28 @@ class App:
             key = str(event.get("key", ""))
             modifiers = frozenset(event.get("modifiers", ()))
             self.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key=key, modifiers=modifiers))
-            # A fresh press (this key wasn't already the one repeating)
-            # restarts the delay -- switching keys while one is held should
-            # not inherit however far the previous key's repeat had gotten.
-            self._repeat_key = key
-            self._repeat_modifiers = modifiers
-            self._repeat_elapsed = 0.0
-            self._repeating = False
+            # A single printable character (len(key) == 1) already repeats
+            # correctly on its own via `_on_char` -- GLFW's `_on_key` only
+            # lower-cases it when Shift is *not currently* held, so the same
+            # physical key can report "J" on press and "j" on release if
+            # Shift was let go in between. Tracking those here too, keyed on
+            # an exact string match to clear them, left `_repeat_key` stuck
+            # forever the moment that happened: a single tap of any shifted
+            # letter would repeat indefinitely rather than stop on release.
+            # Named action keys ("Backspace", "ArrowLeft", ...) never take
+            # that lower-casing branch, so they stay exact and safe to track.
+            if len(key) != 1:
+                self._repeat_key = key
+                self._repeat_modifiers = modifiers
+                self._repeat_elapsed = 0.0
+                self._repeating = False
         elif kind == "key_up":
-            if str(event.get("key", "")) == self._repeat_key:
-                self._repeat_key = None
+            # Cleared unconditionally, not only on a string match against
+            # `self._repeat_key` -- the same modifier-dependent renaming
+            # above means a match can never be guaranteed, and the failure
+            # mode of clearing a key's repeat state a moment early is far
+            # safer than the one this replaces (clearing it never, at all).
+            self._repeat_key = None
         elif kind == "char":
             self.dispatcher.post(KeyEvent(EventType.TEXT, text=str(event.get("data", ""))))
         else:

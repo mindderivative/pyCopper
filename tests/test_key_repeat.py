@@ -136,3 +136,35 @@ def test_a_quick_tap_never_repeats() -> None:
     release(app)
     advance(app, KEY_REPEAT_DELAY * 2)
     assert seen == ["backspace"]
+
+
+def test_a_single_printable_character_never_repeats() -> None:
+    """Found live: a single tap of a letter key was repeating forever.
+    GLFW's `_on_key` lower-cases a printable key's name only when Shift is
+    not *currently* held, so the same physical key can report "J" on
+    press and "j" on release if Shift was let go in between -- an exact
+    string match between the two can never be guaranteed. Printable
+    characters already repeat correctly on their own via `_on_char`
+    (untouched by this mechanism), so they are never tracked here at all,
+    which sidesteps the mismatch entirely rather than working around it."""
+    app = app_with_frozen_clock()
+    seen = spy_on_key_downs(app)
+    press(app, "j")
+    advance(app, KEY_REPEAT_DELAY * 3)
+    assert seen == ["j"], "a single printable key is never tracked for repeat"
+
+
+def test_a_mismatched_release_still_cannot_get_stuck() -> None:
+    """The exact failure mode this replaces: press reports "J" (Shift
+    held), release reports "j" (Shift already let go) -- a case mismatch
+    that used to leave `_repeat_key` stuck on "J" forever, since nothing
+    ever matched it to clear it. `key_up` now clears unconditionally, so
+    even if some other backend produced a real mismatch on a key that
+    *is* tracked, it could not repeat indefinitely."""
+    app = app_with_frozen_clock()
+    seen = spy_on_key_downs(app)
+    app._on_canvas_event({"event_type": "key_down", "key": "J", "modifiers": ("Shift",)})
+    app._on_canvas_event({"event_type": "key_up", "key": "j", "modifiers": ()})
+    assert app._repeat_key is None, "key_up clears the tracked key regardless of the string"
+    advance(app, KEY_REPEAT_DELAY * 3)
+    assert seen == ["J"]
