@@ -3558,17 +3558,34 @@ round, every corner where two buttons meet squares to the M-size figure
 (8dp). The source describes this in prose with no anatomy diagram for the
 shape itself, so the exact reading is pyCopper's own, not a quoted layout.
 
-**Deliberately not built**: the width/shape *morph* animation M3's own
-demo videos show on press and selection (a standard group additionally
-resizes the buttons *adjacent* to the one pressed) -- real, motion-driven
-behaviour with no analogue anywhere else in the framework yet, and the
-XS/S/M/L/XL size ladder button groups are meant to span, which has nowhere
-to attach until `Button` itself grows a size axis the way `Fab` already
-has. Both are flagged rather than silently approximated.
+**Shape morph and selection, built.** The round<->square morph itself
+lives entirely on `ButtonElement`, not here -- `COMPONENT_BUTTONS.md`'s own
+"Corner sizes" table (M size, `Button`'s only shipped size) gives exact
+figures: pressed always morphs to 12dp ("both round and square buttons
+should have the same pressed shape"), and a toggle button (`checked`, the
+same `value:`-bound convention `Chip`'s filter variant and `Accordion`
+already use) rests at 16dp when selected instead of full round. This
+applies to *every* `Button`, grouped or not -- the source page describes it
+as ordinary Button behaviour. `ButtonGroup`'s own, narrower contribution is
+what `COMPONENT_BUTTON_GROUPS.md`'s "Selection & activation" section
+actually adds: a **standard** group's selected/pressed button also grows
+WIDTH (`ButtonElement.GROUP_SELECT_PAD_EXTRA`, not sourced -- the spec
+gives no number, only that it happens), which visibly shifts every later
+sibling along the row as an ordinary consequence of `ButtonGroup` already
+being a plain `Flex` row -- no new cross-element layout coupling was built
+or needed for that. A **connected** group's own selection changes shape
+only, per the spec's own "don't add any interaction between buttons...
+only affect the shape."
 
-`ButtonElement` gained a `_group_radii` instance attribute for this: `None`
-by default, so every button with no `ButtonGroup` parent is unaffected;
-`effective_radii` checks it before falling back to `style.corner_radius`.
+Still not built: the XS/S/M/L/XL size ladder button groups are meant to
+span, which has nowhere to attach until `Button` itself grows a size axis
+the way `Fab`/`Slider` already have.
+
+`ButtonElement` gained `_group_radii` (`None` by default, so every button
+with no `ButtonGroup` parent is unaffected; `effective_radii` checks it
+after pressed/checked, before falling back to `style.corner_radius`) and
+`_group_standard` (set only by a `standard`-variant `ButtonGroup` parent,
+gating the width growth to exactly the groups the spec describes it for).
 `IconButtonElement`'s own `effective_radii` is hardcoded to full-round and
 does not consult an equivalent override, so a connected group's shape
 merging currently applies only to `Button` children, not `IconButton` ones

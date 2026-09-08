@@ -593,6 +593,87 @@ def test_text_button_draws_no_container() -> None:
     assert len(text_btn) < len(filled)
 
 
+# ------------------------------------------------------- button shape morph
+
+
+def test_an_unchecked_unpressed_button_stays_full_round() -> None:
+    """A plain Button (the overwhelming majority -- no `value:` at all)
+    must see zero behaviour change from the shape-morph feature."""
+    from pycopper.widgets.base import ButtonElement
+
+    button = laid_out(widget="Button", text="Go")
+    assert button.effective_radii == (ButtonElement.HEIGHT / 2,) * 4
+
+
+def test_a_checked_button_rests_at_the_sourced_selected_radius() -> None:
+    """`COMPONENT_BUTTONS.md`'s own "Corner sizes" table, M size: 16dp."""
+    from pycopper.widgets.base import ButtonElement
+
+    button = laid_out(widget="Button", text="Go", value="true")
+    assert button.checked is True
+    assert button.effective_radii == (ButtonElement.CHECKED_RADIUS,) * 4 == (16.0,) * 4
+
+
+def test_a_pressed_button_morphs_regardless_of_checked() -> None:
+    """ "Both round and square buttons should have the same pressed shape" --
+    pressed wins over both the round resting shape and the checked one."""
+    from pycopper.widgets.base import ButtonElement
+
+    unchecked = laid_out(widget="Button", text="Go")
+    unchecked.state.pressed = True
+    assert unchecked.effective_radii == (ButtonElement.PRESSED_RADIUS,) * 4 == (12.0,) * 4
+
+    checked = laid_out(widget="Button", text="Go", value="true")
+    checked.state.pressed = True
+    assert checked.effective_radii == (ButtonElement.PRESSED_RADIUS,) * 4
+
+
+def test_a_checked_connected_group_button_overrides_its_own_position_shape() -> None:
+    """A connected group's own selected button still morphs -- the shape
+    change is real Button behaviour, independent of `_group_radii`'s
+    position-based override (`COMPONENT_BUTTON_GROUPS.md`: a connected
+    group's selection "only affect[s] the shape of the button being
+    selected")."""
+    from pycopper.widgets.base import ButtonElement
+
+    view = {
+        "name": "root",
+        "widget": "ButtonGroup",
+        "style": {"variant": "connected"},
+        "children": [
+            {"name": "a", "widget": "Button", "text": "A", "value": "true"},
+            {"name": "b", "widget": "Button", "text": "B"},
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    app.mount()
+    app.update()
+    a = app.root.find("a")
+    assert a._group_radii is not None, "the connected override was set"
+    assert a.effective_radii == (ButtonElement.CHECKED_RADIUS,) * 4, (
+        "checked still wins over the connected group's own position-based shape"
+    )
+
+
+def test_group_select_pad_extra_does_not_apply_outside_a_standard_group() -> None:
+    """A checked, standalone Button (no `ButtonGroup` parent at all) must
+    not grow -- the width change is `ButtonGroup`-specific, not general
+    toggle-button behaviour (`COMPONENT_BUTTON_GROUPS.md`'s own "Selection
+    & activation" section is scoped to groups)."""
+    from pycopper.widgets.base import ButtonElement
+
+    unchecked = laid_out(widget="Button", text="Go")
+    checked = laid_out(widget="Button", text="Go", value="true")
+    assert (
+        checked.size.width
+        == unchecked.size.width
+        == pytest.approx(
+            measure_text("Go", ButtonElement.LABEL_ROLE, engine=unchecked.text_engine).width
+            + 2 * ButtonElement.PAD_X
+        )
+    )
+
+
 # ------------------------------------------------------------------- link
 
 

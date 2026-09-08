@@ -1139,8 +1139,8 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 
 | Widget | M3 spec |
 |---|---|
-| `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. |
-| `ButtonGroup` | An invisible container spacing `Button` children: `standard` (default, 8dp gaps, each button stays fully rounded) or `connected` (2dp gaps, only the group's two outer ends stay fully rounded, every touching corner squares to 8dp). M size only; the press/selection shape-morph animation and the XS/S/L/XL size ladder are real M3 behaviour not built here. |
+| `Button` | 40dp high, full radius, sized to its label with a 64dp floor. `filled`, `filled_tonal`, `outlined`, `elevated`, `text`. Shape-morphs on press (12dp corner, every button) and when toggled `checked` via a `value:` binding (16dp corner, resting) — the same `value:`/`on_click:` convention `Chip`'s filter variant and `Accordion` use; an un-`checked`, unpressed button is unaffected. |
+| `ButtonGroup` | An invisible container spacing `Button` children: `standard` (default, 8dp gaps, each button stays fully rounded unless selected/pressed) or `connected` (2dp gaps, only the group's two outer ends stay fully rounded, every touching corner squares to 8dp — a connected button still morphs its own shape when selected, independent of its neighbours). A `standard` group's selected/pressed button also grows width, shifting later siblings along the row. M size only; the XS/S/L/XL size ladder is real M3 behaviour not built here. |
 | `IconButton` | 40dp container, 24dp icon. `standard`, `filled`, `filled_tonal`, `outlined`. Icon name in `icon:`, accessible name in `label:`. |
 | `Fab` | 56dp standard, 40 small, 80 medium, 96 large, plus `extended` — same 56dp height, a dynamic width (80dp floor) fitting an icon (`icon:`) and a `label:` label side by side. |
 | `Checkbox` | 18dp box, 2dp radius. `indeterminate:` shows a dash instead of a checkmark, M3's third state for a partly-checked group. |

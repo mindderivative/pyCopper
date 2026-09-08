@@ -17,7 +17,7 @@ children:
 
       - name: summary
         widget: Text
-        text: "M3 Expressive's button group: an invisible container that spaces buttons and, for the connected variant, merges their shape."
+        text: "M3 Expressive's button group: an invisible container that spaces buttons, merges their shape when connected, and morphs a toggled button's shape (and, when standard, its width)."
         style: {text_style: body-large, color: on_surface_variant}
 
       - {name: div1, widget: Divider, style: {width: expand}}
@@ -29,23 +29,29 @@ children:
           between buttons and modify button shape" -- quoted directly.
           Standard uses 8dp gaps and leaves every button fully rounded;
           connected uses 2dp gaps and squares every touching corner to
-          8dp while the group's two outer ends stay fully round. Not
-          built here: the width/shape morph animation M3's own demos show
-          on press and selection, and the XS/S/M/L/XL size ladder --
-          `Button` itself has only one size today.
+          8dp while the group's two outer ends stay fully round. M size
+          only -- the XS/S/M/L/XL size ladder isn't built (`Button` itself
+          has one size today).
 
-          Use cases, from the spec: connected groups replace the
-          deprecated segmented button for single- or multi-select
-          patterns; standard groups just space related buttons -- like
-          "Get started" next to a couple of icon-only actions -- without
-          merging their shape.
+          Click a button below to toggle it: COMPONENT_BUTTONS.md's own
+          "Corner sizes" table gives the shape morph exact dp figures --
+          16dp when selected, 12dp while pressed (every button, not just
+          grouped ones). A standard group's selected button ALSO grows
+          width, visibly shifting its neighbours along the row -- an
+          ordinary Flex reflow, not a special case; a connected group's
+          selection changes shape only.
+
+          Use cases, from the spec: standard groups space related toggle
+          buttons -- like a formatting toolbar -- without merging their
+          shape; connected groups replace the deprecated segmented button
+          for single- or multi-select patterns.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}
 
       - name: live_heading
         widget: Text
-        text: "Live example"
+        text: "Live example -- click a button to toggle it"
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
@@ -57,17 +63,47 @@ children:
             widget: ButtonGroup
             style: {variant: standard}
             children:
-              - {widget: Button, text: "Copy", style: {variant: outlined}}
-              - {widget: Button, text: "Cut", style: {variant: outlined}}
-              - {widget: Button, text: "Paste", style: {variant: filled}}
+              - name: bold
+                widget: Button
+                text: "Bold"
+                value: "{{ bold.get() }}"
+                style: {variant: outlined}
+                handlers: {on_click: toggle_bold}
+              - name: italic
+                widget: Button
+                text: "Italic"
+                value: "{{ italic.get() }}"
+                style: {variant: outlined}
+                handlers: {on_click: toggle_italic}
+              - name: underline
+                widget: Button
+                text: "Underline"
+                value: "{{ underline.get() }}"
+                style: {variant: outlined}
+                handlers: {on_click: toggle_underline}
           - {widget: Text, text: "Connected", style: {color: on_surface_variant}}
           - name: connected
             widget: ButtonGroup
             style: {variant: connected}
             children:
-              - {widget: Button, text: "Day", style: {variant: outlined}}
-              - {widget: Button, text: "Week", style: {variant: outlined}}
-              - {widget: Button, text: "Month", style: {variant: outlined}}
+              - name: day
+                widget: Button
+                text: "Day"
+                value: "{{ day.get() }}"
+                style: {variant: outlined}
+                handlers: {on_click: toggle_day}
+              - name: week
+                widget: Button
+                text: "Week"
+                value: "{{ week.get() }}"
+                style: {variant: outlined}
+                handlers: {on_click: toggle_week}
+              - name: month
+                widget: Button
+                text: "Month"
+                value: "{{ month.get() }}"
+                style: {variant: outlined}
+                handlers: {on_click: toggle_month}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

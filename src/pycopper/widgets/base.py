@@ -330,6 +330,19 @@ class ButtonElement(ContainerElement):
     M3 describes these as one component in five configurations, so they are one
     widget with a `variant`, not five widget kinds. Container and content
     tokens come from the variant unless the view sets them explicitly.
+
+    **Shape morph, sourced from `COMPONENT_BUTTONS.md`'s own "Corner sizes"
+    table** (a different file than `ButtonGroup`'s own citations) -- at this
+    widget's one shipped size (M): pressed always morphs to a 12dp corner
+    ("Both round and square buttons should have the same pressed shape"),
+    and a toggle button (`checked`, the same `value:`-bound convention
+    `Chip`'s filter variant and `Accordion` already use -- see `checked` on
+    `ElementMixin`) rests at a 16dp corner when selected instead of full
+    round. This applies to every `Button`, grouped or not -- the source
+    page describes it as ordinary Button behaviour, not something
+    `ButtonGroup` adds. An un-`checked`, unpressed `Button` (the
+    overwhelming majority in this codebase -- anything with no `value:`
+    binding at all) is completely unaffected.
     """
 
     #: "Container Height: 40dp", "Minimum Width: 64dp", "Padding: Horizontal
@@ -358,6 +371,50 @@ class ButtonElement(ContainerElement):
     #: a frozen `StyleSpec` cannot express.
     _group_radii: tuple[float, float, float, float] | None = None
 
+    #: `COMPONENT_BUTTONS.md`'s own "Corner sizes" table, M size (this
+    #: widget's only shipped size today): round (unselected, unpressed)
+    #: stays `size.height / 2`, already correct below; `CHECKED_RADIUS` is
+    #: the toggle-selected resting shape; `PRESSED_RADIUS` applies to every
+    #: press regardless of selection ("Both round and square buttons should
+    #: have the same pressed shape").
+    CHECKED_RADIUS: Final = 16.0
+    PRESSED_RADIUS: Final = 12.0
+
+    #: Set by a `ButtonGroup` parent, `standard` variant only -- mirrors
+    #: `_group_radii`'s own pattern above. `False` (the default: no such
+    #: parent, or a `connected` one) leaves this button's width unaffected
+    #: by selection/press -- connected groups never grow width,
+    #: `COMPONENT_BUTTON_GROUPS.md`'s own "don't add any interaction
+    #: between buttons... only affect the shape."
+    _group_standard: bool = False
+
+    #: Not sourced -- `COMPONENT_BUTTON_GROUPS.md` never gives a number for
+    #: how much a standard group's selected/pressed button grows, only
+    #: that it does ("changes the width... of itself and adjacent
+    #: buttons"). Extra horizontal padding per side while selected or
+    #: pressed inside a standard group.
+    GROUP_SELECT_PAD_EXTRA: Final = 8.0
+
+    def _select_progress(self) -> float:
+        """0..1 toward the standard-group selected/pressed width growth.
+
+        Reveals extra padding the same way `Chip._check_progress()` reveals
+        its checkmark (`material.py`) -- `invalidates="layout"` so the
+        whole `ButtonGroup` row reflows, which is what visibly shifts later
+        siblings along it. No new cross-element coupling: an ordinary Flex
+        row already reflows whenever any child's own size changes.
+        """
+        from .material import SELECTION_CURVE, SELECTION_MOTION  # local: avoids a cycle
+
+        target = 1.0 if self._group_standard and (self.checked or self.state.pressed) else 0.0
+        return self.animated(
+            "group_select",
+            target,
+            duration=SELECTION_MOTION,
+            curve=SELECTION_CURVE,
+            invalidates="layout",
+        )
+
     def perform_layout(self, constraints: Constraints) -> Size:
         """Size to the label, floored at M3's minimum.
 
@@ -372,7 +429,8 @@ class ButtonElement(ContainerElement):
             if self._text.strip()
             else Size(0.0, 0.0)
         )
-        return outer.constrain(Size(max(self.MIN_WIDTH, label.width + 2 * self.PAD_X), self.HEIGHT))
+        pad = self.PAD_X + self.GROUP_SELECT_PAD_EXTRA * self._select_progress()
+        return outer.constrain(Size(max(self.MIN_WIDTH, label.width + 2 * pad), self.HEIGHT))
 
     #: Only the `elevated` variant rests above the surface; M3 puts filled,
     #: tonal and outlined buttons at level 0.
@@ -391,6 +449,18 @@ class ButtonElement(ContainerElement):
 
     @property
     def effective_radii(self) -> tuple[float, float, float, float]:
+        # Pressed always wins -- "both round and square buttons should
+        # have the same pressed shape," overriding whatever the resting
+        # shape was, connected-group position-square included. Checked
+        # (the toggle-selected resting shape) comes next, also ahead of a
+        # connected group's own position-based override -- a connected
+        # group's own button still morphs on selection independent of its
+        # neighbours (`COMPONENT_BUTTON_GROUPS.md`: "only affect the shape
+        # of the button being selected").
+        if self.state.pressed:
+            return (self.PRESSED_RADIUS,) * 4
+        if self.checked:
+            return (self.CHECKED_RADIUS,) * 4
         if self._group_radii is not None:
             return self._group_radii
         radii = self.style.corner_radius

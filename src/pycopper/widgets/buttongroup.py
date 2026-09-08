@@ -2,15 +2,26 @@
 connected variant, merges their outer shape into one pill.
 
 **`COMPONENT_BUTTON_GROUPS.md`'s own words**: "Button groups are invisible
-containers that add padding between buttons and modify button shape." That
-is exactly the scope built here -- a `Flex` row with M3's spacing and, for
-`variant: connected`, per-child corner overrides. What is deliberately not
-built: the width/shape *morph* animation on press and selection (M3's own
-demo videos show adjacent buttons visibly resizing), and the XS/S/M/L/XL
-size ladder button groups are meant to span -- `ButtonElement` itself has
-only one size today, so there is no ladder to select from yet. Both are
-motion- and sizing-system work belonging to `Button`, not to this
-container, and are flagged rather than silently approximated.
+containers that add padding between buttons and modify button shape." A
+`Flex` row with M3's spacing and, for `variant: connected`, per-child
+corner overrides -- plus, now, the width/shape *morph* on press and
+selection M3's own demo videos show. The morph itself (round<->square,
+sourced dp figures) lives entirely on `ButtonElement` (`base.py`) -- it
+applies to any toggle button, grouped or not. This module's own
+contribution is narrower and specific to the "Selection & activation"
+section of `COMPONENT_BUTTON_GROUPS.md`: a **standard** group's selected
+button also grows WIDTH (unsourced amount -- the spec gives none, only
+that it happens; see `ButtonElement.GROUP_SELECT_PAD_EXTRA`), which
+visibly shifts every later sibling along the row as an ordinary
+consequence of this already being a plain `Flex` row -- nothing new was
+needed for that. A **connected** group's own selection changes shape only,
+per the spec's own "don't add any interaction between buttons... only
+affect the shape."
+
+Still not built: the XS/S/M/L/XL size ladder button groups are meant to
+span -- `ButtonElement` itself has only one size today, so there is no
+ladder to select from yet (the same shared gap `Slider`'s own size ladder
+already closed for itself).
 
 **Spacing**: `COMPONENT_BUTTON_GROUPS.md`'s own "between-space" table gives
 one row per size (XS 18dp, S 12dp, M/L/XL 8dp); with `Button` at a single
@@ -74,6 +85,17 @@ class ButtonGroupElement(_StyledMixin, Flex):
             child._group_radii = (leading, trailing, trailing, leading)
 
     def perform_layout(self, constraints: Constraints) -> Size:
+        # Unlike `_apply_shape()` below (paint-only, needs each child's
+        # already-computed `size.height`, so it runs after), this flag
+        # needs to be set BEFORE `super().perform_layout()` -- each Button
+        # child's own `perform_layout` (called from inside that same
+        # `super()` call) reads it to compute its own WIDTH. It depends
+        # only on `self.style.variant`, known immediately, so no
+        # post-layout data is needed for it.
+        standard = self.style.variant != "connected"
+        for child in self.children:
+            if isinstance(child, ButtonElement):
+                child._group_standard = standard
         size = super().perform_layout(constraints)
         self._apply_shape()
         return size
