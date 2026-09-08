@@ -204,15 +204,30 @@ class VerticalElement(_FlexElement):
 
 
 class StackElement(_StyledMixin, Stack):
+    """Overlays children, each positioned by its OWN `style.align_x`/`align_y`
+    when it sets one, falling back to the group's own `align_x`/`align_y`
+    otherwise -- not one alignment forced onto every child regardless of what
+    it asked for. The base `Stack` layout node knows nothing about style (the
+    four-tree split keeps the layout layer spec-unaware), so it can only
+    place every child at one shared `self._alignment`; this class
+    re-positions each child itself afterward, reading its own style
+    directly. `model_fields_set` is what tells "this child wrote align_x"
+    apart from "nobody set anything, so the group's own value applies" --
+    the same idiom `DockSplit.axis` already uses for an identical ambiguity.
+    """
+
     def __init__(self, spec: WidgetSpec) -> None:
-        Stack.__init__(self, alignment=Alignment(spec.style.align_x, spec.style.align_y))
+        Stack.__init__(self)
         self.init_element(spec)
 
-    def configure(self) -> None:
-        self._alignment = Alignment(self.style.align_x, self.style.align_y)
-
     def perform_layout(self, constraints: Constraints) -> Size:
-        return super().perform_layout(self.sized(constraints, self.style))
+        size = super().perform_layout(self.sized(constraints, self.style))
+        for child in self.children:
+            fields = child.style.model_fields_set
+            align_x = child.style.align_x if "align_x" in fields else self.style.align_x
+            align_y = child.style.align_y if "align_y" in fields else self.style.align_y
+            child.offset = Alignment(align_x, align_y).resolve(child.size, size)
+        return size
 
 
 def _face_of(
