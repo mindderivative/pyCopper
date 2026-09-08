@@ -166,7 +166,17 @@ class NodeElement(_StyledMixin, SingleChildNode):
 
     def cursor_at(self, x: float, y: float) -> str | None:
         if self._on_title(y):
-            return "move"
+            # "move"/"grab" would be the honest cursor for a draggable title
+            # bar, but rendercanvas.CursorShape's vocabulary is small and has
+            # neither -- confirmed the same way DockSplit's divider cursor
+            # bug was: `engine.canvas.set_cursor("move")` raises `ValueError`
+            # (real values: default, text, crosshair, pointer, ew-resize,
+            # ns-resize, nesw-resize, nwse-resize, not-allowed, none). Every
+            # frame `App._sync_cursor()` calls this while the pointer sits
+            # over a title bar, so this was not a cosmetic gap -- it crashed
+            # the app on hover. `pointer` is the closest available cursor
+            # that still signals "interactive," which is what's meant here.
+            return "pointer"
         return super().cursor_at(x, y)
 
     def on_pointer_down(self, event: Any) -> None:

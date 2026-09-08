@@ -234,6 +234,28 @@ def test_the_panes_beside_a_dock_split_divider_do_not_claim_the_cursor() -> None
     assert cursor_at(app, rect.x + 10, rect.y + rect.height / 2) == "default"
 
 
+def test_a_node_title_bar_asks_for_a_cursor_without_crashing() -> None:
+    """Not "move" -- this backend's `CursorShape` has no move/grab cursor,
+    and returning it used to raise `ValueError` from inside
+    `App._sync_cursor()` on literally the first frame the pointer sat over
+    a node's title bar, the same bug class `DockSplit`'s divider had."""
+    app = hosted(
+        [
+            {
+                "name": "graph",
+                "widget": "NodeGraph",
+                "style": {"width": 400, "height": 300},
+                "children": [
+                    {"name": "n", "widget": "Node", "text": "N", "style": {"x": 20, "y": 20}},
+                ],
+            }
+        ]
+    )
+    node = app.root.find("n")
+    rect = node.absolute_rect()
+    assert cursor_at(app, rect.x + 10, rect.y + 10) == "pointer"
+
+
 def test_a_sheet_handle_asks_for_a_resize_cursor() -> None:
     app = App(
         {
