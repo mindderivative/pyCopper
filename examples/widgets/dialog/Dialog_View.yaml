@@ -90,7 +90,7 @@ overlays:
     handlers: {on_dismiss: close_dialog}
     children:
       - widget: Horizontal
-        style: {spacing: 8, main_alignment: end}
+        style: {spacing: 8, main_alignment: space_between}
         children:
           - {widget: Button, text: "Cancel", style: {variant: text}, handlers: {on_click: close_dialog}}
           - {widget: Button, text: "Delete", style: {variant: filled}, handlers: {on_click: confirm_delete}}
