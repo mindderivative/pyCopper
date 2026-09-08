@@ -500,6 +500,30 @@ def test_a_click_after_a_cancelled_drag_does_not_switch_tabs() -> None:
     assert right._active_name() == "terminal", "the drag's own drop, not a click, decides this"
 
 
+def test_dropping_directly_on_another_groups_tab_strip_always_inserts_a_tab() -> None:
+    """Found live: dropping onto another group's own tab strip -- the
+    intuitive, standard way to land two tabs next to each other, exactly
+    the way `editor`/`readme` start out in this test's own view -- used to
+    fall into the generic center/edge fraction test and land in the "top
+    edge" split zone instead, since a (short) tab strip sits mostly outside
+    the old 25%-75% center band of the whole rect. The tab strip must
+    always mean "insert as a tab", regardless of where along it you drop."""
+    a = app(_two_groups())
+    left = a.root.find("left")
+    right = a.root.find("right")
+    start = (left.absolute_rect().x + 20, left.absolute_rect().y + 20)
+    target_rect = right.absolute_rect()
+    # Well within the tab strip band (TAB_HEIGHT=48), but off-center
+    # horizontally -- must still classify as "tab", not an edge.
+    drop = (target_rect.x + 5.0, target_rect.y + 10.0)
+    drag(a, start, (start[0] + 20, start[1] + 5), drop)
+
+    right2 = a.root.find("right")
+    assert [c.name for c in right2.children] == ["terminal", "editor"], (
+        "landed as a tab in `right`, not a split -- the whole point of this test"
+    )
+
+
 def test_dragging_onto_an_edge_splits_and_creates_a_new_pane() -> None:
     a = app(_two_groups())
     left = a.root.find("left")

@@ -139,7 +139,17 @@ def find_drop_target(source: Any, x: float, y: float) -> tuple[Any, Zone] | None
         else:
             return None
     rect = target.absolute_rect()
-    zone = _classify(x - rect.x, y - rect.y, rect.width, rect.height)
+    local_y = y - rect.y
+    # Found live: dropping directly onto another group's own tab strip --
+    # the intuitive, standard way to add a tab next to existing ones in
+    # every real docking IDE -- fell into the generic center/edge fraction
+    # test below, which treats the whole rect uniformly and puts most of a
+    # (usually short, TAB_HEIGHT-tall) tab strip inside the "top edge"
+    # split zone rather than "tab" insert. The tab strip always means
+    # "insert as a tab" regardless of horizontal position within it.
+    if isinstance(target, DockGroupElement) and 0.0 <= local_y <= target.TAB_HEIGHT:
+        return target, "tab"
+    zone = _classify(x - rect.x, local_y, rect.width, rect.height)
     return target, zone
 
 
