@@ -32,6 +32,7 @@ from ..theme import Palette
 
 if TYPE_CHECKING:
     from ..layout import LayoutNode
+    from ..runtime.events import EventDispatcher
 
 __all__ = ["ElementMixin", "PaintContext", "WidgetState"]
 
@@ -233,6 +234,7 @@ class ElementMixin:
     _image_atlas: ImageAtlas | None
     _ticker: Ticker | None
     _mounter: Callable[[Any], None] | None
+    _dispatcher: EventDispatcher | None
     _animations: dict[str, Animation]
     _hit_overflow: float
     _hit_insets: EdgeInsets | None
@@ -268,6 +270,7 @@ class ElementMixin:
         self._image_atlas = None
         self._ticker = None
         self._mounter = None
+        self._dispatcher = None
         #: Named animations owned by this element. They survive `update_spec`
         #: with the rest of the runtime state, so a hot reload does not restart
         #: a transition that is mid-flight.
@@ -370,6 +373,28 @@ class ElementMixin:
         for child in self.children:
             if isinstance(child, ElementMixin):
                 child.set_mounter(mounter)
+
+    @property
+    def dispatcher(self) -> EventDispatcher | None:
+        """The app's event dispatcher, once mounted -- `None` for a bare
+        element built without a real `App` (e.g. `build_element(...)` in a
+        unit test). Unlike `ticker`/`text_engine`/`image_atlas`, there is no
+        sensible shared default to fall back to: a dispatcher is inherently
+        tied to one app's own tree, not an interchangeable resource. Exists
+        so an element can call `self.dispatcher.hit_path(x, y)` to find
+        what is currently under the cursor during a gesture that spans more
+        than its own bounds -- Dock's runtime drag-and-drop is the first
+        user, needing to know what `DockGroup`/`DockSplit` a dragged tab is
+        currently hovering, which normal event routing never tells the
+        element holding pointer capture (see `EventDispatcher.hit_path`).
+        """
+        return self._dispatcher
+
+    def set_dispatcher(self, dispatcher: EventDispatcher) -> None:
+        self._dispatcher = dispatcher
+        for child in self.children:
+            if isinstance(child, ElementMixin):
+                child.set_dispatcher(dispatcher)
 
     def animated(
         self,

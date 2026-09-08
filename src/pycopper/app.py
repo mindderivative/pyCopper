@@ -113,6 +113,7 @@ class App:
         self.dispatcher = EventDispatcher()
         self.dispatcher.root = self.root
         self.dispatcher.overlays = self.overlays
+        self.root.set_dispatcher(self.dispatcher)
 
         self.context: dict[str, Any] = {}
         self._handlers: dict[str, Callable[[Any], None]] = {}
@@ -280,6 +281,7 @@ class App:
         self.root.attach(self.layout_owner)
         self.root.set_text_engine(self.text)
         self.root.set_image_atlas(self.images)
+        self.root.set_dispatcher(self.dispatcher)
         self.dispatcher.root = self.root
         self.overlays.build(
             new_view.overlays, text_engine=self.text, image_atlas=self.images, ticker=self.motion
