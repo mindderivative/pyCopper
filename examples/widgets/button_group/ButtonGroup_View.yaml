@@ -41,10 +41,14 @@ children:
           ordinary Flex reflow, not a special case; a connected group's
           selection changes shape only.
 
-          Use cases, from the spec: standard groups space related toggle
-          buttons -- like a formatting toolbar -- without merging their
-          shape; connected groups replace the deprecated segmented button
-          for single- or multi-select patterns.
+          Use cases, from the spec: standard groups space related,
+          independently-toggleable buttons -- like the formatting toolbar
+          below, where
+          bold/italic/underline can all be on at once; connected groups
+          replace the deprecated segmented button, here wired as a
+          single-select switch -- exactly one of Day/Week/Month is ever
+          selected, by binding all three to one shared value instead of
+          three independent toggles.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}
@@ -81,7 +85,7 @@ children:
                 value: "{{ underline.get() }}"
                 style: {variant: outlined}
                 handlers: {on_click: toggle_underline}
-          - {widget: Text, text: "Connected", style: {color: on_surface_variant}}
+          - {widget: Text, text: "Connected -- single-select", style: {color: on_surface_variant}}
           - name: connected
             widget: ButtonGroup
             style: {variant: connected}
@@ -89,21 +93,21 @@ children:
               - name: day
                 widget: Button
                 text: "Day"
-                value: "{{ day.get() }}"
+                value: "{{ period.get() == 'day' }}"
                 style: {variant: outlined}
-                handlers: {on_click: toggle_day}
+                handlers: {on_click: select_day}
               - name: week
                 widget: Button
                 text: "Week"
-                value: "{{ week.get() }}"
+                value: "{{ period.get() == 'week' }}"
                 style: {variant: outlined}
-                handlers: {on_click: toggle_week}
+                handlers: {on_click: select_week}
               - name: month
                 widget: Button
                 text: "Month"
-                value: "{{ month.get() }}"
+                value: "{{ period.get() == 'month' }}"
                 style: {variant: outlined}
-                handlers: {on_click: toggle_month}
+                handlers: {on_click: select_month}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

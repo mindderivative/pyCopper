@@ -1,5 +1,6 @@
-"""Button Group demo's logic: six independent toggles (one per button), and
-the two source panels.
+"""Button Group demo's logic: three independent toggles in the standard
+group, one single-select switch in the connected group, and the two
+source panels.
 
 See app.py in this directory for the entry point.
 """
@@ -16,16 +17,24 @@ class ButtonGroupDemo(ViewModel):
     """State and commands for `ButtonGroup_View.yaml`."""
 
     def __init__(self) -> None:
-        # Standard group -- a formatting toolbar, each button an
+        # Standard group -- a formatting toolbar. Each button is an
         # independent toggle (the same value:/on_click: convention Chip's
-        # filter variant already uses).
+        # filter variant already uses) since bold/italic/underline
+        # legitimately stack.
         self.bold = Signal(False, name="bold")
         self.italic = Signal(False, name="italic")
         self.underline = Signal(False, name="underline")
-        # Connected group.
-        self.day = Signal(False, name="day")
-        self.week = Signal(False, name="week")
-        self.month = Signal(False, name="month")
+        # Connected group -- a time-period switcher. One shared Signal
+        # names which button is active; each button's own value: compares
+        # against it, and clicking always SETS it (not a toggle-flip) --
+        # exactly one of the three is ever selected, the same
+        # single-select pattern `COMPONENT_BUTTON_GROUPS.md` names as the
+        # connected variant's replacement for the deprecated segmented
+        # button. phil: "connected buttons should not hold the square
+        # state they should switch between them" -- an independent
+        # per-button toggle (this demo's first cut) let more than one
+        # look selected at once, which doesn't read as a real switch.
+        self.period = Signal("day", name="period")
 
         self.view_source = (Path(__file__).parent / "ButtonGroup_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
@@ -39,11 +48,11 @@ class ButtonGroupDemo(ViewModel):
     def toggle_underline(self, event: Any) -> None:
         self.underline.update(lambda v: not v)
 
-    def toggle_day(self, event: Any) -> None:
-        self.day.update(lambda v: not v)
+    def select_day(self, event: Any) -> None:
+        self.period.set("day")
 
-    def toggle_week(self, event: Any) -> None:
-        self.week.update(lambda v: not v)
+    def select_week(self, event: Any) -> None:
+        self.period.set("week")
 
-    def toggle_month(self, event: Any) -> None:
-        self.month.update(lambda v: not v)
+    def select_month(self, event: Any) -> None:
+        self.period.set("month")
