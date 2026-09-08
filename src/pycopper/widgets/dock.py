@@ -127,6 +127,9 @@ class DockGroupElement(_StyledMixin, LayoutNode):
 
     TAB_HEIGHT: Final = 48.0
     INDICATOR_H: Final = 3.0
+    #: "Primary tab active indicators are inset 2dp on each side"
+    #: (`COMPONENT_TABS.md`) -- see `TabsElement.PRIMARY_INSET`.
+    PRIMARY_INSET: Final = 2.0
     PAD_X: Final = 16.0
 
     def __init__(self, spec: WidgetSpec) -> None:
@@ -253,14 +256,18 @@ class DockGroupElement(_StyledMixin, LayoutNode):
                 token,
             )
             if selected:
+                # Primary Tabs anatomy, inset 2dp a side with a fully rounded
+                # corner radius -- COMPONENT_TABS.md's own measurements, the
+                # same fix `TabsElement`'s own indicator needed (it was found
+                # missing both here too: full tab width, square corners).
                 _box(
                     ctx,
-                    absolute.x + x,
+                    absolute.x + x + self.PRIMARY_INSET,
                     absolute.y + self.TAB_HEIGHT - self.INDICATOR_H,
-                    width,
+                    width - 2.0 * self.PRIMARY_INSET,
                     self.INDICATOR_H,
                     token=ctx.palette.index("primary"),
-                    radius=0.0,
+                    radius=self.INDICATOR_H,
                 )
 
 

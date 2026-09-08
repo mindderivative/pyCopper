@@ -182,6 +182,30 @@ def test_selected_tab_uses_primary() -> None:
     assert PAL.index("primary") in tokens
 
 
+def test_the_selected_tabs_indicator_is_inset_and_rounded() -> None:
+    """COMPONENT_TABS.md: primary indicators are inset 2dp a side with a
+    fully rounded corner radius -- this widget's own hand-rolled strip
+    (it does not literally reuse `TabsElement`, despite the docstring's
+    "reuses Tabs' own anatomy") needed the identical fix `TabsElement`'s
+    indicator did: full tab width, square corners."""
+    view = {"name": "root", "widget": "Vertical", "children": [_group(value="a")]}
+    a = app(view)
+    group = a.root.find("g")
+    _name, tab_x, tab_w = next(r for r in group._tab_rects() if r[0] == "a")
+    root_rect = group.absolute_rect()
+
+    bars = [
+        s
+        for s in paint(a).view
+        if abs(float(s["rect"][3]) - group.INDICATOR_H) < 0.01
+        and int(s["flags"][2]) == PAL.index("primary")
+    ]
+    assert len(bars) == 1
+    bar = bars[0]
+    assert float(bar["rect"][0]) == pytest.approx(root_rect.x + tab_x + group.PRIMARY_INSET)
+    assert float(bar["rect"][2]) == pytest.approx(tab_w - 2.0 * group.PRIMARY_INSET)
+
+
 # -------------------------------------------------------------- DockSplit
 
 
