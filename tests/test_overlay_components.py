@@ -193,10 +193,49 @@ def test_dialog_paints_the_m3_container_token() -> None:
 # -------------------------------------------------------------------- menu
 
 
-def test_menu_caps_width_at_the_m3_maximum() -> None:
-    """M3 baseline menu: "Container width: 112dp min, 280dp max"."""
-    wide = laid_out({"widget": "Menu"}, Constraints.loose(Size(1000, 700)))
-    assert wide.size.width == MenuElement.MAX_WIDTH == 280.0
+def test_an_empty_menu_shrinks_to_the_m3_minimum_not_the_offered_width() -> None:
+    """No children to measure, so there is nothing to shrink-wrap to --
+    M3's own floor ("Container width: 112dp min, 280dp max") is what's
+    left, not the 1000dp window this is offered."""
+    empty = laid_out({"widget": "Menu"}, Constraints.loose(Size(1000, 700)))
+    assert empty.size.width == MenuElement.MIN_WIDTH == 112.0
+
+
+def test_a_menu_shrink_wraps_to_its_widest_row() -> None:
+    """A short menu does not fill the window it happens to be offered --
+    it takes exactly what its widest row needs, clamped to the M3 range."""
+    menu = laid_out(
+        {
+            "widget": "Menu",
+            "children": [
+                {"widget": "MenuItem", "text": "Rename", "supporting_text": "Ctrl+Shift+R"},
+                {"widget": "MenuItem", "text": "Copy", "supporting_text": "Ctrl+C"},
+            ],
+        },
+        Constraints.loose(Size(1000, 700)),
+    )
+    widest = max(c.natural_width() for c in menu.children)
+    assert MenuElement.MIN_WIDTH < menu.size.width == widest < MenuElement.MAX_WIDTH
+
+
+def test_a_menu_still_caps_width_at_the_m3_maximum() -> None:
+    """A row long enough to want more than 280dp is still clamped there --
+    the M3 maximum wins over content, the same way the minimum wins over
+    an even shorter row."""
+    menu = laid_out(
+        {
+            "widget": "Menu",
+            "children": [
+                {
+                    "widget": "MenuItem",
+                    "text": "A genuinely very long menu item label indeed",
+                    "supporting_text": "Ctrl+Shift+Alt+X",
+                }
+            ],
+        },
+        Constraints.loose(Size(1000, 700)),
+    )
+    assert menu.size.width == MenuElement.MAX_WIDTH == 280.0
 
 
 def test_an_explicit_width_overrides_the_m3_range() -> None:
@@ -229,6 +268,32 @@ def test_menu_item_is_48dp_not_a_list_item_height() -> None:
     """A menu row is denser than a List item (56/72/88dp)."""
     item = laid_out({"widget": "MenuItem", "text": "Cut"})
     assert item.size.height == MenuItemElement.HEIGHT == 48.0
+
+
+def test_menu_item_natural_width_is_padding_plus_label_alone() -> None:
+    """Nothing else contributes when there is no trailing content."""
+    empty = laid_out({"widget": "MenuItem", "text": ""})
+    cut = laid_out({"widget": "MenuItem", "text": "Cut"})
+    assert empty.natural_width() == pytest.approx(MenuItemElement.PAD_X * 2)
+    assert cut.natural_width() > empty.natural_width()
+
+
+def test_menu_item_natural_width_grows_with_a_longer_shortcut() -> None:
+    """A row's own content determines its width -- a longer shortcut asks
+    for more of it, not a fixed slot regardless of what's in it."""
+    short = laid_out({"widget": "MenuItem", "text": "Cut", "supporting_text": "Ctrl+X"})
+    long = laid_out({"widget": "MenuItem", "text": "Cut", "supporting_text": "Ctrl+Shift+Alt+X"})
+    assert long.natural_width() > short.natural_width()
+
+
+def test_menu_item_natural_width_includes_the_submenu_chevron() -> None:
+    """`has_submenu`'s chevron is trailing content too, at its own fixed
+    size plus the same gap a shortcut would use."""
+    plain = laid_out({"widget": "MenuItem", "text": "More"})
+    submenu = laid_out({"widget": "MenuItem", "text": "More", "style": {"has_submenu": True}})
+    assert submenu.natural_width() == pytest.approx(
+        plain.natural_width() + MenuItemElement.GAP + MenuItemElement.CHEVRON
+    )
 
 
 def test_menu_item_paints_label_and_trailing_shortcut() -> None:

@@ -488,6 +488,14 @@ class MenuElement(_PaddedFlex):
     morphing and vibrant colour, both of which need motion and a theme engine
     pyCopper does not have yet -- so the baseline is what is implemented, and
     that is a deliberate choice rather than an oversight.
+
+    **Shrink-wraps to its widest row by default**, unlike most overlays: an
+    explicit `width:` still wins, but otherwise this measures every
+    `MenuItem` child's own `natural_width()` (padding, label, shortcut or
+    chevron -- content only) and takes the largest, clamped to the 112-280dp
+    range above. A menu that always filled the space it was offered read as
+    an accident of `OverlayHost`'s window-sized constraints, not a real
+    design -- a two-item menu has no reason to be as wide as a ten-item one.
     """
 
     RADIUS: Final = 4.0
@@ -504,13 +512,29 @@ class MenuElement(_PaddedFlex):
         radii = self.style.corner_radius
         return radii if any(radii) else (self.RADIUS,) * 4
 
+    def _shrink_wrapped_width(self, constraints: Constraints) -> float:
+        """The widest child's own content width, clamped to the M3 range.
+
+        A throwaway measuring pass: each child is laid out once here under
+        unbounded width to learn what it actually needs
+        (`parent_uses_size=False`, since this result is discarded), then
+        laid out again for real once `perform_layout` below knows the
+        menu's resolved width -- the standard shrink-to-content technique
+        for a single-pass, constraints-down layout engine that otherwise
+        has no way to ask a child its natural size.
+        """
+        probe = Constraints.unbounded()
+        natural = max(
+            (child.layout(probe, parent_uses_size=False).width for child in self._children),
+            default=self.MIN_WIDTH,
+        )
+        return constraints.constrain_width(_clamp(natural, self.MIN_WIDTH, self.MAX_WIDTH))
+
     def perform_layout(self, constraints: Constraints) -> Size:
-        width = _clamped_width(
-            constraints,
-            self.style,
-            minimum=self.MIN_WIDTH,
-            maximum=self.MAX_WIDTH,
-            unbounded=self.MIN_WIDTH,
+        width = (
+            constraints.constrain_width(float(self.style.width.value))
+            if self.style.width.kind == "fixed"
+            else self._shrink_wrapped_width(constraints)
         )
         inner = constraints.copy_with(min_width=width, max_width=width)
         return super().perform_layout(inner)
@@ -551,15 +575,39 @@ class MenuItemElement(_StyledMixin, Padding):
     PAD_X: Final = 12.0
     LABEL: Final = 14.0
     CHEVRON: Final = 24.0
+    #: "Padding between elements within a list item" (`COMPONENT_MENUS.md`'s
+    #: own baseline-menu measurement table) -- the gap between the label and
+    #: whichever trailing content this row has.
+    GAP: Final = 12.0
     CURSOR = "pointer"
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
 
+    def natural_width(self) -> float:
+        """This row's own content width: side padding, the label, and
+        whichever trailing content it has (a shortcut or the submenu
+        chevron) -- nothing else. `MenuElement` measures every row against
+        this to shrink-wrap the whole menu to its widest one, rather than
+        each row filling whatever width it happens to be offered."""
+        width = self.PAD_X * 2
+        label = self._text.strip()
+        if label:
+            width += measure_text(label, self.LABEL, engine=self.text_engine).width
+        if self.style.has_submenu:
+            width += self.GAP + self.CHEVRON
+        else:
+            trailing = self._supporting.strip()
+            if trailing:
+                width += (
+                    self.GAP + measure_text(trailing, self.LABEL, engine=self.text_engine).width
+                )
+        return width
+
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
-        width = outer.max_width if outer.has_bounded_width else MenuElement.MIN_WIDTH
+        width = outer.max_width if outer.has_bounded_width else self.natural_width()
         height = (
             float(self.style.height.value) if self.style.height.kind == "fixed" else self.HEIGHT
         )
