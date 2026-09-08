@@ -540,6 +540,15 @@ class ShapeElement(_StyledMixin, Padding):
     #: this is pyCopper's own and stated as such: large enough to read as a
     #: shape rather than a dot, small enough not to dominate a row.
     DEFAULT_SIZE: Final = 48.0
+    #: One full spin, or one full out-and-back morph -- same cycle
+    #: `CircularProgress`'s own indeterminate spinner uses, so a spinning
+    #: Shape and a loading spinner read as the same "ongoing" speed.
+    CYCLE: Final = "extra_long4"
+    #: How many sides `morph:` adds at the peak of its oscillation, on top
+    #: of `sides:`'s own declared value. Not sourced -- there is no spec for
+    #: this widget at all -- chosen to read clearly as a shape changing
+    #: rather than jittering.
+    MORPH_RANGE: Final = 5.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -556,14 +565,28 @@ class ShapeElement(_StyledMixin, Padding):
         dpr = ctx.pixel_ratio
         border = style.border
         border_token = NO_TOKEN if border is None else ctx.palette.index(border.color)
+
+        # Authored in degrees, because a view file is written by hand.
+        rotation = math.radians(style.rotation)
+        if style.spin:
+            phase = self.animated("spin", 1.0, duration=self.CYCLE, curve="linear", repeat=True)
+            rotation += phase * 2.0 * math.pi
+
+        sides = style.sides
+        if style.morph:
+            # 0 at phase 0 and 1, peaking at phase 0.5 -- an out-and-back
+            # oscillation through the shader's own smooth non-regular
+            # intermediates, not a jump between two fixed polygons.
+            phase = self.animated("morph", 1.0, duration=self.CYCLE, curve="linear", repeat=True)
+            sides += self.MORPH_RANGE * (0.5 - 0.5 * math.cos(phase * 2.0 * math.pi))
+
         ctx.display_list.add_polygon(
             absolute.x * dpr,
             absolute.y * dpr,
             self.size.width * dpr,
             self.size.height * dpr,
-            sides=style.sides,
-            # Authored in degrees, because a view file is written by hand.
-            rotation=math.radians(style.rotation),
+            sides=sides,
+            rotation=rotation,
             # `corner_radius` is per-corner for a box; a regular polygon has one
             # radius for every vertex, so the first entry is the one that means
             # anything here. Taking the max instead would make a stray per-corner

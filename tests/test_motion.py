@@ -304,6 +304,59 @@ def test_omitting_value_is_what_selects_indeterminate() -> None:
     assert not app.root.find("d").indeterminate, "value 0 is a value, not an absence"
 
 
+def _polygon_params(app: App) -> tuple[float, float, float, float]:
+    from pycopper.paint.display_list import Kind
+
+    dl = DisplayList()
+    app.paint(dl)
+    poly = next(i for i in dl.view if i["flags"][0] == Kind.POLYGON)
+    border_w, sides, rotation, radius = poly["params"]
+    return float(border_w), float(sides), float(rotation), float(radius)
+
+
+def test_a_plain_shape_stays_idle() -> None:
+    """No `spin:`/`morph:` -- nothing should keep asking for frames."""
+    app = hosted([{"name": "s", "widget": "Shape", "style": {"sides": 4}}])
+    assert not app.motion.active
+
+
+def test_spin_keeps_asking_for_frames() -> None:
+    app = hosted([{"name": "s", "widget": "Shape", "style": {"spin": True}}])
+    assert app.motion.active
+
+
+def test_morph_keeps_asking_for_frames() -> None:
+    app = hosted([{"name": "s", "widget": "Shape", "style": {"morph": True}}])
+    assert app.motion.active
+
+
+def test_spin_rotates_the_shape_continuously() -> None:
+    app = hosted([{"name": "s", "widget": "Shape", "style": {"sides": 4, "spin": True}}])
+    _, _, start_rotation, _ = _polygon_params(app)
+    # Close to 0 (a repeat=True animation starts there), not exactly -- real
+    # wall-clock time already elapsed inside hosted()'s own mount()/update().
+    assert abs(start_rotation) < 0.05, "a repeat=True animation starts near 0, not the target"
+
+    app.motion.tick(0.5)
+    _, _, mid_rotation, _ = _polygon_params(app)
+    assert mid_rotation > start_rotation, "spin: true must actually move rotation over time"
+
+
+def test_morph_oscillates_sides_within_its_range() -> None:
+    app = hosted([{"name": "s", "widget": "Shape", "style": {"sides": 3, "morph": True}}])
+    from pycopper.widgets.material import ShapeElement
+
+    _, start_sides, _, _ = _polygon_params(app)
+    assert start_sides == pytest.approx(3.0, abs=0.05), (
+        "phase 0 is the declared sides:, not the peak"
+    )
+
+    app.motion.tick(0.5)
+    _, mid_sides, _, _ = _polygon_params(app)
+    assert mid_sides > start_sides, "morph: true must actually move sides over time"
+    assert mid_sides <= 3.0 + ShapeElement.MORPH_RANGE + 1e-6, "must not overshoot its own range"
+
+
 def test_a_switch_slides_instead_of_jumping() -> None:
     on = Signal(False)
     app = hosted([{"name": "s", "widget": "Switch", "value": "{{ on.get() }}"}], signals={"on": on})

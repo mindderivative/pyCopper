@@ -521,6 +521,16 @@ class StyleSpec(_Frozen):
     #: rather than radians because a view file is authored by hand, and 30 is
     #: easier to reason about than 0.5236.
     rotation: float = 0.0
+    #: When true, a `Shape` spins continuously on top of `rotation:`'s own
+    #: static value -- the same `repeat=True` mechanism `CircularProgress`'s
+    #: indeterminate spinner already uses, applied here because animating a
+    #: Shape's rotation costs nothing (see `ShapeElement`'s own docstring).
+    spin: bool = False
+    #: When true, a `Shape`'s `sides` oscillates continuously between its own
+    #: declared value and a wider polygon, passing through the smooth
+    #: non-regular intermediates the shader's own comment describes -- a
+    #: live morph, not a discrete jump between shapes.
+    morph: bool = False
 
     # images
     #: How an `Image` fills a box whose aspect ratio differs from its own,

@@ -33,6 +33,9 @@ children:
           drawn with a shader branch rather than a rasterised path
           specifically so a shape that morphs, spins, or scales doesn't
           thrash the glyph atlas the way animating a cached shape would.
+          `spin:`/`morph:` below opt one into continuous rotation and a
+          continuous sides oscillation, using that same free-to-animate
+          property rather than anything special-cased.
 
           Use cases: a Shape is the right tool for a decorative or
           data-driven mark that needs to change continuously at
@@ -83,6 +86,23 @@ children:
                 widget: Shape
                 style: {width: 56, height: 56, sides: 4, corner_radius: 28, background: secondary}
               - {widget: Text, text: "corner_radius: 28 (maxed -- its inscribed circle)", style: {color: on_surface_variant}}
+
+          - name: animated_row
+            widget: Horizontal
+            style: {height: 64, spacing: 16, cross_alignment: center}
+            children:
+              - name: shape_spin
+                widget: Shape
+                style: {width: 56, height: 56, sides: 4, spin: true, background: tertiary}
+              - {widget: Text, text: "spin: true", style: {color: on_surface_variant}}
+              - name: shape_morph
+                widget: Shape
+                style: {width: 56, height: 56, sides: 3, morph: true, background: tertiary}
+              - {widget: Text, text: "morph: true", style: {color: on_surface_variant}}
+              - name: shape_spin_morph
+                widget: Shape
+                style: {width: 56, height: 56, sides: 3, spin: true, morph: true, background: tertiary}
+              - {widget: Text, text: "spin: true, morph: true", style: {color: on_surface_variant}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

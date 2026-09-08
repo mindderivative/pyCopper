@@ -1123,7 +1123,7 @@ needs. A `Text` shrink-wraps to its ink, so it will not starve its siblings.
 | `Text` | Shaped, kerned, wrapped. `font_size` in dp. |
 | `Icon` | Material Symbols. Name goes in `icon:`; `icon_size`, `icon_fill`, `icon_weight`. |
 | `Divider` | 1dp `outline_variant`. `full_bleed` / `inset`. |
-| `Shape` | A regular polygon: `sides`, `rotation`, `corner_radius`, `background`, `border`. 48dp unless sized. Drawn as a distance field, not a rasterised path, so every one of those is **free to animate**. |
+| `Shape` | A regular polygon: `sides`, `rotation`, `corner_radius`, `background`, `border`. 48dp unless sized. Drawn as a distance field, not a rasterised path, so every one of those is **free to animate** — `spin:`/`morph:` opt into a continuous rotation and sides oscillation using exactly that. |
 | `Image` | A decoded raster image. `path:` names the file; `style: {fit}` controls how it fills a differently-shaped box. No M3 component — see [Image](#image) below. |
 | `Video` | A live-updating video surface — the application decodes and pushes frames. No M3 component — see [Video](#video) below. |
 
@@ -1534,6 +1534,8 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `icon_weight` | 100–700 |
 | `sides` | `Shape` — 3 or more. A **float**: 5.5 is a real shape, so a square morphs continuously into a hexagon. |
 | `rotation` | `Shape` — degrees, clockwise |
+| `spin` | `Shape` — when true, spins continuously on top of `rotation:`'s own value. Free, like every other Shape parameter. |
+| `morph` | `Shape` — when true, `sides` oscillates continuously between its own value and a wider polygon, through the same smooth non-regular intermediates a fractional `sides:` gives. |
 
 ### Component-specific
 
