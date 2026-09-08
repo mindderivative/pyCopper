@@ -20,8 +20,8 @@ class TooltipDemo(ViewModel):
         self.view_source = (Path(__file__).parent / "Tooltip_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
 
-    def toggle(self, event: Any) -> None:
-        self.tip_open.update(lambda on: not on)
+    def show(self, event: Any) -> None:
+        self.tip_open.set(True)
 
     def close(self, event: Any) -> None:
         self.tip_open.set(False)

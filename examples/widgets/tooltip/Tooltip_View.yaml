@@ -29,10 +29,11 @@ root:
             24dp minimum height, 8dp padding, inverse colours -- container
             `inverse_surface`, label `inverse_on_surface`. Never modal and
             never scrimmed: a tooltip explains what is underneath it, so
-            covering that would defeat it. `open:` and `on_dismiss` drive
-            it the same way every overlay does; this demo opens it from a
-            click for a deterministic demonstration, though a real app
-            typically wires it to hover for an icon-only button.
+            covering that would defeat it. `open:` drives it the same way
+            every overlay does; this demo wires `on_pointer_enter`/
+            `on_pointer_leave` on the trigger, matching the spec's own
+            words: "display informative text when users hover or
+            long-press an element."
 
             Use cases, from the spec: plain tooltips briefly describe a UI
             element. They're best used for labelling elements with no
@@ -53,7 +54,7 @@ root:
               widget: IconButton
               text: "delete"
               style: {variant: standard}
-              handlers: {on_click: toggle}
+              handlers: {on_pointer_enter: show, on_pointer_leave: close}
 
         - {name: div3, widget: Divider, style: {width: expand}}
 
