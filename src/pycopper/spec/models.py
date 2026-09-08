@@ -518,6 +518,14 @@ class StyleSpec(_Frozen):
     #: 0 = outlined, 1 = filled. M3 uses this for selected/unselected states.
     icon_fill: float = Field(default=0.0, ge=0, le=1)
     icon_weight: float = Field(default=400.0, ge=100, le=700)
+    #: `Tab`'s icon+label arrangement. `"stacked"` (default) is the one
+    #: `COMPONENT_TABS.md`'s own diagram actually shows -- icon above the
+    #: label, the pair centred as one block. `"leading"`/`"trailing"` are
+    #: opt-in: the icon sits beside the label instead, on whichever side is
+    #: named -- the table's own "padding between inline icon and text: 8dp"
+    #: row, which names a real, sourced gap but no diagram example of the
+    #: arrangement itself, so left/right was a judgment call, not scraped.
+    icon_position: Literal["stacked", "leading", "trailing"] = "stacked"
 
     # shapes. A regular polygon is an analytic SDF like the rounded box, not a
     # rasterised path, which is what makes these free to animate: `sides` and

@@ -159,6 +159,67 @@ def test_a_tabs_icon_paints_above_its_label() -> None:
     assert glyph_ys[0] < glyph_ys[1] - 10.0
 
 
+def test_default_icon_position_is_stacked() -> None:
+    e = laid_out({"name": "w", "widget": "Tab", "text": "Home", "icon": "home"})
+    assert e.style.icon_position == "stacked"
+
+
+def test_a_leading_icon_paints_left_of_its_label_on_the_same_row() -> None:
+    """`style.icon_position: leading` -- opt-in, phil: "make icons opt-in
+    for left and right of label on the tab too." Inline, not stacked: the
+    icon and every label glyph share roughly one row (unlike the stacked
+    case above, which separates them vertically)."""
+    children = [
+        {
+            "name": "t0",
+            "widget": "Tab",
+            "text": "Home",
+            "icon": "home",
+            "style": {"icon_position": "leading"},
+        }
+    ]
+    app = app_with(children, value="t0")
+    glyphs = [s for s in paint(app).view if s["flags"][0] == Kind.GLYPH]
+    xs = sorted(float(s["rect"][0]) for s in glyphs)
+    assert xs[0] < xs[1] - 10.0, "the icon is the sole glyph well left of the label's own cluster"
+    ys = [float(s["rect"][1]) for s in glyphs]
+    assert max(ys) - min(ys) < 10.0, "inline, not stacked -- everything shares one row"
+
+
+def test_a_trailing_icon_paints_right_of_its_label_on_the_same_row() -> None:
+    children = [
+        {
+            "name": "t0",
+            "widget": "Tab",
+            "text": "Home",
+            "icon": "home",
+            "style": {"icon_position": "trailing"},
+        }
+    ]
+    app = app_with(children, value="t0")
+    glyphs = [s for s in paint(app).view if s["flags"][0] == Kind.GLYPH]
+    xs = sorted(float(s["rect"][0]) for s in glyphs)
+    assert xs[-1] > xs[-2] + 10.0, "the icon is the sole glyph well right of the label's cluster"
+    ys = [float(s["rect"][1]) for s in glyphs]
+    assert max(ys) - min(ys) < 10.0, "inline, not stacked -- everything shares one row"
+
+
+def test_an_inline_icon_still_grows_the_bar_to_sixty_four() -> None:
+    """The M3 table gives one height for "icon and label text", not one
+    per arrangement -- leading/trailing grow the bar exactly like stacked."""
+    children = [
+        {
+            "name": "t0",
+            "widget": "Tab",
+            "text": "Home",
+            "icon": "home",
+            "style": {"icon_position": "leading"},
+        }
+    ]
+    e = laid_out({"name": "w", "widget": "Tabs", "children": children})
+    assert e.size.height == TabElement.ICON_HEIGHT == 64.0
+
+
 def test_a_text_only_tab_is_unaffected_by_the_icon_anatomy() -> None:
     """No `icon:` at all -- the overwhelming majority of existing tabs --
     must see zero change from this feature."""

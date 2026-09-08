@@ -36,8 +36,9 @@ children:
 
           Use cases, from the spec: tabs organize groups of related content
           that are at the same level of hierarchy. Tab labels can include
-          icons and text (stacked above the label, per M3's own diagram);
-          text labels should be short.
+          icons and text -- stacked above the label by default (M3's own
+          diagram), or beside it via the opt-in `style.icon_position:
+          leading`/`trailing`. Text labels should be short.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}
@@ -69,7 +70,7 @@ children:
               - {name: s0, widget: Tab, text: "Overview", handlers: {on_click: select_tab2}}
               - {name: s1, widget: Tab, text: "Specs", handlers: {on_click: select_tab2}}
               - {name: s2, widget: Tab, text: "Reviews", handlers: {on_click: select_tab2}}
-          - {widget: Text, text: "With icons -- grows to 64dp", style: {color: on_surface_variant}}
+          - {widget: Text, text: "With icons -- stacked (default), grows to 64dp", style: {color: on_surface_variant}}
           - name: tabs_icon
             widget: Tabs
             value: "{{ tab3.get() }}"
@@ -78,6 +79,24 @@ children:
               - {name: i0, widget: Tab, text: "Video", icon: videocam, handlers: {on_click: select_tab3}}
               - {name: i1, widget: Tab, text: "Photos", icon: photo_camera, handlers: {on_click: select_tab3}}
               - {name: i2, widget: Tab, text: "Audio", icon: music_note, handlers: {on_click: select_tab3}}
+          - {widget: Text, text: "icon_position: leading -- opt-in, beside the label", style: {color: on_surface_variant}}
+          - name: tabs_icon_leading
+            widget: Tabs
+            value: "{{ tab4.get() }}"
+            style: {width: expand}
+            children:
+              - {name: l0, widget: Tab, text: "Video", icon: videocam, style: {icon_position: leading}, handlers: {on_click: select_tab4}}
+              - {name: l1, widget: Tab, text: "Photos", icon: photo_camera, style: {icon_position: leading}, handlers: {on_click: select_tab4}}
+              - {name: l2, widget: Tab, text: "Audio", icon: music_note, style: {icon_position: leading}, handlers: {on_click: select_tab4}}
+          - {widget: Text, text: "icon_position: trailing", style: {color: on_surface_variant}}
+          - name: tabs_icon_trailing
+            widget: Tabs
+            value: "{{ tab5.get() }}"
+            style: {width: expand}
+            children:
+              - {name: r0, widget: Tab, text: "Video", icon: videocam, style: {icon_position: trailing}, handlers: {on_click: select_tab5}}
+              - {name: r1, widget: Tab, text: "Photos", icon: photo_camera, style: {icon_position: trailing}, handlers: {on_click: select_tab5}}
+              - {name: r2, widget: Tab, text: "Audio", icon: music_note, style: {icon_position: trailing}, handlers: {on_click: select_tab5}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

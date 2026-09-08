@@ -608,36 +608,45 @@ class StatusBarElement(_StyledMixin, Flex):
 class TabElement(_StyledMixin, Padding):
     """One tab. The active indicator is drawn by the parent Tabs container.
 
-    `icon:` is an optional leading icon, stacked above the label -- `label`
-    text (below) rather than beside it, per `COMPONENT_TABS.md`'s own
-    Measurements table naming this arrangement "stacked icon" (the "overlap
-    of badge on stacked icon" row) and its own diagram (`m3.material.io`,
-    fetched directly, not recalled): the icon sits centred above the label,
-    the pair vertically centred as one block in a 64dp container -- "Icon
-    and labels are now vertically centered within the container." A table
-    row also lists "padding between INLINE icon and text" (8dp), a second,
-    side-by-side arrangement the diagram gave no example of; not built here.
+    `icon:` is an optional icon; `style.icon_position` picks its
+    arrangement against the label. `"stacked"` (default) is the one
+    `COMPONENT_TABS.md`'s own diagram actually shows (`m3.material.io`,
+    fetched directly, not recalled): icon above the label, the pair
+    vertically centred as one block -- "Icon and labels are now vertically
+    centered within the container." `"leading"`/`"trailing"` are opt-in:
+    the icon sits beside the label instead, on the named side, using the
+    table's own "padding between inline icon and text: 8dp" figure -- a
+    real, sourced gap, though the diagram gave no example of the
+    arrangement itself, so left-vs-right is a judgment call, not scraped.
 
     `icon:`/`label:` (via `self._icon`) needed no schema change -- both are
     already generic `TEMPLATED_FIELDS` (`spec/models.py`) from the earlier
     Icon/IconButton/Fab/NavItem/SearchBar migration. `text:` stays this
     widget's own label (it never overloaded `text:` to mean an icon glyph
-    the way those five did before that migration), so only `icon:` is new
-    here.
+    the way those five did before that migration), so only `icon:` (and
+    now `icon_position`) are new here.
     """
 
     HEIGHT: Final = 48.0
     #: `COMPONENT_TABS.md`'s own Measurements table: "Container height (icon
     #: and label text): 64dp" -- read from the same table's "Container
-    #: height (label text only): 48dp" row above.
+    #: height (label text only): 48dp" row above. One height for "icon and
+    #: label text" full stop, not one per arrangement, so this applies to
+    #: `leading`/`trailing` exactly as it does to `stacked`.
     ICON_HEIGHT: Final = 64.0
     PAD_X: Final = 16.0
-    #: Gap between the icon and the label beneath it. Read directly from the
-    #: Measurements diagram (fetched live from `m3.material.io`, the scraped
-    #: text alone gives no number for this) -- a best-effort reading of the
-    #: diagram's own tick marks, not a scraped text figure quoted verbatim
-    #: the way the two heights above are.
-    ICON_GAP: Final = 6.0
+    #: Gap between the icon and the label beneath it, `"stacked"` only.
+    #: Read directly from the Measurements diagram (fetched live from
+    #: `m3.material.io`, the scraped text alone gives no number for this)
+    #: -- a best-effort reading of the diagram's own tick marks, not a
+    #: scraped text figure quoted verbatim the way the two heights above
+    #: are.
+    STACK_GAP: Final = 6.0
+    #: Gap between the icon and the label beside it, `"leading"`/
+    #: `"trailing"` only. `COMPONENT_TABS.md`'s own Measurements table:
+    #: "Padding between inline icon and text: 8dp" -- a real scraped
+    #: figure, unlike `STACK_GAP` above.
+    INLINE_GAP: Final = 8.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -647,12 +656,21 @@ class TabElement(_StyledMixin, Padding):
     def _has_icon(self) -> bool:
         return bool(self._icon.strip())
 
+    @property
+    def _icon_position(self) -> str:
+        return self.style.icon_position
+
     def perform_layout(self, constraints: Constraints) -> Size:
         label_text = self._text.strip()
         label = measure_text(label_text, TAB_LABEL_ROLE, engine=self.text_engine)
         has_icon = self._has_icon
-        content_width = max(label.width, ICON) if has_icon else label.width
         height = self.ICON_HEIGHT if has_icon else self.HEIGHT
+        if not has_icon:
+            content_width = label.width
+        elif not label_text or self._icon_position == "stacked":
+            content_width = max(label.width, ICON) if label_text else ICON
+        else:
+            content_width = ICON + self.INLINE_GAP + label.width
         return self.sized(constraints, self.style).constrain(
             Size(content_width + self.PAD_X * 2, height)
         )
@@ -678,12 +696,20 @@ class TabElement(_StyledMixin, Padding):
                 token,
             )
             return
-        # Stacked: icon above label, the pair vertically centred as one
-        # block ("vertically centered within the container" -- not two
+        if not label_text or self._icon_position == "stacked":
+            self._paint_stacked(ctx, absolute, token, label)
+        else:
+            assert label is not None  # inline with no label falls into the stacked branch above
+            leading = self._icon_position == "leading"
+            self._paint_inline(ctx, absolute, token, label, leading=leading)
+
+    def _paint_stacked(self, ctx: PaintContext, absolute: Any, token: int, label: Any) -> None:
+        # Icon above label, the pair vertically centred as one block
+        # ("vertically centered within the container" -- not two
         # independently-centred halves, which is why this measures the
         # whole block's height once rather than centring the icon and the
         # label against the container separately).
-        block_height = ICON + (self.ICON_GAP + label.height if label is not None else 0.0)
+        block_height = ICON + (self.STACK_GAP + label.height if label is not None else 0.0)
         top = absolute.y + (self.size.height - block_height) / 2
         ctx.text.emit_icon(
             ctx.display_list,
@@ -700,11 +726,51 @@ class TabElement(_StyledMixin, Padding):
             paint_text(
                 ctx,
                 absolute.x + (self.size.width - label.width) / 2,
-                top + ICON + self.ICON_GAP,
-                label_text,
+                top + ICON + self.STACK_GAP,
+                self._text.strip(),
                 TAB_LABEL_ROLE,
                 token,
             )
+
+    def _paint_inline(
+        self, ctx: PaintContext, absolute: Any, token: int, label: Any, *, leading: bool
+    ) -> None:
+        # Icon beside the label, the pair horizontally centred as one
+        # block -- the same "one block, not two independently-centred
+        # halves" reasoning `_paint_stacked` uses, just along the other
+        # axis. Icon and label each centre against the block's own height,
+        # which may exceed either one alone (a tall icon, a multi-line
+        # label neither of these callers actually has today, but the
+        # centring still has to be correct if one does).
+        block_width = ICON + self.INLINE_GAP + label.width
+        block_height = max(ICON, label.height)
+        left = absolute.x + (self.size.width - block_width) / 2
+        top = absolute.y + (self.size.height - block_height) / 2
+        if leading:
+            icon_x = left
+            label_x = left + ICON + self.INLINE_GAP
+        else:
+            label_x = left
+            icon_x = left + label.width + self.INLINE_GAP
+        ctx.text.emit_icon(
+            ctx.display_list,
+            self._icon.strip(),
+            x=icon_x,
+            y=top + (block_height - ICON) / 2,
+            size=ICON,
+            pixel_ratio=ctx.pixel_ratio,
+            token=token,
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
+        )
+        paint_text(
+            ctx,
+            label_x,
+            top + (block_height - label.height) / 2,
+            self._text.strip(),
+            TAB_LABEL_ROLE,
+            token,
+        )
 
 
 class TabsElement(_SelectionContainer):
