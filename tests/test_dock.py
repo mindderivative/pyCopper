@@ -396,3 +396,155 @@ def test_are_focusable(kind: str) -> None:
     from pycopper.runtime.events import FOCUSABLE_KINDS
 
     assert kind in FOCUSABLE_KINDS
+
+
+# ---------------------------------------------------------- runtime drag/drop
+
+
+def _two_groups(*, second_two_panels: bool = False) -> dict:
+    """`left` (one panel) beside `right` (one or two panels), matching the
+    shape most of these tests drag between."""
+    right_children = [panel("terminal", "Terminal")]
+    if second_two_panels:
+        right_children.append(panel("output", "Output"))
+    return {
+        "name": "root",
+        "widget": "DockSplit",
+        "style": {"width": 800, "height": 400},
+        "children": [
+            {"name": "left", "widget": "DockGroup", "children": [panel("editor", "Editor")]},
+            {"name": "right", "widget": "DockGroup", "children": right_children},
+        ],
+    }
+
+
+def drag(a: App, start: tuple[float, float], *moves: tuple[float, float]) -> None:
+    """A press, past-threshold move(s), then release at the last point --
+    the minimum shape `dock_drag`'s gesture state machine needs to
+    register a drag rather than a click."""
+    sx, sy = start
+    a.dispatcher.post(PointerEvent(EventType.POINTER_DOWN, x=sx, y=sy))
+    a.dispatcher.drain()
+    for mx, my in moves:
+        a.dispatcher.post(PointerEvent(EventType.POINTER_MOVE, x=mx, y=my))
+        a.dispatcher.drain()
+    lx, ly = moves[-1]
+    a.dispatcher.post(PointerEvent(EventType.POINTER_UP, x=lx, y=ly))
+    a.dispatcher.drain()
+
+
+def test_a_plain_click_still_switches_tabs_not_a_drag() -> None:
+    """Below `DRAG_THRESHOLD`, this is an ordinary tab click -- must not be
+    swallowed by the new press/move/up handlers."""
+    view = _two_groups(second_two_panels=True)
+    a = app(view)
+    right = a.root.find("right")
+    rect = right.absolute_rect()
+    click(a, rect.x + 20, rect.y + 20)
+    assert right._active_name() == "terminal"
+
+
+def test_dragging_a_tab_onto_another_groups_strip_inserts_it_as_a_tab() -> None:
+    a = app(_two_groups())
+    left = a.root.find("left")
+    right = a.root.find("right")
+    start = (left.absolute_rect().x + 20, left.absolute_rect().y + 20)
+    target_rect = right.absolute_rect()
+    drop = (target_rect.x + target_rect.width / 2, target_rect.y + target_rect.height / 2)
+    drag(a, start, (start[0] + 20, start[1] + 5), drop)
+
+    right2 = a.root.find("right")
+    assert [c.name for c in right2.children] == ["terminal", "editor"]
+    assert a.root.find("editor") is not None, "moved, not disposed"
+
+
+def test_a_click_after_a_cancelled_drag_does_not_switch_tabs() -> None:
+    """`on_click`'s own drag-guard: the synthesized click after a drag's
+    POINTER_UP must not also switch the active tab."""
+    view = _two_groups(second_two_panels=True)
+    a = app(view)
+    right = a.root.find("right")
+    start = (right.absolute_rect().x + 20, right.absolute_rect().y + 20)
+    # Drag onto genuinely empty space, well outside the 800x400 view (no
+    # dock target at all) -- a no-op drop, but still a real drag, past
+    # threshold.
+    drag(a, start, (start[0] + 50, start[1] + 5), (5000.0, 5000.0))
+    assert right._active_name() == "terminal", "the drag's own drop, not a click, decides this"
+
+
+def test_dragging_onto_an_edge_splits_and_creates_a_new_pane() -> None:
+    a = app(_two_groups())
+    left = a.root.find("left")
+    right = a.root.find("right")
+    start = (right.absolute_rect().x + 20, right.absolute_rect().y + 20)
+    target_rect = left.absolute_rect()
+    # Right edge of `left`'s own rect -- classified as zone "right".
+    drop = (target_rect.x + target_rect.width * 0.9, target_rect.y + target_rect.height / 2)
+    drag(a, start, (start[0] - 20, start[1] + 5), drop)
+
+    left2 = a.root.find("left")
+    terminal = a.root.find("terminal")
+    assert terminal is not None, "moved, not disposed"
+    assert left2 is not None
+    new_split = left2.parent
+    from pycopper.widgets.dock import DockSplitElement
+
+    assert isinstance(new_split, DockSplitElement)
+    # Dropped on the right edge -- the original content stays first.
+    assert new_split.children[0] is left2
+    assert terminal.parent in new_split.children
+
+
+def test_an_emptied_group_collapses_its_parent_split() -> None:
+    """The last panel leaving a group must not leave a dangling empty group
+    and an invalid single-child split sitting in the tree."""
+    view = {
+        "name": "root",
+        "widget": "DockSplit",
+        "style": {"width": 900, "height": 400},
+        "children": [
+            {"name": "outer", "widget": "DockGroup", "children": [panel("files", "Files")]},
+            {
+                "name": "inner_split",
+                "widget": "DockSplit",
+                "children": [
+                    {
+                        "name": "mid",
+                        "widget": "DockGroup",
+                        "children": [panel("editor", "Editor")],
+                    },
+                    {
+                        "name": "empties",
+                        "widget": "DockGroup",
+                        "children": [panel("terminal", "T")],
+                    },
+                ],
+            },
+        ],
+    }
+    a = app(view)
+    empties = a.root.find("empties")
+    mid = a.root.find("mid")
+    start = (empties.absolute_rect().x + 20, empties.absolute_rect().y + 20)
+    target_rect = mid.absolute_rect()
+    # Dead center of `mid`'s own rect -- inside the center band on both
+    # axes, so it classifies as zone "tab" (a drop that does NOT itself
+    # create a new split -- the invariant below must hold regardless of
+    # which valid zone a drop happens to land in, exact pixel geometry is
+    # not what this test is about).
+    drop = (target_rect.x + target_rect.width / 2, target_rect.y + target_rect.height / 2)
+    drag(a, start, (start[0] - 20, start[1] + 5), drop)
+
+    from pycopper.widgets.dock import DockSplitElement
+
+    assert a.root.find("empties") is None, "the emptied group is gone"
+    assert a.root.find("terminal") is not None, "its panel was moved, not disposed"
+
+    def splits(node) -> list:
+        found = [node] if isinstance(node, DockSplitElement) else []
+        for child in node.children:
+            found.extend(splits(child))
+        return found
+
+    for split in splits(a.root):
+        assert len(split.children) != 1, "no dangling single-child split anywhere in the tree"

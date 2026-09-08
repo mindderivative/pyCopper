@@ -15,12 +15,13 @@ IDE's layout is:
   draggable divider. `value:` is the first child's share of the space,
   0..1; dragging the divider updates it and fires `on_change`.
 
-**This is the static half only.** Runtime drag-and-drop -- dragging a tab
-onto an edge to split or rearrange the tree at runtime -- is a separate,
-substantially larger feature (drop-zone hit-testing, tree mutation, tab
-reordering, drag previews) and is deliberately not part of this pass. A
-layout is arranged once, in the view file, the way a `Horizontal`/`Vertical`/`Stack`
-tree already is.
+**Runtime drag-and-drop** -- dragging a tab out of one `DockGroup` and
+dropping it as a new tab in another, or onto an edge to split that area
+and create a new pane -- is implemented in `dock_drag.py`, kept separate
+from this file's own static layout/paint/tab-switch/divider-drag code;
+see that module's own docstring for the design. A layout is still arranged
+once in the view file the way a `Horizontal`/`Vertical`/`Stack` tree is,
+but it is no longer fixed for the widget's lifetime.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from ..runtime.events import ChangeEvent, EventType
 from ..spec import WidgetSpec
 from ..spec.typescale import TYPE_SCALE
 from ..tree.element import PaintContext
+from . import dock_drag
 from .base import _StyledMixin, content_token, measure_text, paint_text
 from .material import HOVER, STATE_LAYER_CURVE, STATE_LAYER_MOTION, _box, _state_alpha
 
@@ -183,6 +185,13 @@ class DockGroupElement(_StyledMixin, LayoutNode):
     def on_click(self, event: Any) -> None:
         if self.effective_disabled:
             return
+        if self.state.data.pop("dragging", False):
+            # A drag that ended with a drop -- or with no valid target --
+            # must not also switch the active tab, which the synthesized
+            # CLICK following POINTER_UP would otherwise do (press and
+            # release share the same path[0], the tab strip, throughout a
+            # drag). See `dock_drag.py`.
+            return
         rect = self.absolute_rect()
         if event.y - rect.y > self.TAB_HEIGHT:
             return
@@ -195,12 +204,40 @@ class DockGroupElement(_StyledMixin, LayoutNode):
             handler(ChangeEvent(EventType.CHANGE, target=self, value=name))
         self.mark_needs_layout()
 
+    def on_pointer_down(self, event: Any) -> None:
+        if self.effective_disabled:
+            return
+        rect = self.absolute_rect()
+        if event.y - rect.y > self.TAB_HEIGHT:
+            return
+        name = self._tab_at(event.x)
+        if name is None:
+            return
+        self.state.data["press_tab"] = name
+        self.state.data["press_pos"] = (event.x, event.y)
+
     def on_pointer_move(self, event: Any) -> None:
+        press_tab = self.state.data.get("press_tab")
+        if press_tab is not None:
+            if self.state.data.get("dragging"):
+                dock_drag.update_drag(self, event.x, event.y)
+                return
+            px, py = self.state.data["press_pos"]
+            if ((event.x - px) ** 2 + (event.y - py) ** 2) ** 0.5 >= dock_drag.DRAG_THRESHOLD:
+                self.state.data["dragging"] = True
+                dock_drag.begin_drag(self, press_tab, event.x, event.y)
+            return
         rect = self.absolute_rect()
         name = self._tab_at(event.x) if event.y - rect.y <= self.TAB_HEIGHT else None
         if self.state.data.get("tab_hover") != name:
             self.state.data["tab_hover"] = name
             self.mark_needs_paint()
+
+    def on_pointer_up(self, event: Any) -> None:
+        self.state.data.pop("press_tab", None)
+        self.state.data.pop("press_pos", None)
+        if self.state.data.get("dragging"):
+            dock_drag.end_drag(self)
 
     def on_pointer_leave(self, event: Any) -> None:
         if self.state.data.get("tab_hover") is not None:
@@ -269,6 +306,11 @@ class DockGroupElement(_StyledMixin, LayoutNode):
                     token=ctx.palette.index("primary"),
                     radius=self.INDICATOR_H,
                 )
+        zone = self.state.data.get("drag_highlight")
+        if zone is not None:
+            dock_drag.paint_drop_zone(
+                ctx, absolute.x, absolute.y, self.size.width, self.size.height, zone
+            )
 
 
 class DockSplitElement(_StyledMixin, LayoutNode):
@@ -465,4 +507,9 @@ class DockSplitElement(_StyledMixin, LayoutNode):
                 color=(1.0, 1.0, 1.0, alpha),
                 clip=ctx.clip,
                 clip_radii=ctx.clip_radii,
+            )
+        zone = self.state.data.get("drag_highlight")
+        if zone is not None:
+            dock_drag.paint_drop_zone(
+                ctx, absolute.x, absolute.y, self.size.width, self.size.height, zone
             )

@@ -1,0 +1,364 @@
+"""Dock's runtime half: dragging a tab out of one `DockGroup` and dropping
+it as a new tab in another, or onto an edge to split that area and create
+a new pane. `dock.py`'s own module docstring used to call this "a separate,
+substantially larger feature... deliberately not part of this pass" --
+this module is that pass, kept separate from `dock.py` because the drag
+controller needs cross-element knowledge (source, target, zone classifier,
+tree splicer, overlay ghost) that is a distinct concern from either
+element's own static rendering, the same way `tree/reconcile.py` is a
+free-function module operating on elements rather than a method on one.
+
+**Gesture.** `DockGroupElement.on_pointer_down` (inside its own tab strip)
+stashes the pressed tab's name; `on_pointer_move` compares distance moved
+against `DRAG_THRESHOLD` before calling this module's `begin_drag`. Past
+that point every move calls `update_drag` (recompute the live drop target
+via `element.dispatcher.hit_path` -- independent of pointer capture, the
+only way to know what is under the cursor while capture routes every event
+to the drag's own source element and nowhere else -- and move the ghost),
+and `on_pointer_up` calls `end_drag` (perform the drop, or do nothing if
+there was no valid target).
+
+**Tree mutation never disposes a moved subtree.** `remove_child`/
+`insert_child` (`layout/node.py`) never call `dispose()` -- a `DockPanel`
+holding a live `Terminal` (a running shell process) survives a move
+untouched, which is why this is written directly against those two
+primitives rather than through `tree/reconcile.py`'s spec-diffing (which
+has no cross-parent matching at all, and would tear down and rebuild
+anything that moved between parents).
+
+**Scope, stated the same way `dock.py`'s own docstring discloses deferred
+work**: only mouse drag (no keyboard-driven rearrange), only cross-group
+moves and edge-splits (no reordering tabs within one group, no
+multi-panel drag), no floating/undocked windows, and no layout
+serialization across reloads -- a runtime rearrangement is pure in-memory
+tree state and is lost the moment a view file is hot-reloaded and
+`reconcile()` rebuilds from the parsed spec. `on_rearrange` exists so an
+application *can* persist a rearrangement if it wants to, not because
+pyCopper does.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Final, Literal
+
+from ..runtime.events import ChangeEvent, EventType
+from ..spec import SizeSpec, StyleSpec, WidgetKind, WidgetSpec
+
+if TYPE_CHECKING:
+    from .dock import DockGroupElement, DockPanelElement
+
+__all__ = ["DRAG_THRESHOLD", "begin_drag", "cancel_drag", "end_drag", "update_drag"]
+
+#: Not sourced -- no drag-threshold precedent exists anywhere else in this
+#: codebase -- chosen to distinguish an intentional drag from click jitter.
+DRAG_THRESHOLD: Final = 8.0
+
+#: Fraction of a target's own width/height that counts as its center zone
+#: (insert as a tab) rather than an edge zone (split). Generous on purpose,
+#: biasing toward tabbing over splitting the way most docking IDEs default.
+CENTER_BAND: Final = 0.25
+
+Zone = Literal["tab", "left", "right", "top", "bottom"]
+
+#: The ghost's own fixed size -- a label-sized rectangle, not a live
+#: re-render of the dragged panel's content (which could be a Terminal or
+#: anything else expensive/stateful to duplicate mid-drag).
+_GHOST_SIZE: Final = (140.0, 32.0)
+
+
+def _classify(local_x: float, local_y: float, width: float, height: float) -> Zone:
+    """Which zone of a `width` x `height` rect a point falls in.
+
+    Center (`CENTER_BAND`..`1-CENTER_BAND` on both axes) means "insert as a
+    tab"; otherwise whichever margin the point is furthest into, by
+    proportional distance past its own band edge, wins as the split edge.
+    """
+    fx = local_x / width if width > 0 else 0.5
+    fy = local_y / height if height > 0 else 0.5
+    if CENTER_BAND <= fx <= 1.0 - CENTER_BAND and CENTER_BAND <= fy <= 1.0 - CENTER_BAND:
+        return "tab"
+    # Distance past each band's own edge -- whichever margin is pierced
+    # deepest wins, so a point near a corner still resolves to one edge.
+    left_depth = CENTER_BAND - fx
+    right_depth = fx - (1.0 - CENTER_BAND)
+    top_depth = CENTER_BAND - fy
+    bottom_depth = fy - (1.0 - CENTER_BAND)
+    depths: list[tuple[float, Zone]] = [
+        (left_depth, "left"),
+        (right_depth, "right"),
+        (top_depth, "top"),
+        (bottom_depth, "bottom"),
+    ]
+    return max(depths, key=lambda pair: pair[0])[1]
+
+
+def find_drop_target(source: Any, x: float, y: float) -> tuple[Any, Zone] | None:
+    """The nearest `DockGroup`/`DockSplit` under `(x, y)`, and which zone of
+    it, or `None` if nothing dock-shaped is there. `source` (the dragging
+    element) is excluded so dragging back over your own tab strip is never
+    a valid target.
+    """
+    from .dock import DockGroupElement, DockSplitElement
+
+    dispatcher = source.dispatcher
+    if dispatcher is None:
+        return None
+    path = dispatcher.hit_path(x, y)
+    target = None
+    for element in reversed(path):
+        if element is source:
+            continue
+        if isinstance(element, DockGroupElement | DockSplitElement):
+            target = element
+            break
+    if target is None:
+        return None
+    # A DockSplit's own two children fill it entirely except the divider --
+    # recurse one more hit_path step to classify against whichever child is
+    # actually under the cursor, not the split's own (usually much larger)
+    # bounds.
+    if isinstance(target, DockSplitElement):
+        for element in reversed(path):
+            if element is target or element is source:
+                continue
+            is_dock = isinstance(element, DockGroupElement | DockSplitElement)
+            if is_dock and element in target.children:
+                target = element
+                break
+        else:
+            return None
+    rect = target.absolute_rect()
+    zone = _classify(x - rect.x, y - rect.y, rect.width, rect.height)
+    return target, zone
+
+
+def _build_ghost(label: str) -> Any:
+    from .base import build_element
+
+    width, height = _GHOST_SIZE
+    spec = WidgetSpec(
+        widget=WidgetKind.CONTAINER,
+        style=StyleSpec(
+            placement="pointer",
+            background="primary",
+            corner_radius=(6.0, 6.0, 6.0, 6.0),
+            width=SizeSpec("fixed", width),
+            height=SizeSpec("fixed", height),
+        ),
+    )
+    return build_element(spec)
+
+
+def begin_drag(source: DockGroupElement, panel_name: str, x: float, y: float) -> None:
+    """Start dragging `panel_name` out of `source`. Pushes a floating ghost
+    into the overlay layer, positioned by the same `"pointer"` placement
+    every other overlay uses."""
+    source.state.data["drag_panel"] = panel_name
+    source.state.data["drag_target"] = None
+    source.state.data["drag_zone"] = None
+    if source.dispatcher is not None:
+        ghost = _build_ghost(panel_name)
+        entry = source.dispatcher.overlays.push_transient(ghost)
+        source.state.data["drag_ghost_entry"] = entry
+    update_drag(source, x, y)
+
+
+def update_drag(source: DockGroupElement, x: float, y: float) -> None:
+    """Recompute the live drop target and move the ghost. Called on every
+    pointer move once a drag has started."""
+    from .dock import DockGroupElement as _Group
+    from .dock import DockSplitElement as _Split
+
+    found = find_drop_target(source, x, y)
+    previous = source.state.data.get("drag_target")
+    if previous is not None and isinstance(previous, _Group | _Split):
+        previous.state.data.pop("drag_highlight", None)
+        previous.mark_needs_paint()
+    if found is not None:
+        target, zone = found
+        target.state.data["drag_highlight"] = zone
+        target.mark_needs_paint()
+        source.state.data["drag_target"] = target
+        source.state.data["drag_zone"] = zone
+    else:
+        source.state.data["drag_target"] = None
+        source.state.data["drag_zone"] = None
+    entry = source.state.data.get("drag_ghost_entry")
+    if entry is not None:
+        entry.element.drag_offset = _pointer_offset(x, y)
+
+
+def _pointer_offset(x: float, y: float) -> Any:
+    from ..layout import Offset
+
+    return Offset(x + 12.0, y + 12.0)
+
+
+def end_drag(source: DockGroupElement) -> None:
+    """Finish the drag: perform the drop if there is a valid target, then
+    clear all drag state regardless."""
+    from .dock import DockGroupElement as _Group
+    from .dock import DockSplitElement as _Split
+
+    panel_name = source.state.data.get("drag_panel")
+    target = source.state.data.get("drag_target")
+    zone = source.state.data.get("drag_zone")
+    if panel_name is not None and target is not None and zone is not None:
+        panel = next((c for c in source.children if c.name == panel_name), None)
+        if panel is not None:
+            if zone == "tab":
+                _drop_as_tab(source, panel, target)
+            else:
+                _drop_as_split(source, panel, target, zone)
+    if isinstance(target, _Group | _Split):
+        target.state.data.pop("drag_highlight", None)
+        target.mark_needs_paint()
+    cancel_drag(source)
+
+
+def cancel_drag(source: DockGroupElement) -> None:
+    """Clear all drag state without performing a drop -- also the cleanup
+    path `end_drag` shares once it has done its own work."""
+    entry = source.state.data.pop("drag_ghost_entry", None)
+    if entry is not None and source.dispatcher is not None:
+        source.dispatcher.overlays.clear_transient()
+    source.state.data.pop("drag_panel", None)
+    source.state.data.pop("drag_target", None)
+    source.state.data.pop("drag_zone", None)
+
+
+def _fire_rearrange(element: Any, kind: str, panel_name: str) -> None:
+    handler = element.handlers.get("on_rearrange")
+    if handler is not None:
+        handler(ChangeEvent(EventType.CHANGE, target=element, value=f"{kind}:{panel_name}"))
+
+
+def _drop_as_tab(
+    source: DockGroupElement, panel: DockPanelElement, target: DockGroupElement
+) -> None:
+    source.remove_child(panel)
+    target.insert_child(len(target.children), panel)
+    target._value = panel.name or ""
+    _wire_new_subtree(target, panel)
+    collapse_if_empty(source)
+    _fire_rearrange(target, "tab", panel.name or "")
+
+
+def _drop_as_split(
+    source: DockGroupElement, panel: DockPanelElement, target: Any, zone: Zone
+) -> None:
+    from .base import build_element
+    from .dock import DockGroupElement as _Group
+
+    parent = target.parent
+    if parent is None:
+        return
+    index = parent.children.index(target)
+    horizontal = zone in ("left", "right")
+    new_split_spec = WidgetSpec(
+        widget=WidgetKind.DOCK_SPLIT,
+        style=StyleSpec(axis="horizontal" if horizontal else "vertical"),
+    )
+    new_group_spec = WidgetSpec(widget=WidgetKind.DOCK_GROUP)
+    new_split = build_element(new_split_spec)
+    new_group = build_element(new_group_spec)
+    assert isinstance(new_group, _Group)
+
+    parent.remove_child(target)
+    source.remove_child(panel)
+    new_group.insert_child(0, panel)
+    new_group._value = panel.name or ""
+
+    first, second = (new_group, target) if zone in ("left", "top") else (target, new_group)
+    new_split.insert_child(0, first)
+    new_split.insert_child(1, second)
+    parent.insert_child(index, new_split)
+
+    _wire_new_subtree(source, new_split)
+    collapse_if_empty(source)
+    _fire_rearrange(new_split, "split", panel.name or "")
+
+
+def _wire_new_subtree(reference: Any, subtree: Any) -> None:
+    """Wire a subtree built after initial mount the same way `PageHost`
+    already wires a page it constructs later (`widgets/pagehost.py`) --
+    ticker/text_engine/image_atlas/dispatcher propagated from an already-live
+    sibling, then `mounter()` to resolve `{{ }}` bindings and `handlers:`
+    the same way `App.mount()` would have for anything present at mount
+    time. `subtree` may be a pre-existing moved element (already wired --
+    these calls are idempotent, just re-propagating the same values) or a
+    genuinely new wrapper -- either way this is correct and cheap.
+    """
+    subtree.set_ticker(reference.ticker)
+    subtree.set_text_engine(reference.text_engine)
+    subtree.set_image_atlas(reference.image_atlas)
+    if reference.dispatcher is not None:
+        subtree.set_dispatcher(reference.dispatcher)
+    reference.mounter(subtree)
+
+
+#: Not sourced -- there is no M3 page for this -- a translucent tint over
+#: the target zone, the same visual idea every IDE's own docking drop
+#: indicator uses. Matches this file's own tab-hover state-layer opacity
+#: order of magnitude rather than inventing an unrelated value.
+HIGHLIGHT_OPACITY: Final = 0.24
+
+
+def paint_drop_zone(ctx: Any, x: float, y: float, width: float, height: float, zone: Zone) -> None:
+    """Paint the current drop-zone highlight -- called from both
+    `DockGroupElement.paint_self` and `DockSplitElement.paint_self`, reading
+    `self.state.data["drag_highlight"]`. `"tab"` tints the whole rect
+    (insert as a tab, no split edge to single out); an edge zone tints the
+    half of the rect on that side -- the pane the drop would create there.
+    """
+    dpr = ctx.pixel_ratio
+    if zone == "tab":
+        hx, hy, hw, hh = x, y, width, height
+    elif zone == "left":
+        hx, hy, hw, hh = x, y, width / 2.0, height
+    elif zone == "right":
+        hx, hy, hw, hh = x + width / 2.0, y, width / 2.0, height
+    elif zone == "top":
+        hx, hy, hw, hh = x, y, width, height / 2.0
+    else:  # "bottom"
+        hx, hy, hw, hh = x, y + height / 2.0, width, height / 2.0
+    ctx.display_list.add_box(
+        hx * dpr,
+        hy * dpr,
+        hw * dpr,
+        hh * dpr,
+        token=ctx.palette.index("primary"),
+        color=(1.0, 1.0, 1.0, HIGHLIGHT_OPACITY),
+        clip=ctx.clip,
+        clip_radii=ctx.clip_radii,
+    )
+
+
+def collapse_if_empty(group: DockGroupElement) -> None:
+    """If `group` lost its last panel, it is no longer valid on its own.
+
+    Its parent is either a `DockSplit` (the common case, by construction --
+    collapse it, promoting the surviving sibling into the split's own old
+    slot), the tree root (leave it empty, already tolerated --
+    `_active_name()` already returns `None` for zero children), or some
+    other container a view file legally wrapped it in (leave it empty too
+    -- an accepted edge-case limit, not a crash).
+    """
+    from .dock import DockSplitElement
+
+    if group.children:
+        return
+    parent = group.parent
+    if parent is None or not isinstance(parent, DockSplitElement):
+        return
+    siblings = [c for c in parent.children if c is not group]
+    if len(siblings) != 1:
+        return
+    survivor = siblings[0]
+    grandparent = parent.parent
+    if grandparent is None:
+        return
+    index = grandparent.children.index(parent)
+    grandparent.remove_child(parent)
+    parent.remove_child(survivor)
+    grandparent.insert_child(index, survivor)
