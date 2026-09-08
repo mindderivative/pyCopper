@@ -31,7 +31,9 @@ root:
             below it, flipping above when it would overflow the window.
             Cascading submenus reuse this same anchor mechanism (a
             `MenuItem` with `style.has_submenu` anchors a second `Menu`
-            beside itself).
+            beside itself). Each row's own optional `icon:` (24dp, leading
+            the label) is independent of its trailing shortcut -- both can
+            appear on the same row.
 
             Use cases, from the spec: use a menu to show a temporary set of
             actions. To show actions on screen at all times instead, use a
@@ -81,6 +83,6 @@ overlays:
     style: {anchor: trigger}
     handlers: {on_dismiss: close_menu}
     children:
-      - {name: cut, widget: MenuItem, text: "Cut", supporting_text: "Ctrl+X", handlers: {on_click: pick}}
-      - {name: copy, widget: MenuItem, text: "Copy", supporting_text: "Ctrl+C", handlers: {on_click: pick}}
-      - {name: paste, widget: MenuItem, text: "Paste", supporting_text: "Ctrl+V", handlers: {on_click: pick}}
+      - {name: cut, widget: MenuItem, text: "Cut", icon: content_cut, supporting_text: "Ctrl+X", handlers: {on_click: pick}}
+      - {name: copy, widget: MenuItem, text: "Copy", icon: content_copy, supporting_text: "Ctrl+C", handlers: {on_click: pick}}
+      - {name: paste, widget: MenuItem, text: "Paste", icon: content_paste, supporting_text: "Ctrl+V", handlers: {on_click: pick}}

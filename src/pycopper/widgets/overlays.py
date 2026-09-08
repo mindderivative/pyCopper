@@ -615,7 +615,18 @@ class MenuItemElement(_StyledMixin, Padding):
     denser. `supporting_text:` is the trailing text (a keyboard shortcut, in
     practice), drawn `on_surface_variant` at the far edge.
 
-    `style.has_submenu` swaps that trailing slot for a 24dp `chevron_right`
+    `icon:` is an optional 24dp leading icon (`COMPONENT_MENUS.md`'s own
+    anatomy: "List item leading icon"), needing no schema change -- already a
+    generic `TEMPLATED_FIELDS` entry (`spec/models.py`) from the earlier
+    Icon/IconButton/Fab/NavItem/SearchBar migration. Painted `on_surface_
+    variant` (the same role the trailing shortcut/chevron already use, and
+    the measurements table's own "left/right padding with-icon: 12dp" --
+    unchanged from the no-icon case, so only the label shifts, not the
+    row's own edges). Mirrors `NavItemElement`'s own expanded-row pattern
+    (icon, then `ICON + GAP` of space, then the label) rather than
+    inventing a new one.
+
+    `style.has_submenu` swaps the trailing slot for a 24dp `chevron_right`
     instead -- M3's anatomy lists a generic "Trailing icon (optional)", and a
     right-facing chevron marking "this opens more choices" is the near-
     universal convention for it (shown in the spec's own submenu screenshot,
@@ -634,9 +645,15 @@ class MenuItemElement(_StyledMixin, Padding):
     PAD_X: Final = 12.0
     LABEL: Final = 14.0
     CHEVRON: Final = 24.0
+    #: "Leading/trailing icon size: 24dp" (`COMPONENT_MENUS.md`'s own
+    #: baseline-menu measurement table) -- the same figure as `CHEVRON`
+    #: above, kept as its own name since the two are conceptually distinct
+    #: slots (leading icon vs. trailing chevron), not the same one reused.
+    ICON: Final = 24.0
     #: "Padding between elements within a list item" (`COMPONENT_MENUS.md`'s
     #: own baseline-menu measurement table) -- the gap between the label and
-    #: whichever trailing content this row has.
+    #: whichever trailing content this row has, and, now, between a leading
+    #: icon and the label.
     GAP: Final = 12.0
     CURSOR = "pointer"
 
@@ -644,13 +661,20 @@ class MenuItemElement(_StyledMixin, Padding):
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
 
+    @property
+    def _has_icon(self) -> bool:
+        return bool(self._icon.strip())
+
     def natural_width(self) -> float:
-        """This row's own content width: side padding, the label, and
-        whichever trailing content it has (a shortcut or the submenu
-        chevron) -- nothing else. `MenuElement` measures every row against
-        this to shrink-wrap the whole menu to its widest one, rather than
-        each row filling whatever width it happens to be offered."""
+        """This row's own content width: side padding, an optional leading
+        icon, the label, and whichever trailing content it has (a shortcut
+        or the submenu chevron) -- nothing else. `MenuElement` measures
+        every row against this to shrink-wrap the whole menu to its widest
+        one, rather than each row filling whatever width it happens to be
+        offered."""
         width = self.PAD_X * 2
+        if self._has_icon:
+            width += self.ICON + self.GAP
         label = self._text.strip()
         if label:
             width += measure_text(label, self.LABEL, engine=self.text_engine).width
@@ -685,12 +709,27 @@ class MenuItemElement(_StyledMixin, Padding):
             )
         _emit_state_layer(ctx, self, absolute, label_token, (0.0,) * 4)
 
+        x = absolute.x + self.PAD_X
+        if self._has_icon:
+            ctx.text.emit_icon(
+                ctx.display_list,
+                self._icon.strip(),
+                x=x,
+                y=absolute.y + (self.size.height - self.ICON) / 2,
+                size=self.ICON,
+                pixel_ratio=ctx.pixel_ratio,
+                token=ctx.palette.index("on_surface_variant"),
+                clip=ctx.clip,
+                clip_radii=ctx.clip_radii,
+            )
+            x += self.ICON + self.GAP
+
         label = self._text.strip()
         if label:
             metrics = measure_text(label, self.LABEL, engine=self.text_engine)
             paint_text(
                 ctx,
-                absolute.x + self.PAD_X,
+                x,
                 absolute.y + (self.size.height - metrics.height) / 2,
                 label,
                 self.LABEL,

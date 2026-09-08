@@ -26,12 +26,13 @@ root:
         - name: explanation
           widget: Text
           text: |
-            `supporting_text:` is the trailing text (a keyboard shortcut,
-            in practice), drawn `on_surface_variant` at the far edge.
-            `style.has_submenu` swaps that trailing slot for a 24dp
-            `chevron_right` instead -- the two trailing contents are
+            `icon:` is an optional 24dp leading icon (`on_surface_variant`,
+            like File/Edit/View below); `supporting_text:` is the trailing
+            text (a keyboard shortcut, in practice), drawn `on_surface_variant`
+            at the far edge. `style.has_submenu` swaps that trailing slot for
+            a 24dp `chevron_right` instead -- the two trailing contents are
             mutually exclusive, a row that opens a submenu does not also
-            carry its own shortcut.
+            carry its own shortcut. The icon slot is independent of both.
 
             Below is a real menu bar, not just an item in isolation: File,
             Edit, View, and Help each open their own `Menu`, and View's
@@ -91,10 +92,10 @@ overlays:
     style: {anchor: file}
     handlers: {on_dismiss: close_menu}
     children:
-      - {name: new_file, widget: MenuItem, text: "New", supporting_text: "Ctrl+N", handlers: {on_click: pick}}
-      - {name: open_file, widget: MenuItem, text: "Open", supporting_text: "Ctrl+O", handlers: {on_click: pick}}
-      - {name: save_file, widget: MenuItem, text: "Save", supporting_text: "Ctrl+S", handlers: {on_click: pick}}
-      - {name: quit_file, widget: MenuItem, text: "Exit", supporting_text: "Ctrl+Q", handlers: {on_click: pick}}
+      - {name: new_file, widget: MenuItem, text: "New", icon: insert_drive_file, supporting_text: "Ctrl+N", handlers: {on_click: pick}}
+      - {name: open_file, widget: MenuItem, text: "Open", icon: folder_open, supporting_text: "Ctrl+O", handlers: {on_click: pick}}
+      - {name: save_file, widget: MenuItem, text: "Save", icon: save, supporting_text: "Ctrl+S", handlers: {on_click: pick}}
+      - {name: quit_file, widget: MenuItem, text: "Exit", icon: logout, supporting_text: "Ctrl+Q", handlers: {on_click: pick}}
 
   - name: edit_menu
     widget: Menu
@@ -102,9 +103,9 @@ overlays:
     style: {anchor: edit}
     handlers: {on_dismiss: close_menu}
     children:
-      - {name: cut, widget: MenuItem, text: "Cut", supporting_text: "Ctrl+X", handlers: {on_click: pick}}
-      - {name: copy, widget: MenuItem, text: "Copy", supporting_text: "Ctrl+C", handlers: {on_click: pick}}
-      - {name: paste, widget: MenuItem, text: "Paste", supporting_text: "Ctrl+V", handlers: {on_click: pick}}
+      - {name: cut, widget: MenuItem, text: "Cut", icon: content_cut, supporting_text: "Ctrl+X", handlers: {on_click: pick}}
+      - {name: copy, widget: MenuItem, text: "Copy", icon: content_copy, supporting_text: "Ctrl+C", handlers: {on_click: pick}}
+      - {name: paste, widget: MenuItem, text: "Paste", icon: content_paste, supporting_text: "Ctrl+V", handlers: {on_click: pick}}
 
   - name: view_menu
     widget: Menu
@@ -112,9 +113,9 @@ overlays:
     style: {anchor: view}
     handlers: {on_dismiss: close_menu}
     children:
-      - {name: zoom_in, widget: MenuItem, text: "Zoom In", supporting_text: "Ctrl++", handlers: {on_click: pick}}
-      - {name: zoom_out, widget: MenuItem, text: "Zoom Out", supporting_text: "Ctrl+-", handlers: {on_click: pick}}
-      - {name: panels, widget: MenuItem, text: "Panels", style: {has_submenu: true}, handlers: {on_click: open_panels}}
+      - {name: zoom_in, widget: MenuItem, text: "Zoom In", icon: zoom_in, supporting_text: "Ctrl++", handlers: {on_click: pick}}
+      - {name: zoom_out, widget: MenuItem, text: "Zoom Out", icon: zoom_out, supporting_text: "Ctrl+-", handlers: {on_click: pick}}
+      - {name: panels, widget: MenuItem, text: "Panels", icon: folder, style: {has_submenu: true}, handlers: {on_click: open_panels}}
 
   - name: panels_menu
     widget: Menu

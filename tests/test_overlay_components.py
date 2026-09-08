@@ -441,6 +441,59 @@ def test_menu_item_natural_width_includes_the_submenu_chevron() -> None:
     )
 
 
+def test_menu_item_natural_width_includes_a_leading_icon() -> None:
+    """`COMPONENT_MENUS.md`'s own anatomy: "List item leading icon" -- a
+    real, optional slot, at its own fixed 24dp size plus the same 12dp gap
+    a trailing shortcut/chevron would use."""
+    plain = laid_out({"widget": "MenuItem", "text": "Cut"})
+    iconed = laid_out({"widget": "MenuItem", "text": "Cut", "icon": "content_cut"})
+    assert iconed.natural_width() == pytest.approx(
+        plain.natural_width() + MenuItemElement.ICON + MenuItemElement.GAP
+    )
+
+
+def test_a_menu_items_leading_icon_and_trailing_shortcut_both_measure_in() -> None:
+    """The two slots are independent -- an icon on one side does not
+    substitute for content on the other."""
+    icon_only = laid_out({"widget": "MenuItem", "text": "Copy", "icon": "content_copy"})
+    both = laid_out(
+        {
+            "widget": "MenuItem",
+            "text": "Copy",
+            "icon": "content_copy",
+            "supporting_text": "Ctrl+C",
+        }
+    )
+    assert both.natural_width() > icon_only.natural_width()
+
+
+def test_a_menu_items_leading_icon_paints_left_of_its_label() -> None:
+    from pycopper.paint import Kind
+
+    dl = painted(
+        {
+            "widget": "Menu",
+            "children": [{"widget": "MenuItem", "text": "Cut", "icon": "content_cut"}],
+        }
+    )
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    xs = sorted(float(s["rect"][0]) for s in glyphs)
+    assert xs[0] < xs[1] - 10.0, "the icon is the sole glyph well left of the label's own cluster"
+
+
+def test_a_menu_items_leading_icon_uses_the_on_surface_variant_token() -> None:
+    """The same role the trailing shortcut/chevron already use -- a menu
+    row's own content is on_surface, its secondary/supporting glyphs are
+    on_surface_variant."""
+    dl = painted(
+        {
+            "widget": "Menu",
+            "children": [{"widget": "MenuItem", "text": "Cut", "icon": "content_cut"}],
+        }
+    )
+    assert PALETTE.index("on_surface_variant") in tokens_in(dl)
+
+
 def test_menu_item_paints_label_and_trailing_shortcut() -> None:
     dl = painted(
         {
