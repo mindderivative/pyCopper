@@ -16,7 +16,7 @@ class DialogDemo(ViewModel):
 
     def __init__(self) -> None:
         self.dialog_open = Signal(False, name="dialog_open")
-        self.dismissals = Signal(0, name="dismissals")
+        self.deleted = Signal(0, name="deleted")
 
         self.view_source = (Path(__file__).parent / "Dialog_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
@@ -25,8 +25,10 @@ class DialogDemo(ViewModel):
         self.dialog_open.set(True)
 
     def close_dialog(self, event: Any) -> None:
+        """Cancel, click-outside, or Escape -- backing out with nothing done."""
         self.dialog_open.set(False)
-        self.dismissals.update(lambda n: n + 1)
 
     def confirm_delete(self, event: Any) -> None:
+        """The actual action the dialog exists to confirm."""
         self.dialog_open.set(False)
+        self.deleted.update(lambda n: n + 1)
