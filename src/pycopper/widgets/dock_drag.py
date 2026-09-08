@@ -170,6 +170,44 @@ def _build_ghost(label: str) -> Any:
     return build_element(spec)
 
 
+#: The single element currently showing a drop-zone indicator, tracked
+#: globally rather than per-source-group -- see `_set_highlight`. There is
+#: only ever one drag in flight at a time in a real app, so a module-level
+#: reference is the simplest thing that is also correct.
+_highlighted: Any | None = None
+
+
+def _set_highlight(element: Any, zone: Zone) -> None:
+    """Highlight `element`, first clearing whatever else was previously
+    highlighted -- guarantees exactly one element is ever highlighted
+    app-wide.
+
+    Found live: clearing scoped to "whatever `source.state.data
+    ['drag_target']` was last time", one attribute per drag-initiating
+    group, could leave a highlight stuck on an element if that
+    bookkeeping ever fell even slightly out of step with the highlight it
+    was meant to track -- phil: seeing a highlight "mostly on the tab
+    strip" while hovering somewhere else entirely. A single, global
+    "whatever is highlighted right now" reference cannot drift out of
+    sync with itself the way two separate pieces of per-source state can.
+    """
+    global _highlighted
+    if _highlighted is not None and _highlighted is not element:
+        _highlighted.state.data.pop("drag_highlight", None)
+        _highlighted.mark_needs_paint()
+    element.state.data["drag_highlight"] = zone
+    element.mark_needs_paint()
+    _highlighted = element
+
+
+def _clear_highlight() -> None:
+    global _highlighted
+    if _highlighted is not None:
+        _highlighted.state.data.pop("drag_highlight", None)
+        _highlighted.mark_needs_paint()
+        _highlighted = None
+
+
 def begin_drag(source: DockGroupElement, panel_name: str, x: float, y: float) -> None:
     """Start dragging `panel_name` out of `source`. Pushes a floating ghost
     into the overlay layer, positioned by the same `"pointer"` placement
@@ -177,6 +215,7 @@ def begin_drag(source: DockGroupElement, panel_name: str, x: float, y: float) ->
     source.state.data["drag_panel"] = panel_name
     source.state.data["drag_target"] = None
     source.state.data["drag_zone"] = None
+    _clear_highlight()  # a stray highlight from any earlier drag must not survive into this one
     if source.dispatcher is not None:
         ghost = _build_ghost(panel_name)
         entry = source.dispatcher.overlays.push_transient(ghost)
@@ -187,21 +226,14 @@ def begin_drag(source: DockGroupElement, panel_name: str, x: float, y: float) ->
 def update_drag(source: DockGroupElement, x: float, y: float) -> None:
     """Recompute the live drop target and move the ghost. Called on every
     pointer move once a drag has started."""
-    from .dock import DockGroupElement as _Group
-    from .dock import DockSplitElement as _Split
-
     found = find_drop_target(source, x, y)
-    previous = source.state.data.get("drag_target")
-    if previous is not None and isinstance(previous, _Group | _Split):
-        previous.state.data.pop("drag_highlight", None)
-        previous.mark_needs_paint()
     if found is not None:
         target, zone = found
-        target.state.data["drag_highlight"] = zone
-        target.mark_needs_paint()
+        _set_highlight(target, zone)
         source.state.data["drag_target"] = target
         source.state.data["drag_zone"] = zone
     else:
+        _clear_highlight()
         source.state.data["drag_target"] = None
         source.state.data["drag_zone"] = None
     entry = source.state.data.get("drag_ghost_entry")
@@ -256,9 +288,7 @@ def end_drag(source: DockGroupElement) -> None:
                 _drop_as_tab(source, panel, target)
             elif zone != "tab" and isinstance(target, _Group | _Split):
                 _drop_as_split(source, panel, target, zone)
-    if isinstance(target, _Group | _Split):
-        target.state.data.pop("drag_highlight", None)
-        target.mark_needs_paint()
+    _clear_highlight()
     # Set *before* cancel_drag clears "dragging" -- kept as its own
     # one-shot flag, separate from "dragging" itself, because
     # DockGroupElement.on_click needs to see "a drag just ended" AFTER
