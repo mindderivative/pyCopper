@@ -53,10 +53,10 @@ children:
         widget: StatusBar
         style: {width: expand, height: 28, background: surface_container_low, padding: {left: 12, right: 12}}
         children:
-          - {widget: Text, text: "Ln 12, Col 4", style: {font_size: 12, color: on_surface_variant}}
+          - {widget: Icon, icon: check_circle, style: {icon_size: 14, color: on_surface_variant}}
+          - {widget: Text, text: " main   Ln 12, Col 4", style: {font_size: 12, color: on_surface_variant}}
           - {widget: Spacer}
           - {widget: Text, text: "UTF-8", style: {font_size: 12, color: on_surface_variant}}
-          - {widget: Text, text: "  |  main", style: {font_size: 12, color: on_surface_variant}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 
