@@ -185,12 +185,17 @@ class DockGroupElement(_StyledMixin, LayoutNode):
     def on_click(self, event: Any) -> None:
         if self.effective_disabled:
             return
-        if self.state.data.pop("dragging", False):
+        if self.state.data.pop("just_dragged", False):
             # A drag that ended with a drop -- or with no valid target --
             # must not also switch the active tab, which the synthesized
-            # CLICK following POINTER_UP would otherwise do (press and
-            # release share the same path[0], the tab strip, throughout a
-            # drag). See `dock_drag.py`.
+            # CLICK following POINTER_UP would otherwise do when press and
+            # release land on the same element (only case a CLICK is even
+            # synthesized after a drag). A one-shot flag, deliberately
+            # separate from "dragging" itself -- `cancel_drag` (called from
+            # `on_pointer_up`, which always runs before this) already
+            # clears "dragging" by the time a synthesized CLICK could ever
+            # reach here, so checking that instead would never fire. See
+            # `dock_drag.end_drag`.
             return
         rect = self.absolute_rect()
         if event.y - rect.y > self.TAB_HEIGHT:

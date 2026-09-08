@@ -213,18 +213,42 @@ def end_drag(source: DockGroupElement) -> None:
     if isinstance(target, _Group | _Split):
         target.state.data.pop("drag_highlight", None)
         target.mark_needs_paint()
+    # Set *before* cancel_drag clears "dragging" -- kept as its own
+    # one-shot flag, separate from "dragging" itself, because
+    # DockGroupElement.on_click needs to see "a drag just ended" AFTER
+    # on_pointer_up has already run cancel_drag (dispatch order:
+    # POINTER_UP is handled, then, only if press and release shared the
+    # same element, a synthesized CLICK follows -- events.py:422-430).
+    # "dragging" itself is gone by then; this flag is what on_click
+    # actually reads.
+    source.state.data["just_dragged"] = True
     cancel_drag(source)
 
 
 def cancel_drag(source: DockGroupElement) -> None:
     """Clear all drag state without performing a drop -- also the cleanup
-    path `end_drag` shares once it has done its own work."""
+    path `end_drag` shares once it has done its own work.
+
+    **Must clear `"dragging"` itself.** Found live: it wasn't, and the
+    synthesized CLICK that follows POINTER_UP -- the only *other* place
+    that cleared it -- only ever fires when the release lands back on the
+    same element as the press (`EventDispatcher._dispatch_pointer`,
+    `events.py:422-430`, comparing a fresh `hit_path` at the release point
+    against the press's own path). A genuine cross-group drop releases
+    over a *different* element, so that CLICK never fires at all for the
+    success case this whole feature exists for -- leaving `"dragging"`
+    stuck `True` on the source group forever, which made every later
+    press-and-move on it skip the threshold check entirely and immediately
+    resume "drag update" mode, and left its ghost never cleared the one
+    time a real drop's own `cancel_drag` call still ran before this fix.
+    """
     entry = source.state.data.pop("drag_ghost_entry", None)
     if entry is not None and source.dispatcher is not None:
         source.dispatcher.overlays.clear_transient()
     source.state.data.pop("drag_panel", None)
     source.state.data.pop("drag_target", None)
     source.state.data.pop("drag_zone", None)
+    source.state.data.pop("dragging", None)
 
 
 def _fire_rearrange(element: Any, kind: str, panel_name: str) -> None:

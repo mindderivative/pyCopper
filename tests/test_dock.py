@@ -444,6 +444,34 @@ def test_a_plain_click_still_switches_tabs_not_a_drag() -> None:
     assert right._active_name() == "terminal"
 
 
+def test_a_drag_that_releases_back_on_its_own_group_does_not_switch_tabs() -> None:
+    """Found live: a real cross-group drag left `state.data["dragging"]`
+    stuck `True` forever, because the synthesized CLICK that used to clear
+    it only fires when release lands back on the *same* element as the
+    press (`EventDispatcher._dispatch_pointer`) -- true for THIS case
+    (wobble within one group, past threshold, release still over it), but
+    never true for a genuine cross-group drop. `end_drag`'s own
+    `just_dragged` one-shot flag is what actually has to suppress the
+    tab-switch here; assert that mechanism works for the one case where a
+    CLICK really does follow."""
+    view = _two_groups(second_two_panels=True)
+    a = app(view)
+    right = a.root.find("right")
+    rect = right.absolute_rect()
+    start = (rect.x + 20, rect.y + 20)  # "terminal" tab
+    # Wobble past DRAG_THRESHOLD but land back over the same group, on a
+    # different tab ("output") -- a real drag, released on itself.
+    end = (rect.x + 20, rect.y + 20 + 20)
+    drag(a, start, (start[0] + 20, start[1] + 5), end)
+    assert right._active_name() == "terminal", "the drag's own drop decided this, not a stray click"
+    # And a plain, later click still works normally -- the guard is a
+    # one-shot flag, not stuck permanently suppressing clicks.
+    right2 = a.root.find("right")
+    output_x = right2.absolute_rect().x + right2._tab_rects()[1][1] + 10
+    click(a, output_x, right2.absolute_rect().y + 20)
+    assert right2._active_name() == "output"
+
+
 def test_dragging_a_tab_onto_another_groups_strip_inserts_it_as_a_tab() -> None:
     a = app(_two_groups())
     left = a.root.find("left")
