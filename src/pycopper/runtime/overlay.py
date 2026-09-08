@@ -64,6 +64,15 @@ class OverlayEntry:
     #: they land on whatever is behind it.
     dismissed: bool = False
 
+    #: A controller-owned entry pushed via `OverlayHost.push_transient`
+    #: rather than declared in `ViewSpec.overlays` -- Dock's drag-and-drop
+    #: ghost/drop-zone highlight is the first user. Never has an `open:`
+    #: binding or a dismiss gesture of its own (its owner adds/removes it
+    #: directly), so `showing` and `visible()` special-case it: always
+    #: "showing" while present, but excluded from hit-testing/press so it
+    #: never steals routing from the gesture that owns it.
+    transient: bool = False
+
     @property
     def showing(self) -> bool:
         """Whether this overlay should be up.
@@ -73,7 +82,13 @@ class OverlayEntry:
         drawn at full opacity while being excluded from hit testing -- a dialog
         you could see, could not click, and could not close, because the only
         buttons that would clear its signal were underneath it.
+
+        A transient entry has neither source -- its lifetime is owned
+        directly by whatever pushed it -- so it is simply "showing" for as
+        long as it exists.
         """
+        if self.transient:
+            return True
         return bool(self.element.is_open) and not self.dismissed
 
     @property
@@ -185,6 +200,30 @@ class OverlayHost:
         for entry in self.entries:
             entry.dismissed = False
 
+    def push_transient(self, element: Any) -> OverlayEntry:
+        """Add a controller-owned overlay entry outside the declarative
+        `ViewSpec.overlays` list -- the escape hatch a gesture that must
+        paint unclipped, above everything, needs without being authored in
+        a view file. `element` still needs to be a real, already-built
+        element (via `build_element`, with `text_engine`/`image_atlas`/
+        `ticker` already wired the normal way) -- this only skips `build()`'s
+        spec-list construction, not element construction itself. Positioned
+        by the same `_place()` logic every other overlay uses (read
+        `element.style.placement`, e.g. `"pointer"`, same as any declared
+        overlay); painted via `rendered()`'s existing fade-aware fallback,
+        never hit-tested (`visible()` excludes it). Removed by
+        `clear_transient()`, never by dismissal -- a transient entry has no
+        `open:` binding for a dismissal to even coordinate against.
+        """
+        entry = OverlayEntry(element, transient=True)
+        self.entries.append(entry)
+        return entry
+
+    def clear_transient(self) -> None:
+        """Remove every transient entry -- called once the gesture that
+        pushed one ends or cancels."""
+        self.entries = [e for e in self.entries if not e.transient]
+
     def bind(
         self,
         context: dict[str, Any],
@@ -223,8 +262,17 @@ class OverlayHost:
         just dismissed must stop swallowing clicks the moment it is dismissed,
         not 200ms later -- so hit testing, modality and dismissal all read this
         list, while layout and paint read `rendered()`.
+
+        Also excludes transient entries (`OverlayEntry.transient`) -- a drag
+        ghost/drop-zone highlight must never itself absorb the hit-testing or
+        press handling meant for the gesture that owns it. `rendered()` still
+        includes them for layout/paint, via its own `opacity > 0.0` fallback.
         """
-        return [e for e in self.entries if e.showing and e.key not in self._dismissed]
+        return [
+            e
+            for e in self.entries
+            if not e.transient and e.showing and e.key not in self._dismissed
+        ]
 
     def rendered(self) -> list[OverlayEntry]:
         """Overlays that must be **drawn**: the interactive ones, plus any
