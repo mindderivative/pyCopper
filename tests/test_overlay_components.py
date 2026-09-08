@@ -185,6 +185,44 @@ def test_dialog_without_actions_still_lays_out() -> None:
     assert dialog.size.height > DialogElement.PADDING * 2
 
 
+def test_the_actions_row_fills_the_content_width_so_end_alignment_works() -> None:
+    """phil: "cancel and delete buttons are aligned to the left, the delete
+    button needs to be aligned to the right, and the cancel aligned to the
+    left." A `Horizontal` actions child used to be laid out with
+    `min_width=0.0`, so it shrink-wrapped to its own buttons' content width
+    -- `main_alignment: end` then had no free space left to push anything
+    into, and the whole row sat flush against `pad.left` regardless. The
+    child must now be given the dialog's full inner width, so its own
+    `main_alignment: end` genuinely pushes the last button to the dialog's
+    trailing edge."""
+    dialog = laid_out(
+        {
+            "widget": "Dialog",
+            "text": "Title",
+            "style": {"width": 400},
+            "children": [
+                {
+                    "widget": "Horizontal",
+                    "style": {"spacing": 8, "main_alignment": "end", "height": 40},
+                    "children": [
+                        {"widget": "Button", "text": "Cancel", "style": {"variant": "text"}},
+                        {"widget": "Button", "text": "Delete", "style": {"variant": "filled"}},
+                    ],
+                }
+            ],
+        }
+    )
+    actions = dialog.children[0]
+    inner_width = dialog.size.width - DialogElement.PADDING * 2
+    assert actions.size.width == pytest.approx(inner_width)
+    cancel, delete = actions.children
+    # Delete (the last button) reaches the row's own right edge; Cancel
+    # sits immediately to its left, inside the same right-hand cluster --
+    # not spread to opposite ends, matching M3's own basic-dialog diagrams.
+    assert delete.offset.x + delete.size.width == pytest.approx(actions.size.width)
+    assert cancel.offset.x < delete.offset.x
+
+
 def test_dialog_paints_the_m3_container_token() -> None:
     dl = painted({"widget": "Dialog", "text": "Title", "style": {"modal": True, "scrim": True}})
     assert PALETTE.index("surface_container_high") in tokens_in(dl)

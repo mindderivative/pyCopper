@@ -260,9 +260,23 @@ class DialogElement(_StyledMixin, Padding):
         actions_h = 0.0
         child = self.child
         if child is not None:
+            # Tight, not `min_width=0.0`: the actions child (normally a
+            # `Horizontal` of buttons) must fill the dialog's own content
+            # width, or its own `main_alignment` has no free space to push
+            # anything into. Found live (phil: "cancel and delete buttons
+            # are aligned to the left, the delete button needs to be
+            # aligned to the right") -- with `min_width=0.0`, a Horizontal
+            # shrink-wraps to its buttons' own content width regardless of
+            # `main_alignment: end`, so the whole row sat flush against
+            # `pad.left` no matter what the view asked for. M3's own basic-
+            # dialog diagrams (fetched live earlier this session) always
+            # show the actions clustered together at the dialog's trailing
+            # edge, matching what `main_alignment: end` was already
+            # correctly asking for in the demo -- the row just never had
+            # room to honour it.
             child.layout(
                 Constraints(
-                    min_width=0.0,
+                    min_width=inner_width,
                     max_width=inner_width,
                     min_height=0.0,
                     max_height=constraints.max_height,
