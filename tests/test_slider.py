@@ -20,6 +20,7 @@ from pycopper.widgets.base import _REGISTRY, create_element
 from pycopper.widgets.slider import SliderElement
 
 PAL = Palette(Theme(dark=True))
+XS_TRACK_HEIGHT, XS_HANDLE_HEIGHT, XS_TRACK_RADIUS = SliderElement.SIZES["extra_small"]
 
 
 def slider(width: float = 200.0, **spec) -> SliderElement:
@@ -89,7 +90,57 @@ def test_is_focusable() -> None:
 def test_handle_height_sets_the_overall_height() -> None:
     """M3 XS anatomy: 44dp handle, taller than the 16dp track it sits on."""
     e = slider()
-    assert e.size.height == SliderElement.HANDLE_HEIGHT == 44.0
+    assert e.size.height == XS_HANDLE_HEIGHT == 44.0
+
+
+@pytest.mark.parametrize(
+    ("size", "track_height", "handle_height", "track_radius"),
+    [
+        ("extra_small", 16.0, 44.0, 8.0),
+        ("small", 24.0, 44.0, 8.0),
+        ("medium", 40.0, 52.0, 12.0),
+        ("large", 56.0, 68.0, 16.0),
+        ("extra_large", 96.0, 108.0, 28.0),
+    ],
+)
+def test_the_size_ladder_matches_component_sliders_md(
+    size: str, track_height: float, handle_height: float, track_radius: float
+) -> None:
+    """`COMPONENT_SLIDERS.md`'s own Measurements table, every size -- the
+    overall element height (driven by handle height), the painted track
+    segments' own thickness, and their outer-end corner radius (`track_
+    radius`'s size-derived default, since no view here sets it explicitly)."""
+    e = slider(value="50", style={"min": 0, "max": 100, "size": size})
+    assert e.size.height == handle_height
+
+    dl = painted(e)
+    tracks = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX and round(float(s["rect"][3]), 3) == round(track_height, 3)
+    ]
+    assert len(tracks) == 2, f"expected two {track_height}dp track segments for size={size!r}"
+    for s in tracks:
+        radii = {float(v) for v in s["radii"]}
+        # Which specific corner is the outer end vs. the handle-facing
+        # cradle differs per segment -- already covered exactly by
+        # test_track_segments_are_square_near_the_handle_and_rounded_at_the_outer_end.
+        # Here: the size-derived outer radius must appear somewhere, next
+        # to the unrelated, unscaled cradle_radius default (2.0).
+        assert track_radius in radii
+        assert 2.0 in radii
+
+
+def test_an_explicit_track_radius_still_wins_over_the_size_default() -> None:
+    """A view file that sets `track_radius:` explicitly must keep it, even
+    though the size ladder now gives every size its own default -- the same
+    `model_fields_set` distinction `DockSplitElement.horizontal` already
+    relies on for `axis` (`widgets/dock.py`)."""
+    e = slider(value="50", style={"min": 0, "max": 100, "size": "extra_large", "track_radius": 3.0})
+    assert e._track_radius() == 3.0
+
+    default = slider(value="50", style={"min": 0, "max": 100, "size": "extra_large"})
+    assert default._track_radius() == 28.0
 
 
 def test_an_unbounded_width_falls_back_to_its_own_minimum() -> None:
@@ -234,8 +285,8 @@ def test_the_handle_is_drawn_taller_than_the_track() -> None:
     """M3's own visual point: a vertical bar, not a circular thumb like Switch."""
     dl = painted(slider(value="50", style={"min": 0, "max": 100}))
     heights = {round(float(s["rect"][3]), 3) for s in dl.view if s["flags"][0] == Kind.BOX}
-    assert round(SliderElement.HANDLE_HEIGHT, 3) in heights
-    assert round(SliderElement.TRACK_HEIGHT, 3) in heights
+    assert round(XS_HANDLE_HEIGHT, 3) in heights
+    assert round(XS_TRACK_HEIGHT, 3) in heights
 
 
 # ------------------------------------------------------------ style opt-ins
@@ -262,8 +313,7 @@ def test_a_gap_separates_the_track_from_the_handle() -> None:
     tracks = [
         s
         for s in dl.view
-        if s["flags"][0] == Kind.BOX
-        and round(float(s["rect"][3]), 3) == round(SliderElement.TRACK_HEIGHT, 3)
+        if s["flags"][0] == Kind.BOX and round(float(s["rect"][3]), 3) == round(XS_TRACK_HEIGHT, 3)
     ]
     assert len(tracks) == 2
     for s in tracks:
@@ -285,8 +335,7 @@ def test_track_segments_are_square_near_the_handle_and_rounded_at_the_outer_end(
     tracks = [
         s
         for s in dl.view
-        if s["flags"][0] == Kind.BOX
-        and round(float(s["rect"][3]), 3) == round(SliderElement.TRACK_HEIGHT, 3)
+        if s["flags"][0] == Kind.BOX and round(float(s["rect"][3]), 3) == round(XS_TRACK_HEIGHT, 3)
     ]
     assert len(tracks) == 2
     for s in tracks:
@@ -321,4 +370,4 @@ def test_handle_shape_circle_paints_a_round_handle_instead_of_the_line() -> None
     assert tuple(float(v) for v in circles[0]["radii"]) == (diameter / 2,) * 4
 
     heights = {round(float(s["rect"][3]), 3) for s in dl.view if s["flags"][0] == Kind.BOX}
-    assert round(SliderElement.HANDLE_HEIGHT, 3) not in heights
+    assert round(XS_HANDLE_HEIGHT, 3) not in heights

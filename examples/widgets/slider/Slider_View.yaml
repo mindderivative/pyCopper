@@ -17,7 +17,7 @@ children:
 
       - name: summary
         widget: Text
-        text: "M3's slider, Standard variant, XS size: a 16dp track and a 4x44dp handle."
+        text: "M3's slider, Standard variant, every named size: style.size selects extra_small (default) through extra_large."
         style: {text_style: body-large, color: on_surface_variant}
 
       - {name: div1, widget: Divider, style: {width: expand}}
@@ -25,7 +25,10 @@ children:
       - name: explanation
         widget: Text
         text: |
-          16dp track, 8dp track-corner radius, a 4x44dp handle.
+          Track height 16/24/40/56/96dp, handle height 44/44/52/68/108dp,
+          track corner radius 8/8/12/16/28dp for extra_small/small/medium/
+          large/extra_large -- COMPONENT_SLIDERS.md's own Measurements
+          table. Handle width stays a constant 4dp at every size.
           `style: {min, max, step}` bound it -- unlike SpinBox, an unset
           min/max falls back to 0.0/1.0 rather than "unbounded", since a
           slider needs a real range to draw a track at all. Click or drag
@@ -36,28 +39,77 @@ children:
           Use cases: a slider is the right control when a value is best
           understood by dragging within a bounded range -- volume,
           brightness, a percentage -- rather than typing or stepping one
-          unit at a time the way `SpinBox` does.
+          unit at a time the way `SpinBox` does. Larger sizes increase the
+          target and give more visual emphasis; M3 reserves extra_large
+          for a "hero moment" where the slider is the page's main control.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - {name: div2, widget: Divider, style: {width: expand}}
 
       - name: live_heading
         widget: Text
-        text: "Live example"
+        text: "Live example -- all five sizes"
         style: {text_style: title-medium, color: primary}
 
       - name: live_demo
-        widget: Horizontal
-        style: {spacing: 16, width: expand, cross_alignment: center}
+        widget: Vertical
+        style: {spacing: 20, width: expand, cross_alignment: stretch}
         children:
-          - name: volume
-            widget: Slider
-            value: "{{ volume.get() }}"
-            style: {width: expand, min: 0, max: 100, step: 5}
-            handlers: {on_change: change_volume}
-          - widget: Text
-            text: "{{ volume.get() }}"
-            style: {color: on_surface_variant}
+          - name: row_xs
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "extra_small", style: {width: 100, color: on_surface_variant}}
+              - name: volume_xs
+                widget: Slider
+                value: "{{ volume_xs.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, size: extra_small}
+                handlers: {on_change: change_volume_xs}
+              - {widget: Text, text: "{{ volume_xs.get() }}", style: {color: on_surface_variant}}
+          - name: row_s
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "small", style: {width: 100, color: on_surface_variant}}
+              - name: volume_s
+                widget: Slider
+                value: "{{ volume_s.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, size: small}
+                handlers: {on_change: change_volume_s}
+              - {widget: Text, text: "{{ volume_s.get() }}", style: {color: on_surface_variant}}
+          - name: row_m
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "medium", style: {width: 100, color: on_surface_variant}}
+              - name: volume_m
+                widget: Slider
+                value: "{{ volume_m.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, size: medium}
+                handlers: {on_change: change_volume_m}
+              - {widget: Text, text: "{{ volume_m.get() }}", style: {color: on_surface_variant}}
+          - name: row_l
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "large", style: {width: 100, color: on_surface_variant}}
+              - name: volume_l
+                widget: Slider
+                value: "{{ volume_l.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, size: large}
+                handlers: {on_change: change_volume_l}
+              - {widget: Text, text: "{{ volume_l.get() }}", style: {color: on_surface_variant}}
+          - name: row_xl
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "extra_large", style: {width: 100, color: on_surface_variant}}
+              - name: volume_xl
+                widget: Slider
+                value: "{{ volume_xl.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, size: extra_large}
+                handlers: {on_change: change_volume_xl}
+              - {widget: Text, text: "{{ volume_xl.get() }}", style: {color: on_surface_variant}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

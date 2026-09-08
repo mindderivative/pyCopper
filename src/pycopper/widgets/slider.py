@@ -1,11 +1,28 @@
 """M3 Slider: a value picked from a range by dragging, clicking, or the keyboard.
 
-Standard variant, XS size -- M3's own stated default (`COMPONENT_SLIDERS.md`'s
-size table: XS is "existing default"; S/M/L/XL are M3 Expressive additions,
-same shape as `Fab`'s own small/standard/medium/large ladder). Discrete
-(stop indicators) and Range (two handles) are real M3 variants, deliberately
-out of scope for this pass -- each is a materially separate widget shape, not
-a style tweak on this one.
+Standard variant, every named M3 size -- `style.size` selects one of
+`extra_small` (M3's own stated default), `small`, `medium`, `large`, or
+`extra_large`, all sourced directly from `COMPONENT_SLIDERS.md`'s own
+Measurements table (confirmed twice: the table itself, and again in its
+"Size" guideline section, which agree exactly):
+
+| Size | Track height | Handle height | Track corner radius |
+|------|-------------|----------------|----------------------|
+| extra_small (default) | 16dp | 44dp | 8dp |
+| small | 24dp | 44dp | 8dp |
+| medium | 40dp | 52dp | 12dp |
+| large | 56dp | 68dp | 16dp |
+| extra_large | 96dp | 108dp | 28dp |
+
+Handle **width** stays a constant 4dp across every size -- the table's own
+"Handle width: 4dp" row has no per-size variation at all, unlike the other
+three dimensions. Discrete (stop indicators) and Range (two handles) are
+real M3 variants, deliberately out of scope for this pass -- each is a
+materially separate widget shape, not a style tweak on this one; so is the
+M3 Sliders page's own "Variant" axis (Standard/Centered/Range), which is
+why size lives in its own `style.size` field rather than `style.variant` --
+that field already means each widget's own distinct M3 vocabulary
+elsewhere, and Range would collide with size on it the moment it exists.
 
 **This is the one gap that mattered most.** `SpinBox` (`material.py`) was
 built once already citing this same page ("Icon buttons placed outside the
@@ -13,17 +30,25 @@ slider should have the button role"), but the actual slider -- the thing
 with a track and a draggable handle -- was never built. Nothing here is
 therefore inferred; every behaviour quoted below is the page's own words.
 
-**Anatomy, XS (`COMPONENT_SLIDERS.md`'s own measurement table):** 16dp track
-height, 8dp track corner radius, a 4dp-wide by 44dp-tall handle -- taller
-than the track by design ("A handle changes shape when it's being pressed or
+**Colour roles** are not fully specified in the scraped tokens table (an
+interactive image, not text -- the same gap `CircularProgress`'s own default
+diameter has), so this reuses M3's own established selection-control pairing
+directly: `primary` for the active track and the handle, `secondary_container`
+for the inactive track -- the identical role `Chip`/`Segment` already use for
+"filled and selected". The handle is also taller than the track by design
+regardless of size ("A handle changes shape when it's being pressed or
 dragged"; M3's visual refresh gave it "a vertical handle that narrows when
-pressed", not a circular thumb the way `Switch`'s handle is one). Colour
-roles are not fully specified in the scraped tokens table (an interactive
-image, not text -- the same gap `CircularProgress`'s own default diameter
-has), so this reuses M3's own established selection-control pairing directly:
-`primary` for the active track and the handle, `secondary_container` for the
-inactive track -- the identical role `Chip`/`Segment` already use for
-"filled and selected".
+pressed", not a circular thumb the way `Switch`'s handle is one).
+
+**Not part of the sourced ladder above, and NOT scaled by size** -- the
+spec gives no size-dependent figure for any of these, so each stays exactly
+the single fixed value it already was before the ladder existed:
+`cradle_gap`, `cradle_radius`, the hover/press/focus halo
+(`STATE_LAYER_SIZE`), the circle-handle diameter (`style.handle_shape:
+circle`), and this widget's own minimum width. This is a known, disclosed
+risk, not an oversight -- a 32dp halo sized for a 44dp XS handle may not
+read right around a 108dp XL one; watch for it live rather than guessing
+another unsourced number ahead of actually seeing it.
 
 **All three named M3 behaviours are implemented, not just one:**
 
@@ -68,11 +93,21 @@ __all__ = ["SliderElement"]
 
 
 class SliderElement(_StyledMixin, Padding):
-    """M3 Slider, Standard variant, XS size. See the module docstring."""
+    """M3 Slider, Standard variant, every named size. See the module docstring."""
 
-    TRACK_HEIGHT: Final = 16.0
+    #: `style.size` -> (track_height, handle_height, track_radius), all
+    #: three sourced from `COMPONENT_SLIDERS.md`'s own Measurements table
+    #: (see the module docstring's own copy of it). Handle *width* is not
+    #: here -- unlike these three, it does not vary by size at all -- so it
+    #: stays `HANDLE_WIDTH`, a plain constant below.
+    SIZES: Final = {
+        "extra_small": (16.0, 44.0, 8.0),
+        "small": (24.0, 44.0, 8.0),
+        "medium": (40.0, 52.0, 12.0),
+        "large": (56.0, 68.0, 16.0),
+        "extra_large": (96.0, 108.0, 28.0),
+    }
     HANDLE_WIDTH: Final = 4.0
-    HANDLE_HEIGHT: Final = 44.0
     HANDLE_RADIUS: Final = 2.0
     #: M2's circular handle, opt-in via `style.handle_shape: circle`. Not a
     #: scraped M3 figure -- the current spec documents only the line handle
@@ -93,6 +128,25 @@ class SliderElement(_StyledMixin, Padding):
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
+
+    # ------------------------------------------------------------ geometry
+
+    def _geometry(self) -> tuple[float, float, float]:
+        """(track_height, handle_height, track_radius) for `style.size`."""
+        return self.SIZES.get(self.style.size, self.SIZES["extra_small"])
+
+    def _track_radius(self) -> float:
+        """The size-appropriate `track_radius`, unless a view file set it
+        explicitly -- the same `model_fields_set` check `DockSplitElement.
+        horizontal` already uses to tell "the view actually wrote this"
+        apart from "using the field's own bare default" (`widgets/dock.py`).
+        Without it, `track_radius`'s own pre-existing default (8.0, correct
+        only for `extra_small`) would silently override every larger size's
+        real corner radius on every slider that never mentions the field.
+        """
+        if "track_radius" in self.style.model_fields_set:
+            return self.style.track_radius
+        return self._geometry()[2]
 
     # ------------------------------------------------------------- bounds
 
@@ -131,7 +185,8 @@ class SliderElement(_StyledMixin, Padding):
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
         width = outer.max_width if outer.has_bounded_width else self.MIN_WIDTH
-        return outer.constrain(Size(width, self.HANDLE_HEIGHT))
+        _track_height, handle_height, _track_radius = self._geometry()
+        return outer.constrain(Size(width, handle_height))
 
     def _usable_width(self) -> float:
         return float(max(1.0, self.size.width - self.HANDLE_WIDTH))
@@ -217,7 +272,8 @@ class SliderElement(_StyledMixin, Padding):
         style = self.style
         active = ctx.palette.index(style.background or "primary")
         inactive = ctx.palette.index("secondary_container")
-        track_y = absolute.y + (self.size.height - self.TRACK_HEIGHT) / 2
+        track_height, handle_height, _track_radius = self._geometry()
+        track_y = absolute.y + (self.size.height - track_height) / 2
         handle_x = absolute.x + self._handle_x()
         handle_center = handle_x + self.HANDLE_WIDTH / 2
         clearance = self._handle_half_extent() + style.cradle_gap
@@ -228,7 +284,7 @@ class SliderElement(_StyledMixin, Padding):
         # the accent colour touching the handle with no gap at all, unlike
         # a real M3 slider.
         cradle = style.cradle_radius
-        outer = style.track_radius
+        outer = self._track_radius()
 
         inactive_start = handle_center + clearance
         inactive_width = absolute.x + self.size.width - inactive_start
@@ -240,7 +296,7 @@ class SliderElement(_StyledMixin, Padding):
                 inactive_start,
                 track_y,
                 inactive_width,
-                self.TRACK_HEIGHT,
+                track_height,
                 inactive,
                 (cradle, outer, outer, cradle),
             )
@@ -252,7 +308,7 @@ class SliderElement(_StyledMixin, Padding):
                 absolute.x,
                 track_y,
                 active_width,
-                self.TRACK_HEIGHT,
+                track_height,
                 active,
                 (outer, cradle, cradle, outer),
             )
@@ -286,9 +342,9 @@ class SliderElement(_StyledMixin, Padding):
             _box(
                 ctx,
                 handle_x,
-                absolute.y + (self.size.height - self.HANDLE_HEIGHT) / 2,
+                absolute.y + (self.size.height - handle_height) / 2,
                 self.HANDLE_WIDTH,
-                self.HANDLE_HEIGHT,
+                handle_height,
                 token=active,
                 radius=self.HANDLE_RADIUS,
             )

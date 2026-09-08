@@ -3318,22 +3318,48 @@ The one gap that mattered most from the M3-catalogue review this session
 opened: `SpinBox` (§5.12) was built once already citing this exact page
 ("Icon buttons placed outside the slider should have the button role"), but
 the actual slider -- a track with a draggable handle -- was never built.
-Standard variant, XS size: M3's own stated default (`COMPONENT_SLIDERS.md`'s
-size table calls XS "existing default"; S/M/L/XL are M3 Expressive
-additions, the same shape as `Fab`'s own small/standard/medium/large
-ladder). Discrete (stop indicators) and Range (two handles) are real M3
+Standard variant, every named M3 size: `style.size` selects one of
+`extra_small` (M3's own stated default), `small`, `medium`, `large`, or
+`extra_large`, all four sourced from `COMPONENT_SLIDERS.md`'s own
+Measurements table (confirmed twice -- the table itself, and again in its
+own "Size" guideline section, agreeing exactly):
+
+| Size | Track height | Handle height | Track corner radius |
+|------|-------------|----------------|----------------------|
+| extra_small (default) | 16dp | 44dp | 8dp |
+| small | 24dp | 44dp | 8dp |
+| medium | 40dp | 52dp | 12dp |
+| large | 56dp | 68dp | 16dp |
+| extra_large | 96dp | 108dp | 28dp |
+
+Handle *width* stays a constant 4dp across every size -- the one dimension
+of the four the table gives no per-size variation for. Size lives in its
+own `StyleSpec.size` field rather than `style.variant`, unlike `Fab`'s own
+small/standard/medium/large ladder (`§5.x`, read from `style.variant`) --
+`Fab` has no separate M3 "variant" concept of its own, but Sliders do
+(Standard/Centered/Range, `COMPONENT_SLIDERS.md`'s own "Variants" section),
+and Range is already named as a real, deliberately-deferred future feature
+below; folding size into `variant` now would collide with it the moment it
+exists. Discrete (stop indicators) and Range (two handles) are real M3
 variants, deliberately out of scope -- each is a materially different widget
 shape, not a style tweak on this one.
 
-**Anatomy, XS:** 16dp track height, 8dp track corner radius, a 4dp-wide by
-44dp-tall handle -- taller than the track by design (M3's visual refresh:
-"a vertical handle that narrows when pressed", not a circular thumb the way
-`Switch`'s is). Colour roles are not fully specified in the scraped tokens
-table (an interactive image, not text -- the same gap `CircularProgress`'s
-default diameter has), so this reuses M3's own established selection-control
-pairing directly: `primary` for the active track and the handle,
+**Not part of the sourced ladder, and not scaled by size**: `cradle_gap`,
+`cradle_radius`, the hover/press/focus halo, the circle-handle diameter
+(`style.handle_shape: circle`), and this widget's own minimum width --
+`COMPONENT_SLIDERS.md` gives no size-dependent figure for any of them, so
+each stays the single fixed value it already was before the ladder existed.
+A disclosed, known risk rather than an oversight: a 32dp halo sized for a
+44dp XS handle may not read right around a 108dp XL one.
+
+Colour roles are not fully specified in the scraped tokens table (an
+interactive image, not text -- the same gap `CircularProgress`'s default
+diameter has), so this reuses M3's own established selection-control pairing
+directly: `primary` for the active track and the handle,
 `secondary_container` for the inactive track, the same role `Chip`/`Segment`
-already use for "filled and selected".
+already use for "filled and selected". The handle is taller than the track
+by design at every size (M3's visual refresh: "a vertical handle that
+narrows when pressed", not a circular thumb the way `Switch`'s is).
 
 **All three of M3's own named behaviours are implemented, not just one.**
 "Select & drag" (`on_pointer_down` jumps to the press position and starts a

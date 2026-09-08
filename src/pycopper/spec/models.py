@@ -431,8 +431,20 @@ class StyleSpec(_Frozen):
     #: not a scraped figure.
     cradle_radius: float = Field(default=2.0, ge=0)
     #: Corner radius on each of a Slider's track segments' outer end.
-    #: `COMPONENT_SLIDERS.md`'s own XS-size measurement table: 8dp.
+    #: `COMPONENT_SLIDERS.md`'s own XS-size measurement table: 8dp. The
+    #: size-appropriate default for whichever `size:` is set (below) unless
+    #: a view file sets this explicitly -- see `SliderElement._track_radius`.
     track_radius: float = Field(default=8.0, gt=0)
+    #: A component's step on M3's named size scale, where one applies
+    #: (currently only `Slider`; `pyCopper ButtonGroup Design Backlog`
+    #: expects to want the identical ladder once ButtonGroup's own sizes
+    #: are built, so this is deliberately not Slider-specific in name or
+    #: place). `COMPONENT_SLIDERS.md`'s own token naming convention
+    #: ("md.comp.slider.xsmall") is the source for these spellings. Not
+    #: folded into `Variant` above -- that alias is reused *by name* across
+    #: many widgets' own distinct M3 vocabularies; a generic size scale is
+    #: a different, orthogonal axis, not one more entry in that list.
+    size: Literal["extra_small", "small", "medium", "large", "extra_large"] = "extra_small"
     #: A Pagination's total number of pages.
     count: int = Field(default=1, ge=1)
 
