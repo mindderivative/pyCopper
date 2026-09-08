@@ -523,6 +523,58 @@ def test_dragging_onto_an_edge_splits_and_creates_a_new_pane() -> None:
     assert terminal.parent in new_split.children
 
 
+def test_dragging_onto_a_group_nested_two_levels_deep_finds_that_group() -> None:
+    """Found live: dropping a tab onto a group nested inside TWO DockSplits
+    (a root split whose second child is itself a split) crashed --
+    `find_drop_target` iterated `hit_path` backwards (root-to-leaf instead
+    of `hit_test`'s own documented deepest-first order), so it resolved to
+    an ANCESTOR split instead of the specific group under the cursor. A
+    flat, one-level layout accidentally self-corrected through the
+    split-recursion step; a real two-level layout, the whole reason this
+    feature nests DockSplit inside DockSplit at all, did not."""
+    view = {
+        "name": "root",
+        "widget": "DockSplit",
+        "style": {"width": 900, "height": 400},
+        "children": [
+            {"name": "files", "widget": "DockGroup", "children": [panel("browser", "Browser")]},
+            {
+                "name": "right_split",
+                "widget": "DockSplit",
+                "style": {"axis": "vertical"},
+                "children": [
+                    {
+                        "name": "editor_group",
+                        "widget": "DockGroup",
+                        "children": [panel("editor", "Editor"), panel("readme", "Readme")],
+                    },
+                    {
+                        "name": "terminal_group",
+                        "widget": "DockGroup",
+                        "children": [panel("terminal", "Terminal")],
+                    },
+                ],
+            },
+        ],
+    }
+    a = app(view)
+    editor_group = a.root.find("editor_group")
+    terminal_group = a.root.find("terminal_group")
+    # "readme" is editor_group's 2nd tab -- start past "editor"'s own width.
+    start = (editor_group.absolute_rect().x + 90, editor_group.absolute_rect().y + 20)
+    target_rect = terminal_group.absolute_rect()
+    drop = (target_rect.x + target_rect.width / 2, target_rect.y + target_rect.height / 2)
+    drag(a, start, (start[0] + 10, start[1] + 5), drop)
+
+    assert a.root.find("readme") is not None, "moved, not orphaned by a crash mid-drop"
+    terminal_group2 = a.root.find("terminal_group")
+    assert terminal_group2 is not None and len(terminal_group2.children) == 2, (
+        "the actual target -- not an ancestor split -- received the drop"
+    )
+    editor_group2 = a.root.find("editor_group")
+    assert [c.name for c in editor_group2.children] == ["editor"]
+
+
 def test_an_emptied_group_collapses_its_parent_split() -> None:
     """The last panel leaving a group must not leave a dangling empty group
     and an invalid single-child split sitting in the tree."""

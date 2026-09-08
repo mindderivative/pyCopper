@@ -103,9 +103,20 @@ def find_drop_target(source: Any, x: float, y: float) -> tuple[Any, Zone] | None
     dispatcher = source.dispatcher
     if dispatcher is None:
         return None
+    # `hit_path`/`hit_test` returns deepest-first, root-last (`element.py`'s
+    # own `hit_test`: `return [*found, self]`, the recursive call's result
+    # ahead of the current, shallower element). Found live: this used to
+    # iterate `reversed(path)`, walking root-to-leaf instead -- which, for
+    # any layout with a nested DockSplit, picked an ANCESTOR split instead
+    # of the specific group actually under the cursor, and that split
+    # sometimes already had two children by the time `_drop_as_tab` called
+    # `insert_child` on it, crashing (`ValueError: DockSplit takes exactly
+    # two children`) after the dragged panel had already been removed from
+    # its source -- silently orphaning it, since `rendercanvas` logs a
+    # per-frame draw exception rather than propagating it.
     path = dispatcher.hit_path(x, y)
     target = None
-    for element in reversed(path):
+    for element in path:
         if element is source:
             continue
         if isinstance(element, DockGroupElement | DockSplitElement):
@@ -118,7 +129,7 @@ def find_drop_target(source: Any, x: float, y: float) -> tuple[Any, Zone] | None
     # actually under the cursor, not the split's own (usually much larger)
     # bounds.
     if isinstance(target, DockSplitElement):
-        for element in reversed(path):
+        for element in path:
             if element is target or element is source:
                 continue
             is_dock = isinstance(element, DockGroupElement | DockSplitElement)
@@ -205,10 +216,15 @@ def end_drag(source: DockGroupElement) -> None:
     zone = source.state.data.get("drag_zone")
     if panel_name is not None and target is not None and zone is not None:
         panel = next((c for c in source.children if c.name == panel_name), None)
+        # Defense in depth against `find_drop_target` ever again resolving
+        # to the wrong element (it did, live, before the hit_path ordering
+        # fix above): only ever remove `panel` from `source` once the drop
+        # path is confirmed valid for the zone it claims, so a bad target
+        # is a silent no-op rather than orphaning the dragged panel.
         if panel is not None:
-            if zone == "tab":
+            if zone == "tab" and isinstance(target, _Group):
                 _drop_as_tab(source, panel, target)
-            else:
+            elif zone != "tab" and isinstance(target, _Group | _Split):
                 _drop_as_split(source, panel, target, zone)
     if isinstance(target, _Group | _Split):
         target.state.data.pop("drag_highlight", None)
