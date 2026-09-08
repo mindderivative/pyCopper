@@ -13,29 +13,51 @@ per-application PTY or VT-parsing boilerplate.
 pseudo-terminal is OS-specific process management; interpreting its byte
 stream is the VT/ANSI state machine every real terminal emulator implements
 identically. Neither is this widget's own concern to reinvent -- `pexpect`
-(ISC) gives POSIX PTY spawning, `pyte` (LGPLv3) gives the state machine, and
-what is actually left for pyCopper to build is the third layer: rendering
-whatever cell grid `pyte.Screen.buffer` says is currently true, and turning
-keystrokes into the bytes a shell expects. Both are optional extras
-(`pycopper[terminal]`), never hard dependencies -- `pyte`'s licence alone
-would force that, the same rule `accesskit` already follows.
+(ISC) gives POSIX PTY spawning, `bittty` (WTFPL) gives the state machine,
+and what is actually left for pyCopper to build is the third layer:
+rendering whatever cell grid `bittty.Board`'s video memory says is currently
+true, and turning keystrokes into the bytes a shell expects. Both are
+optional extras (`pycopper[terminal]`), never hard dependencies.
+
+**`bittty` replaced `pyte` here (2026-09-08), found live.** A single real
+keystroke, under zsh with zsh-syntax-highlighting active, could corrupt the
+whole input line ("echo hi" rendering as "echoo o hi"). Confirmed a real
+`pyte` (0.8.2, the latest release; the project has seen no meaningful update
+in years) parsing defect, not a pyCopper bug: reproduced with zero pyCopper
+code involved (bare `pexpect` + `pyte` fed the exact same bytes), independent
+of typing speed, independent of how the byte stream was chunked, and gone
+entirely once the shell plugin responsible for the redraw sequences was
+disabled. `bittty` renders the identical byte stream correctly. pyCopper
+still owns PTY spawning/reading/writing via `pexpect`/`_PtySession`
+unchanged -- only the VT/ANSI state machine consuming those bytes changed,
+via `bittty.devices.board.Board` used purely as a parser (`start_process()`,
+`bittty`'s own PTY spawning, is never called -- its rendering/chrome layer
+has no notion of pyCopper's own GPU display-list pipeline, so pyCopper still
+has to translate cells into display-list primitives regardless of which
+`bittty` class is used; `Board` alone is the right amount of integration).
+
+**Known regression from this swap: no scrollback.** `bittty` keeps no
+scrollback buffer (a documented limitation, not an oversight -- confirmed
+against its own README), unlike `pyte.HistoryScreen`. Mouse-wheel scrollback
+is dropped for now; re-implementing it against `bittty` is tracked as a
+separate follow-up, not part of this fix.
 
 **Only POSIX is implemented and verified in this pass.** `pexpect.spawn`
 was exercised directly (spawn a shell, read its output through
-`read_nonblocking`, feed it to `pyte.ByteStream`, read the resulting
-`screen.display` back) before being relied on. Windows needs a different
-backend entirely -- `pywinpty` wrapping ConPTY; `pexpect.spawn` is
-POSIX-only -- architected for (the platform check is a real branch) but not
-built, since nothing here could verify it rather than guess. `sys.platform
-== "win32"` leaves the widget simply unstarted rather than guessing at an
-unverified API, the honest choice `AccessKit`'s own "untested on Windows and
-macOS" precedent already sets.
+`read_nonblocking`, feed it to `bittty`, read the resulting cell grid back)
+before being relied on. Windows needs a different backend entirely --
+`pywinpty` wrapping ConPTY; `pexpect.spawn` is POSIX-only -- architected for
+(the platform check is a real branch) but not built, since nothing here
+could verify it rather than guess. `sys.platform == "win32"` leaves the
+widget simply unstarted rather than guessing at an unverified API, the
+honest choice `AccessKit`'s own "untested on Windows and macOS" precedent
+already sets.
 
 **No PTY mutation happens off the engine thread.** The background reader
 thread's only job is to append raw bytes to a lock-guarded buffer --
 ARCHITECTURE.md 8's "the engine thread owns everything mutable" applies to
-`pyte.Screen` exactly as it does to a `Signal`, so feeding the byte stream
-and repainting both happen later, back on the engine thread, in
+the `bittty.Board` exactly as it does to a `Signal`, so feeding the byte
+stream and repainting both happen later, back on the engine thread, in
 `_drain_pty()`. When a real `asyncio` loop can be captured, the reader
 thread also calls `loop.call_soon_threadsafe(...)` to wake an idle app
 promptly -- the identical pattern `VideoElement.push_frame`'s own docstring
@@ -58,14 +80,19 @@ always line up; the *glyphs drawn inside* a run of same-styled cells are
 laid out with the text engine's ordinary shaping, which only lands exactly
 on that grid when the requested font is genuinely monospace -- a
 proportional fallback still runs, just without the columns of `ls` or a
-box-drawn table lining up.
+box-drawn table lining up. Separately, and unrelated to monospace-ness: the
+bundled Roboto/Noto Sans set has no Arrows or Dingbats coverage, so
+icon-heavy shell prompt themes (powerline/Nerd-Font-style glyphs) render
+those specific glyphs as a visible missing-glyph box -- the same, deliberate
+"visible box, not a silent gap" fallback the font system uses everywhere,
+just hitting a real coverage gap for this content.
 
 **Deliberately out of scope for this pass**: mouse text selection and
 copy (Ctrl+C is always the interrupt byte here, never a copy shortcut,
 since there is nothing to copy without a selection), underline and
 strikethrough rendering, function keys beyond F1-F4, true-colour-aware
-theme adaptation (the ANSI palette is fixed, not part of the M3 theme), and
-Windows support.
+theme adaptation (the ANSI palette is fixed, not part of the M3 theme),
+scrollback (see above), and Windows support.
 """
 
 from __future__ import annotations
@@ -94,11 +121,11 @@ from .base import _StyledMixin
 __all__ = ["TerminalElement"]
 
 try:
-    import pyte
+    from bittty.devices.board import Board
 
-    _PYTE_AVAILABLE = True
+    _BITTTY_AVAILABLE = True
 except ImportError:
-    _PYTE_AVAILABLE = False
+    _BITTTY_AVAILABLE = False
 
 if sys.platform != "win32":
     try:
@@ -138,7 +165,7 @@ _ANSI_COLORS: Final[dict[str, tuple[float, float, float, float]]] = {
     "black": _srgb(0.11, 0.11, 0.13),
     "red": _srgb(0.87, 0.35, 0.35),
     "green": _srgb(0.55, 0.75, 0.40),
-    "brown": _srgb(0.85, 0.70, 0.35),  # pyte's own name for ANSI yellow
+    "brown": _srgb(0.85, 0.70, 0.35),  # ANSI yellow
     "blue": _srgb(0.40, 0.60, 0.90),
     "magenta": _srgb(0.75, 0.50, 0.85),
     "cyan": _srgb(0.40, 0.75, 0.80),
@@ -152,29 +179,62 @@ _ANSI_COLORS: Final[dict[str, tuple[float, float, float, float]]] = {
     "brightcyan": _srgb(0.55, 0.85, 0.90),
     "brightwhite": _srgb(0.95, 0.95, 0.97),
 }
+#: `Color(mode="indexed", value=N)` for N in 0-15 names into `_ANSI_COLORS`
+#: in standard ANSI order (0-7 normal, 8-15 bright).
+_ANSI_INDEX_NAMES: Final[tuple[str, ...]] = (
+    "black",
+    "red",
+    "green",
+    "brown",
+    "blue",
+    "magenta",
+    "cyan",
+    "white",
+    "brightblack",
+    "brightred",
+    "brightgreen",
+    "brightbrown",
+    "brightblue",
+    "brightmagenta",
+    "brightcyan",
+    "brightwhite",
+)
 _DEFAULT_FG: Final = _srgb(0.85, 0.85, 0.88)
 _DEFAULT_BG: Final = _srgb(0.10, 0.10, 0.12)
 
 
 def _cell_color(
-    name: str, default: tuple[float, float, float, float]
+    color: Any, default: tuple[float, float, float, float]
 ) -> tuple[float, float, float, float]:
-    """A pyte cell colour name (`"red"`, `"brightblue"`, a 6-hex-digit
-    256-colour/truecolour string, or `"default"`) resolved to linear RGBA."""
-    if name == "default":
+    """A `bittty` cell colour (`None`, or a `Color` in "default"/"indexed"/
+    "rgb" mode) resolved to linear RGBA.
+
+    The indexed branch beyond 0-15 is the standard xterm 256-colour table:
+    16-231 a 6x6x6 cube (`0, 95, 135, 175, 215, 255` per axis step), 232-255
+    a 24-step greyscale ramp (`8` to `238`, step `10`) -- the same formula
+    every terminal emulator (and `pyte` itself) uses, not an approximation.
+    """
+    if color is None or color.mode == "default":
         return default
-    known = _ANSI_COLORS.get(name)
-    if known is not None:
-        return known
-    if len(name) == 6:
-        try:
-            return _srgb(
-                int(name[0:2], 16) / 255.0,
-                int(name[2:4], 16) / 255.0,
-                int(name[4:6], 16) / 255.0,
-            )
-        except ValueError:
-            pass
+    if color.mode == "rgb":
+        r, g, b = color.value
+        return _srgb(r / 255.0, g / 255.0, b / 255.0)
+    if color.mode == "indexed":
+        index = color.value
+        if 0 <= index < 16:
+            return _ANSI_COLORS[_ANSI_INDEX_NAMES[index]]
+        if 16 <= index < 232:
+            cube = index - 16
+            r, g, b = cube // 36, (cube // 6) % 6, cube % 6
+
+            def scale(v: int) -> float:
+                return 0.0 if v == 0 else (55 + v * 40) / 255.0
+
+            return _srgb(scale(r), scale(g), scale(b))
+        if 232 <= index < 256:
+            level = (index - 232) * 10 + 8
+            v = level / 255.0
+            return _srgb(v, v, v)
     return default
 
 
@@ -212,7 +272,7 @@ _KEY_BYTES: Final[dict[str, bytes]] = {
 class _PtySession:
     """Owns exactly one background thread: reading a pty is a blocking
     syscall, and the only thing that thread does is append raw bytes to a
-    lock-guarded buffer. Feeding them to `pyte` and repainting both happen
+    lock-guarded buffer. Feeding them to `bittty` and repainting both happen
     later, back on the engine thread -- see the module docstring.
     """
 
@@ -286,6 +346,30 @@ class _PtySession:
             self._thread = None
 
 
+class _BitttyConnection:
+    """Adapts `_PtySession.write` to `bittty`'s `Connection` protocol
+    (`write(str)`), so a `Board`'s own internal auto-replies -- device status
+    reports, cursor position reports, and any other query a shell or its
+    plugins may issue -- reach the real pty. `_PtySession` still owns PTY
+    spawning and reading; this only wires the reply-writing direction, the
+    same "screen writes back to the process" seam `pyte`'s own
+    `write_process_input` extension point existed for.
+    """
+
+    closed = False
+
+    def __init__(self, session: _PtySession) -> None:
+        self._session = session
+
+    def write(self, data: str) -> None:
+        self._session.write(data.encode("utf-8", "ignore"))
+
+    def resize(self, rows: int, cols: int) -> None:
+        """No-op: `TerminalElement._apply_grid` already resizes the real pty
+        directly through `_PtySession.resize`; `Board.resize()` calls this
+        too, but there is nothing further to do here."""
+
+
 class TerminalElement(_StyledMixin, Padding):
     """A real shell, rendered as a grid of styled monospace cells.
 
@@ -303,18 +387,15 @@ class TerminalElement(_StyledMixin, Padding):
     #: size falls back to.
     DEFAULT_COLS: Final = 80
     DEFAULT_ROWS: Final = 24
-    #: Lines of history `pyte.HistoryScreen` keeps. Not exposed as a style
-    #: property -- one more knob a v1 does not need.
-    SCROLLBACK: Final = 2000
     CURSOR_BLINK_PERIOD: Final = 1.0
     #: How long a candidate (cols, rows) must sit unchanged before an
     #: already-live grid actually reflows to it -- the same trade
     #: `Engine._pin_surface` makes for the swapchain (ARCHITECTURE.md
-    #: 5.8.1), applied here to the pyte reflow instead. Wall-clock, not a
-    #: frame count: `perform_layout` only runs when something actually
-    #: re-lays-out, which a static (non-resizing) window may never do again
-    #: after this fires, so the countdown cannot depend on layout being
-    #: called again. See `perform_layout`/`_maybe_apply_pending_grid`.
+    #: 5.8.1), applied here instead. Wall-clock, not a frame count:
+    #: `perform_layout` only runs when something actually re-lays-out,
+    #: which a static (non-resizing) window may never do again after this
+    #: fires, so the countdown cannot depend on layout being called again.
+    #: See `perform_layout`/`_maybe_apply_pending_grid`.
     GRID_SETTLE_SECONDS: Final = 0.1
     CAPTURES_TAB = True
     CURSOR = "text"
@@ -323,8 +404,7 @@ class TerminalElement(_StyledMixin, Padding):
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
         self._session: _PtySession | None = None
-        self._screen: Any = None
-        self._stream: Any = None
+        self._board: Any = None
         self._cols = self.DEFAULT_COLS
         self._rows = self.DEFAULT_ROWS
         #: The debounced target and when it was last (re)armed -- see
@@ -332,9 +412,9 @@ class TerminalElement(_StyledMixin, Padding):
         self._pending_grid: tuple[int, int] | None = None
         self._pending_grid_since = 0.0
         #: Whether this element has ever completed one grid sizing. NOT the
-        #: same as "a screen exists" -- `set_ticker()` creates the real
-        #: screen (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very first
-        #: `perform_layout` call ever runs, so `self._screen is not None` is
+        #: same as "a board exists" -- `set_ticker()` creates the real
+        #: board (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very first
+        #: `perform_layout` call ever runs, so `self._board is not None` is
         #: already true on that first call for any `App`-managed Terminal.
         #: Debouncing that first sizing too would leave a freshly mounted
         #: terminal showing the wrong grid for `GRID_SETTLE_SECONDS`, for no
@@ -360,23 +440,17 @@ class TerminalElement(_StyledMixin, Padding):
         return os.environ.get("SHELL") or "/bin/sh"
 
     def _ensure_started(self) -> None:
-        if self._session is not None or not (_PYTE_AVAILABLE and _PTY_AVAILABLE):
+        if self._session is not None or not (_BITTTY_AVAILABLE and _PTY_AVAILABLE):
             return
-        screen = pyte.HistoryScreen(self._cols, self._rows, history=self.SCROLLBACK)
-        # An instance override of `Screen`'s own documented no-op extension
-        # point (its docstring: "By default is a noop") -- simpler than a
-        # subclass for one method, verified to work (no __slots__ on pyte's
-        # Screen/HistoryScreen).
-        screen.write_process_input = self._write_input  # type: ignore[method-assign]
-        self._screen = screen
-        self._stream = pyte.ByteStream(screen)
+        board = Board(command=self._command(), width=self._cols, height=self._rows)
+        self._board = board
         session = _PtySession(self._command())
         self._session = session
+        # Wire reply-writing (DSR etc.) back to the real pty -- see
+        # `_BitttyConnection`. This never calls `Board.start_process()`, so
+        # `bittty`'s own PTY spawning/reading is never used.
+        board.pty = _BitttyConnection(session)
         session.start((self._cols, self._rows), self._on_output)
-
-    def _write_input(self, data: str) -> None:
-        if self._session is not None:
-            self._session.write(data.encode("utf-8", "ignore"))
 
     def _on_output(self) -> None:
         """The PTY wake callback -- may run via `call_soon_threadsafe` from
@@ -386,11 +460,11 @@ class TerminalElement(_StyledMixin, Padding):
         self.mark_needs_paint()
 
     def _drain_pty(self) -> None:
-        if self._session is None or self._stream is None:
+        if self._session is None or self._board is None:
             return
         data = self._session.drain()
         if data:
-            self._stream.feed(data)
+            self._board.feed_host_data(data)
 
     def _feed(self, data: bytes) -> None:
         """Feed bytes directly into the VT parser, bypassing any real PTY.
@@ -398,8 +472,8 @@ class TerminalElement(_StyledMixin, Padding):
         The seam a test uses to exercise rendering without a real subprocess
         -- see `tests/test_terminal.py`.
         """
-        if self._stream is not None:
-            self._stream.feed(data)
+        if self._board is not None:
+            self._board.feed_host_data(data)
 
     # ---------------------------------------------------------------- layout
 
@@ -422,26 +496,26 @@ class TerminalElement(_StyledMixin, Padding):
     def perform_layout(self, constraints: Constraints) -> Size:
         """Sizing is exact every frame; reflowing an already-live grid is not.
 
-        `screen.resize()` reflows `pyte`'s buffer, which changes exactly
-        which characters land in which row -- so the very next paint's
-        per-run `text_engine.layout()` calls see brand-new text the shape
-        cache has never seen, forcing a full re-shape of the whole visible
-        grid. Applying that on every (cols, rows) change during a live
-        resize drag means doing it roughly once per cell of width crossed,
-        which measured 8-22ms per occurrence against this widget's ordinary
-        ~2ms paint -- a real, confirmed stutter (see the 2026-09 resize
-        investigation). `Engine._pin_surface` already accepts the identical
-        trade for the swapchain: stay coarse while the drag is in flight,
-        catch up once it stops.
+        `board.resize()` reflows `bittty`'s video memory, which changes
+        exactly which characters land in which row -- so the very next
+        paint's per-run `text_engine.layout()` calls see brand-new text the
+        shape cache has never seen, forcing a full re-shape of the whole
+        visible grid. Applying that on every (cols, rows) change during a
+        live resize drag means doing it roughly once per cell of width
+        crossed, which measured 8-22ms per occurrence against this widget's
+        ordinary ~2ms paint -- a real, confirmed stutter (see the 2026-09
+        resize investigation). `Engine._pin_surface` already accepts the
+        identical trade for the swapchain: stay coarse while the drag is in
+        flight, catch up once it stops.
 
         Debouncing only kicks in once a grid has already been sized once --
         the very first sizing applies immediately, since there is no prior
         content to keep stable against and nothing else would ever advance
         a deferred target for a window that never resizes again. That is
-        `_grid_settled_once`, not "a screen exists": `set_ticker()` creates
-        the real screen (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very
+        `_grid_settled_once`, not "a board exists": `set_ticker()` creates
+        the real board (at `DEFAULT_COLS`/`DEFAULT_ROWS`) before the very
         first `perform_layout` call an `App`-managed Terminal ever gets, so
-        a screen is already there on that first call too. See
+        a board is already there on that first call too. See
         `_maybe_apply_pending_grid` for why the countdown lives there and
         not here. The returned `size` is never debounced; only the reflow
         of an already-settled grid is, so surrounding layout stays exact.
@@ -474,8 +548,8 @@ class TerminalElement(_StyledMixin, Padding):
     def _apply_grid(self, target: tuple[int, int]) -> None:
         cols, rows = target
         self._cols, self._rows = cols, rows
-        if self._screen is not None:
-            self._screen.resize(lines=rows, columns=cols)
+        if self._board is not None:
+            self._board.resize(cols, rows)
         if self._session is not None:
             self._session.resize(cols, rows)
         self._pending_grid = None
@@ -518,7 +592,7 @@ class TerminalElement(_StyledMixin, Padding):
             clip=ctx.clip,
             clip_radii=ctx.clip_radii,
         )
-        if self._screen is None:
+        if self._board is None:
             self._paint_unavailable(ctx, absolute)
             return
 
@@ -544,8 +618,8 @@ class TerminalElement(_StyledMixin, Padding):
 
     def _paint_unavailable(self, ctx: PaintContext, absolute: Offset) -> None:
         message = (
-            "pyte/pexpect not installed (pycopper[terminal])"
-            if not (_PYTE_AVAILABLE and _PTY_AVAILABLE)
+            "bittty/pexpect not installed (pycopper[terminal])"
+            if not (_BITTTY_AVAILABLE and _PTY_AVAILABLE)
             else "Terminal is not implemented on this platform"
         )
         self.text_engine.emit(
@@ -560,35 +634,34 @@ class TerminalElement(_StyledMixin, Padding):
         )
 
     def _paint_rows(self, ctx: PaintContext, origin: Offset, cell: Size) -> None:
-        screen = self._screen
+        page = self._board.blitter.current_page
         dpr = ctx.pixel_ratio
         request = self._font_request()
         for row in range(self._rows):
-            line = screen.buffer[row]
             y = origin.y + row * cell.height
             col = 0
             while col < self._cols:
                 start = col
-                first = line[col]
-                fg_name, bg_name = first.fg, first.bg
-                if first.reverse:
-                    fg_name, bg_name = bg_name, fg_name
+                first_style, first_char = page.get_cell(col, row)
+                fg_color, bg_color = first_style.fg, first_style.bg
+                if first_style.reverse:
+                    fg_color, bg_color = bg_color, fg_color
                 text_chars: list[str] = []
                 col += 1
-                if first.data:
-                    text_chars.append(first.data)
+                if first_char:
+                    text_chars.append(first_char)
                 while col < self._cols:
-                    ch = line[col]
-                    ch_fg, ch_bg = ch.fg, ch.bg
-                    if ch.reverse:
+                    ch_style, ch_char = page.get_cell(col, row)
+                    ch_fg, ch_bg = ch_style.fg, ch_style.bg
+                    if ch_style.reverse:
                         ch_fg, ch_bg = ch_bg, ch_fg
-                    if ch_fg != fg_name or ch_bg != bg_name:
+                    if ch_fg != fg_color or ch_bg != bg_color:
                         break
-                    if ch.data:
-                        text_chars.append(ch.data)
+                    if ch_char:
+                        text_chars.append(ch_char)
                     col += 1
                 width_cols = col - start
-                bg = _cell_color(bg_name, _DEFAULT_BG)
+                bg = _cell_color(bg_color, _DEFAULT_BG)
                 if bg != _DEFAULT_BG:
                     ctx.display_list.add_box(
                         (origin.x + start * cell.width) * dpr,
@@ -601,7 +674,7 @@ class TerminalElement(_StyledMixin, Padding):
                     )
                 text = "".join(text_chars)
                 if text.strip():
-                    fg = _cell_color(fg_name, _DEFAULT_FG)
+                    fg = _cell_color(fg_color, _DEFAULT_FG)
                     paragraph = self.text_engine.layout(
                         text, px=self.style.font_size, request=request
                     )
@@ -617,8 +690,8 @@ class TerminalElement(_StyledMixin, Padding):
                     )
 
     def _paint_cursor(self, ctx: PaintContext, origin: Offset, cell: Size) -> None:
-        screen = self._screen
-        if screen.cursor.hidden or screen.history.position < screen.history.size:
+        board = self._board
+        if not board.modes.cursor_visible:
             return
         if not self.state.focused:
             return
@@ -628,8 +701,8 @@ class TerminalElement(_StyledMixin, Padding):
         if not self.ticker.reduce_motion and phase >= 0.5:
             return
         dpr = ctx.pixel_ratio
-        x = origin.x + screen.cursor.x * cell.width
-        y = origin.y + screen.cursor.y * cell.height
+        x = origin.x + board.cursor.x * cell.width
+        y = origin.y + board.cursor.y * cell.height
         ctx.display_list.add_box(
             x * dpr,
             y * dpr,
@@ -644,16 +717,11 @@ class TerminalElement(_StyledMixin, Padding):
     # ------------------------------------------------------------- pointer
 
     def on_wheel(self, event: Any) -> None:
-        if self._screen is None:
-            return
-        if event.dy < 0:
-            self._screen.prev_page()
-        elif event.dy > 0:
-            self._screen.next_page()
-        else:
-            return
-        self.mark_needs_paint()
-        event.stop_propagation()
+        """No-op: `bittty` keeps no scrollback buffer to page through (see
+        the module docstring) -- the event is left to propagate rather than
+        swallowed, so a Terminal sitting inside a `ScrollView` at least lets
+        the page scroll instead of doing nothing at all."""
+        return
 
     def on_focus(self, event: Any) -> None:
         self.mark_needs_paint()

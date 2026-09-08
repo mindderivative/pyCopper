@@ -867,9 +867,11 @@ needs re-diagnosing) rather than assumed from the symptom. `acquire`
 (the swapchain rebuild this section fixes) stayed at its post-fix ~0.03–0.1
 ms throughout the drag — **not a swapchain regression**. Instead, `paint`
 spiked 8–22 ms roughly every 12 px of width change, matching a monospace
-cell width to the pixel. `TerminalElement.perform_layout` reflows `pyte`'s
-buffer (`screen.resize`) every time the computed (cols, rows) changes, and a
-reflow changes exactly which characters land in which row — so the next
+cell width to the pixel. `TerminalElement.perform_layout` reflows the
+terminal library's video memory (`board.resize()`, `bittty` as of
+2026-09-08 -- `screen.resize()` under the `pyte` it replaced, same
+mechanism) every time the computed (cols, rows) changes, and a reflow
+changes exactly which characters land in which row — so the next
 paint's per-run `text_engine.layout()` calls see brand-new text the shape
 cache has never seen, forcing a full HarfBuzz re-shape of the whole visible
 grid once per column crossed. Benchmarked directly: `screen.resize()` and
@@ -3155,17 +3157,34 @@ here the answer was the opposite: `pycopper[terminal]` owns the shell, and
 a view just says `widget: Terminal, style: {shell: "/bin/bash"}`.
 
 **Three layers, two of them someone else's problem.** `pexpect` (ISC) gives
-POSIX PTY spawning; `pyte` (LGPLv3) gives the VT/ANSI state machine every
+POSIX PTY spawning; `bittty` (WTFPL) gives the VT/ANSI state machine every
 terminal emulator implements identically. What is actually left for
 pyCopper to build is the third layer -- rendering whatever cell grid
-`pyte.Screen.buffer` currently says is true, and turning keystrokes into
-the bytes a shell expects. `pyte`'s licence forces the whole `pycopper
-[terminal]` extra to stay optional, never a hard dependency, the same rule
-`accesskit` already follows.
+`bittty`'s video memory currently says is true, and turning keystrokes into
+the bytes a shell expects. Both licences keep the whole `pycopper[terminal]`
+extra optional, never a hard dependency, the same rule `accesskit` already
+follows.
+
+**`bittty` replaced `pyte` here (2026-09-08), found live.** A single real
+keystroke, under zsh with zsh-syntax-highlighting active, could corrupt the
+whole input line ("echo hi" rendering as "echoo o hi") -- confirmed a real
+`pyte` (0.8.2, the latest release; no meaningful update in years) parsing
+defect, not a pyCopper bug: reproduced with zero pyCopper code involved
+(bare `pexpect` + `pyte` fed the identical bytes), independent of typing
+speed and of how the byte stream was chunked, and gone once the responsible
+shell plugin was disabled. `bittty` renders the same stream correctly.
+`bittty.devices.board.Board` is used purely as a parser -- its own PTY
+spawning (`start_process()`) is never called, since `pexpect`/`_PtySession`
+already own that reliably; `Board.pty` is instead wired to a small
+`Connection`-protocol shim over `_PtySession.write`, so the board's own
+internal auto-replies (DSR and similar shell queries) still reach the real
+pty. **Regression from the swap: no scrollback** -- `bittty` keeps none (a
+documented limitation, not an oversight); re-implementing it is a tracked
+follow-up, not done in this pass.
 
 **Only POSIX is implemented and verified.** `pexpect.spawn` was exercised
 directly -- spawn a shell, read its output through `read_nonblocking`, feed
-it to `pyte.ByteStream`, read `screen.display` back -- before being relied
+it to `bittty`, read the resulting cell grid back -- before being relied
 on. Windows would need `pywinpty` wrapping ConPTY entirely, a different
 backend, not `pexpect.spawn`, which is POSIX-only; the platform check is a
 real branch, but nothing here could verify a Windows implementation rather
@@ -3176,7 +3195,7 @@ Windows and macOS" precedent, applied here as "not built" rather than
 **No PTY mutation happens off the engine thread**, the identical rule
 `Signal.set` and `HotReloader` (§5.11) already follow. The background
 reader thread's only job is appending raw bytes to a lock-guarded buffer;
-feeding `pyte`'s byte stream and repainting both happen later, back on the
+feeding them into `bittty` and repainting both happen later, back on the
 engine thread. When a real `asyncio` loop can be captured, the reader
 thread also calls `loop.call_soon_threadsafe(...)` to wake an idle app
 promptly -- `VideoElement.push_frame`'s (§5.23) own docstring already

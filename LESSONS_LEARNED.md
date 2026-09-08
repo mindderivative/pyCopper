@@ -237,10 +237,13 @@ entity `pyCopper Performance Findings`.
 - **Toolkits cannot be embedded — not a licensing question.** `qtconsole`
   (BSD) and `pyqtconsole` (MIT) are both unusable regardless of licence:
   they render through their own surface and event loop. Only *headless*
-  libraries help (`pexpect`+`pyte` for Terminal).
+  libraries help (`pexpect`+`bittty` for Terminal, `bittty` replacing
+  `pyte` on 2026-09-08 after a real `pyte` parsing defect surfaced live —
+  see `widgets/terminal.py`'s own docstring).
 - **Licence traps for an MIT framework, verify from PyPI, never recall:**
-  PyQt6 is GPL-3.0-only; `pyte` is LGPLv3 (kept as an optional-only extra
-  for this reason); `filedialpy` declares **no licence at all**.
+  PyQt6 is GPL-3.0-only; `bittty` is WTFPL, even more permissive than
+  `pyte` (LGPLv3, the reason it too was kept an optional-only extra);
+  `filedialpy` declares **no licence at all**.
 - **Native file dialogs must go through the XDG portal** — `jeepney` (MIT,
   pure Python) is the route, same seam shape as the clipboard and the
   accessibility bridge.

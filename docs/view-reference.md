@@ -834,11 +834,11 @@ is no separate `cols:`/`rows:` to keep in sync by hand, and resizing the
 widget resizes the shell's own idea of its terminal size too.
 
 **POSIX only in this pass.** Spawning a real pseudo-terminal needs
-`pycopper[terminal]` (`pyte` for VT/ANSI parsing, `pexpect` for the PTY —
-both optional; `pyte` is LGPLv3, so it can never become a hard dependency).
-Without them, or on Windows (not yet implemented — see the widget's own
-docstring for why), the terminal area shows a message explaining what is
-missing instead of a shell.
+`pycopper[terminal]` (`bittty` for VT/ANSI parsing, `pexpect` for the PTY —
+both optional, and neither can become a hard dependency: `bittty` is
+WTFPL, `pexpect` is ISC). Without them, or on Windows (not yet
+implemented — see the widget's own docstring for why), the terminal area
+shows a message explaining what is missing instead of a shell.
 
 **No monospace font ships with pyCopper**, the same gap
 [Code editor](#code-editor) documents. `style.font_family` names a face by
@@ -846,15 +846,19 @@ family; without one, text still renders, proportionally, so columns and
 box-drawn tables will not line up — load a real monospace face with
 `app.text.db.load(path)` before the view mounts to fix that.
 
-**Scrollback** is 2000 lines, not configurable per view. The mouse wheel
-pages through it; typing anything snaps back to the live bottom (inherited
-from `pyte`'s own scrollback behaviour, not something pyCopper adds on top).
+**No scrollback.** `bittty` (swapped in for `pyte` on 2026-09-08, after a
+real `pyte` parsing defect corrupted typed input under some shell prompt
+plugins — see the widget's own docstring) keeps no scrollback buffer at
+all, a documented limitation of the library, not an oversight. The mouse
+wheel over a Terminal does nothing; re-implementing scrollback against
+`bittty` is a tracked follow-up, not done yet.
 **Ctrl+C is always the interrupt byte** sent to the shell, never a copy
 shortcut — there is no text selection to copy in this pass, so nothing was
 taken from Ctrl+C to make room for one.
 
 **Not implemented**: mouse text selection and copy, underline and
-strikethrough rendering, function keys beyond F1–F4, and Windows support.
+strikethrough rendering, function keys beyond F1–F4, scrollback (see
+above), and Windows support.
 
 ## Page host
 

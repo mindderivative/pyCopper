@@ -31,9 +31,9 @@ children:
           process management; interpreting its byte stream is the VT/
           ANSI state machine every real terminal emulator implements
           identically -- neither is this widget's own concern to
-          reinvent. `pexpect` gives POSIX PTY spawning, `pyte` gives the
+          reinvent. `pexpect` gives POSIX PTY spawning, `bittty` gives the
           state machine; what pyCopper actually builds is the third
-          layer, rendering whatever cell grid `pyte.Screen.buffer` says
+          layer, rendering whatever cell grid `bittty`'s video memory says
           is currently true and turning keystrokes into the bytes a
           shell expects. Both are optional extras
           (`pycopper[terminal]`), never hard dependencies. Only POSIX is

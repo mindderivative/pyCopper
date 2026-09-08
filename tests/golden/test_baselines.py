@@ -266,9 +266,9 @@ def test_gallery_advanced_page_baseline(render_scene, assert_golden) -> None:
     Terminal only spawns its shell once its page is actually active
     (`PageHost`'s whole reason for existing -- see `pagehost.py`), so unlike
     the old single-scroll gallery this needs an explicit navigation before
-    the swapped-in `pyte` stand-in below has anything to attach to.
+    the swapped-in `bittty` stand-in below has anything to attach to.
     """
-    import pyte
+    from bittty.devices.board import Board
 
     demo = _import_gallery_app()
     demo.gallery.current_page.set("advanced")
@@ -302,8 +302,7 @@ def test_gallery_advanced_page_baseline(render_scene, assert_golden) -> None:
             pass
 
     term._session = _AlwaysAlive()
-    term._screen = pyte.HistoryScreen(term._cols, term._rows, history=200)
-    term._stream = pyte.ByteStream(term._screen)
+    term._board = Board(command="/bin/sh", width=term._cols, height=term._rows)
     term._feed(b"$ \x1b[32mgit status\x1b[0m\r\n")
     term._feed(b"\x1b[41mon branch main\x1b[0m\r\n")
 
@@ -2713,11 +2712,11 @@ def test_codeeditor_baseline(render_scene, assert_golden) -> None:
 def test_terminal_baseline(render_scene, assert_golden) -> None:
     """A prompt line, a coloured line, and a focused blinking cursor: proves
     the cell grid, per-run background/foreground colour, and cursor all
-    render together. Bytes are fed directly into a `pyte` screen attached to
+    render together. Bytes are fed directly into a `bittty` board attached to
     the mounted element rather than through a real spawned shell -- the real
     PTY pipeline is proven end to end in `test_terminal.py`; a golden image
     only needs deterministic content, not a race with a live process."""
-    import pyte
+    from bittty.devices.board import Board
 
     view = {
         "root": {
@@ -2750,8 +2749,7 @@ def test_terminal_baseline(render_scene, assert_golden) -> None:
             return b""
 
     term._session = _AlwaysAlive()
-    term._screen = pyte.HistoryScreen(term._cols, term._rows, history=200)
-    term._stream = pyte.ByteStream(term._screen)
+    term._board = Board(command="/bin/sh", width=term._cols, height=term._rows)
     term._feed(b"$ \x1b[32mgit status\x1b[0m\r\n")
     term._feed(b"\x1b[41mon branch main\x1b[0m\r\n")
     app.dispatcher.focus(term)

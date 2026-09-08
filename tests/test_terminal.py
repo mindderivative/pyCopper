@@ -6,11 +6,11 @@ same way every other ungrounded widget this session was.
 Most tests here never spawn a real process: `TerminalElement` only starts
 its PTY session from `set_ticker()` (called by `App`, never by a bare
 `build_element(...).layout(...)`), so rendering and key-forwarding logic is
-exercised by attaching a `pyte` screen directly (`_attach_screen`) or by
+exercised by attaching a `bittty` board directly (`_attach_board`) or by
 injecting a fake session (`_FakeSession`) -- the same seam the widget's own
 `_feed()` method exists for. A handful of tests at the bottom spawn a real
 `/bin/sh` to prove the actual pipeline works end to end, skipped if
-`pyte`/`pexpect` are not installed.
+`bittty`/`pexpect` are not installed.
 """
 
 from __future__ import annotations
@@ -33,21 +33,23 @@ from pycopper.spec import WidgetKind, parse_view
 from pycopper.widgets import build_element
 from pycopper.widgets.base import _REGISTRY
 from pycopper.widgets.terminal import (
+    _BITTTY_AVAILABLE,
     _PTY_AVAILABLE,
-    _PYTE_AVAILABLE,
     TerminalElement,
     _cell_color,
 )
 
 try:
-    import pyte
+    from bittty.devices.board import Board
+    from bittty.style import Color
 except ImportError:
-    pyte = None  # type: ignore[assignment]
+    Board = None  # type: ignore[assignment,misc]
+    Color = None  # type: ignore[assignment,misc]
 
 CTRL = frozenset({"Control"})
 SHIFT = frozenset({"Shift"})
 
-REAL_PTY = _PYTE_AVAILABLE and _PTY_AVAILABLE and sys.platform != "win32"
+REAL_PTY = _BITTTY_AVAILABLE and _PTY_AVAILABLE and sys.platform != "win32"
 
 
 def terminal(width: float = 400.0, height: float = 200.0, **spec) -> TerminalElement:
@@ -57,12 +59,14 @@ def terminal(width: float = 400.0, height: float = 200.0, **spec) -> TerminalEle
     return element
 
 
-def _attach_screen(element: TerminalElement, cols: int = 20, rows: int = 5) -> None:
-    """Give the element a real pyte screen with no real PTY behind it."""
+def _attach_board(element: TerminalElement, cols: int = 20, rows: int = 5) -> None:
+    """Give the element a real `bittty` board with no real PTY behind it."""
     element._cols, element._rows = cols, rows
-    screen = pyte.HistoryScreen(cols, rows, history=200)
-    element._screen = screen
-    element._stream = pyte.ByteStream(screen)
+    element._board = Board(command="/bin/sh", width=cols, height=rows)
+
+
+def _cell_text(board, x: int, y: int) -> str:
+    return board.blitter.current_page.get_cell(x, y)[1]
 
 
 class _FakeSession:
@@ -107,7 +111,7 @@ def test_never_started_shows_the_unavailable_message_not_a_crash() -> None:
     .layout(...)` alone must never spawn a process."""
     element = terminal()
     assert element._session is None
-    assert element._screen is None
+    assert element._board is None
 
 
 # ------------------------------------------------------------------ layout
@@ -132,26 +136,26 @@ def test_the_grid_follows_the_pixel_size() -> None:
     assert large._rows > small._rows
 
 
-def test_resizing_an_attached_screen_is_debounced_then_applied() -> None:
+def test_resizing_an_attached_board_is_debounced_then_applied() -> None:
     """`_apply_grid`'s trade, mirroring `Engine._pin_surface`: an already-live
-    screen does not reflow on every intermediate size during a drag (see the
+    board does not reflow on every intermediate size during a drag (see the
     2026-09 resize investigation -- a reflow forces the whole grid's text to
     re-shape, since every run's text changes), only once the target has sat
     still for `GRID_SETTLE_SECONDS`."""
     element = terminal(width=300.0, height=150.0)
-    _attach_screen(element, cols=element._cols, rows=element._rows)
-    before = (element._screen.columns, element._screen.lines)
+    _attach_board(element, cols=element._cols, rows=element._rows)
+    before = (element._board.width, element._board.height)
     element.layout(Constraints(0.0, 900.0, 0.0, 450.0))
-    assert (element._screen.columns, element._screen.lines) == before, "not yet, still debounced"
+    assert (element._board.width, element._board.height) == before, "not yet, still debounced"
     assert element._pending_grid is not None and element._pending_grid != before
 
     element._pending_grid_since -= TerminalElement.GRID_SETTLE_SECONDS + 0.01
     element._maybe_apply_pending_grid()
 
-    after = (element._screen.columns, element._screen.lines)
+    after = (element._board.width, element._board.height)
     assert after != before
-    assert element._screen.columns == element._cols
-    assert element._screen.lines == element._rows
+    assert element._board.width == element._cols
+    assert element._board.height == element._rows
     assert element._pending_grid is None
 
 
@@ -159,7 +163,7 @@ def test_a_resize_during_the_settle_window_re_arms_it() -> None:
     """A drag is not one clean jump from old size to new -- a second, still
     different, target mid-window must not let the first one sneak through."""
     element = terminal(width=300.0, height=150.0)
-    _attach_screen(element, cols=element._cols, rows=element._rows)
+    _attach_board(element, cols=element._cols, rows=element._rows)
     before = (element._cols, element._rows)
 
     element.layout(Constraints(0.0, 900.0, 0.0, 450.0))
@@ -205,38 +209,45 @@ def test_an_explicit_shell_style_wins(monkeypatch) -> None:
 
 
 def test_named_ansi_colours_resolve() -> None:
-    assert _cell_color("red", (0, 0, 0, 1)) != (0, 0, 0, 1)
-    assert _cell_color("brightblue", (0, 0, 0, 1)) != (0, 0, 0, 1)
+    assert _cell_color(Color("indexed", 1), (0, 0, 0, 1)) != (0, 0, 0, 1)  # red
+    assert _cell_color(Color("indexed", 12), (0, 0, 0, 1)) != (0, 0, 0, 1)  # brightblue
 
 
 def test_default_falls_back_to_the_given_colour() -> None:
     default = (0.1, 0.2, 0.3, 1.0)
-    assert _cell_color("default", default) == default
+    assert _cell_color(None, default) == default
+    assert _cell_color(Color("default"), default) == default
 
 
-def test_a_hex_colour_is_parsed() -> None:
-    """`ff8000` is sRGB 100%/50%/0% -- converted to linear, red stays at 1.0
-    (a fixed point of the sRGB curve) but green drops well below its sRGB
-    reading, which is exactly the point of the conversion (see `_srgb`)."""
-    r, g, b, a = _cell_color("ff8000", (0, 0, 0, 1))
+def test_an_rgb_colour_is_converted() -> None:
+    """`(255, 128, 0)` is sRGB 100%/50%/0% -- converted to linear, red stays
+    at 1.0 (a fixed point of the sRGB curve) but green drops well below its
+    sRGB reading, which is exactly the point of the conversion (see
+    `_srgb`)."""
+    r, g, b, a = _cell_color(Color("rgb", (255, 128, 0)), (0, 0, 0, 1))
     assert round(r, 2) == 1.0
     assert 0.15 < g < 0.30
     assert b == 0.0
     assert a == 1.0
 
 
-def test_an_unrecognised_name_falls_back() -> None:
+def test_an_extended_indexed_colour_resolves() -> None:
+    """Beyond the 16 named ANSI colours, `Color`'s mode is always a known
+    literal -- there is no free-form "unrecognised name" case any more, so
+    this exercises the 256-colour cube and greyscale-ramp branches instead
+    of `_cell_color`'s defensive default fallback."""
     default = (0.1, 0.2, 0.3, 1.0)
-    assert _cell_color("not-a-colour", default) == default
+    assert _cell_color(Color("indexed", 200), default) != default  # 6x6x6 cube
+    assert _cell_color(Color("indexed", 244), default) != default  # greyscale ramp
 
 
 # -------------------------------------------------------------- rendering
 
 
-@pytest.mark.skipif(pyte is None, reason="pyte not installed")
+@pytest.mark.skipif(Board is None, reason="bittty not installed")
 def test_feeding_bytes_renders_without_crashing() -> None:
     element = terminal()
-    _attach_screen(element)
+    _attach_board(element)
     element._feed(b"hello\r\n")
     from pycopper.paint import DisplayList
     from pycopper.theme import Palette, Theme
@@ -247,7 +258,7 @@ def test_feeding_bytes_renders_without_crashing() -> None:
     assert len(ctx.display_list.view) > 0
 
 
-@pytest.mark.skipif(pyte is None, reason="pyte not installed")
+@pytest.mark.skipif(Board is None, reason="bittty not installed")
 def test_coloured_output_paints_more_than_plain_text() -> None:
     from pycopper.paint import DisplayList
     from pycopper.theme import Palette, Theme
@@ -255,7 +266,7 @@ def test_coloured_output_paints_more_than_plain_text() -> None:
 
     def render(data: bytes) -> int:
         element = terminal()
-        _attach_screen(element)
+        _attach_board(element)
         element._feed(data)
         ctx = PaintContext(display_list=DisplayList(), palette=Palette(Theme(dark=True)))
         element.paint(ctx, element.offset.__class__(0.0, 0.0))
@@ -269,32 +280,17 @@ def test_coloured_output_paints_more_than_plain_text() -> None:
 # --------------------------------------------------------------- scrollback
 
 
-@pytest.mark.skipif(pyte is None, reason="pyte not installed")
-def test_wheel_up_scrolls_back_through_history() -> None:
+def test_wheel_does_nothing_without_scrollback() -> None:
+    """`bittty` keeps no scrollback buffer (see the module docstring) --
+    wheeling over a Terminal, attached board or not, must never raise, and
+    must not consume the event (it is left to propagate to a containing
+    `ScrollView` instead)."""
     element = terminal()
-    _attach_screen(element, cols=20, rows=5)
-    for i in range(40):
-        element._feed(f"line{i}\r\n".encode())
-    before = element._screen.history.position
-    element.on_wheel(WheelEvent(EventType.WHEEL, dy=-100.0))
-    assert element._screen.history.position < before
+    element.on_wheel(WheelEvent(EventType.WHEEL, dy=-100.0))  # no board: must not raise
 
-
-@pytest.mark.skipif(pyte is None, reason="pyte not installed")
-def test_wheel_down_returns_toward_the_bottom() -> None:
-    element = terminal()
-    _attach_screen(element, cols=20, rows=5)
-    for i in range(40):
-        element._feed(f"line{i}\r\n".encode())
-    element.on_wheel(WheelEvent(EventType.WHEEL, dy=-100.0))
-    scrolled = element._screen.history.position
-    element.on_wheel(WheelEvent(EventType.WHEEL, dy=100.0))
-    assert element._screen.history.position > scrolled
-
-
-def test_wheel_with_no_screen_does_nothing() -> None:
-    element = terminal()
-    element.on_wheel(WheelEvent(EventType.WHEEL, dy=-100.0))  # must not raise
+    if Board is not None:
+        _attach_board(element, cols=20, rows=5)
+        element.on_wheel(WheelEvent(EventType.WHEEL, dy=-100.0))  # must not raise either
 
 
 # ------------------------------------------------------------------ keyboard
@@ -420,7 +416,7 @@ def test_dispose_stops_the_session() -> None:
 # -------------------------------------------------------- real end to end
 
 
-@pytest.mark.skipif(not REAL_PTY, reason="pyte/pexpect not available on this platform")
+@pytest.mark.skipif(not REAL_PTY, reason="bittty/pexpect not available on this platform")
 def test_a_real_shell_produces_visible_output() -> None:
     element = terminal(width=400.0, height=200.0, style={"shell": "/bin/sh -c 'echo hello-pty'"})
     element.set_ticker(Ticker())
@@ -429,19 +425,19 @@ def test_a_real_shell_produces_visible_output() -> None:
         found = False
         while time.monotonic() < deadline:
             element._drain_pty()
-            if element._screen is not None and any(
-                "hello-pty" in "".join(element._screen.buffer[r][c].data for c in range(20))
+            if element._board is not None and any(
+                "hello-pty" in "".join(_cell_text(element._board, c, r) for c in range(20))
                 for r in range(5)
             ):
                 found = True
                 break
             time.sleep(0.05)
-        assert found, "the real shell's output never reached the pyte screen"
+        assert found, "the real shell's output never reached the bittty board"
     finally:
         element.dispose()
 
 
-@pytest.mark.skipif(not REAL_PTY, reason="pyte/pexpect not available on this platform")
+@pytest.mark.skipif(not REAL_PTY, reason="bittty/pexpect not available on this platform")
 def test_a_real_shell_receives_keyboard_input() -> None:
     element = terminal(width=400.0, height=200.0, style={"shell": "/bin/cat"})
     element.set_ticker(Ticker())
@@ -451,8 +447,8 @@ def test_a_real_shell_receives_keyboard_input() -> None:
         found = False
         while time.monotonic() < deadline:
             element._drain_pty()
-            if element._screen is not None and "p" in "".join(
-                element._screen.buffer[0][c].data for c in range(10)
+            if element._board is not None and "p" in "".join(
+                _cell_text(element._board, c, 0) for c in range(10)
             ):
                 found = True
                 break

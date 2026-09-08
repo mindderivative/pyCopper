@@ -108,7 +108,7 @@ nearest real M3 guidance where any existed: `Popover`, `Accordion`, `TreeView`/
 `Image`, `Video`, `NodeGraph`/`Node`, `CodeEditor`, and `Terminal` — plus SVG
 icon compilation (`pycopper[svg]`). `CodeEditor` and `Terminal` are optional
 capabilities, not hard dependencies: Pygments syntax highlighting
-(`pycopper[code]`) and a real spawned shell via `pyte`/`pexpect`
+(`pycopper[code]`) and a real spawned shell via `bittty`/`pexpect`
 (`pycopper[terminal]`, POSIX only — Windows needs a ConPTY backend not yet
 built). None of it touched `__all__`; the version moves for the view format's
 sake, the same rule v1.2 established. A full-codebase review (60 subagents,

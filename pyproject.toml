@@ -67,13 +67,16 @@ svg = ["svgelements>=1.9,<2"]
 # a CodeEditor with no `style.language` set, or this extra not installed,
 # still works as a plain editable multi-line text control, just uncoloured.
 code = ["pygments>=2.18,<3"]
-# Terminal (widgets/terminal.py). pyte is LGPLv3 -- an optional extra, never
-# a hard dependency, the same rule accesskit's own licence follows. Only a
-# real POSIX pseudo-terminal (pexpect, ISC) is implemented and verified in
-# this pass; Windows would need pywinpty (MIT) wrapping ConPTY, which is
-# architected for but not yet built -- see the widget's own docstring.
+# Terminal (widgets/terminal.py). bittty is WTFPL -- an optional extra, never
+# a hard dependency, the same rule accesskit's own licence follows. Replaced
+# `pyte` here (2026-09-08): a real `pyte` parsing defect corrupted typed
+# input under zsh-syntax-highlighting, reproduced with pyCopper's code not
+# even involved -- see the widget's own module docstring. Only a real POSIX
+# pseudo-terminal (pexpect, ISC) is implemented and verified in this pass;
+# Windows would need pywinpty (MIT) wrapping ConPTY, which is architected
+# for but not yet built.
 terminal = [
-    "pyte>=0.8,<1",
+    "bittty>=0.2,<1",
     "pexpect>=4.9,<5; sys_platform != 'win32'",
 ]
 dev = [
@@ -86,7 +89,7 @@ dev = [
     "accesskit>=0.7,<0.8",
     "svgelements>=1.9,<2",
     "pygments>=2.18,<3",
-    "pyte>=0.8,<1",
+    "bittty>=0.2,<1",
     "pexpect>=4.9,<5; sys_platform != 'win32'",
 ]
 
@@ -153,10 +156,10 @@ module = ["pygments", "pygments.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# pyte and pexpect ship no inline types. Same reasoning as accesskit/pygments
-# above -- scoped to the one lazily-imported, optional module that uses them
-# (widgets/terminal.py).
-module = ["pyte", "pyte.*", "pexpect", "pexpect.*"]
+# bittty and pexpect ship no inline types (no py.typed marker, checked
+# directly). Same reasoning as accesskit/pygments above -- scoped to the one
+# lazily-imported, optional module that uses them (widgets/terminal.py).
+module = ["bittty", "bittty.*", "pexpect", "pexpect.*"]
 ignore_missing_imports = true
 
 [tool.mypy]

@@ -21,11 +21,11 @@ from pycopper.spec import WidgetKind, parse_view
 from pycopper.widgets.base import _REGISTRY, create_element
 
 try:
-    from pycopper.widgets.terminal import _PTY_AVAILABLE, _PYTE_AVAILABLE
+    from pycopper.widgets.terminal import _BITTTY_AVAILABLE, _PTY_AVAILABLE
 except ImportError:
-    _PTY_AVAILABLE = _PYTE_AVAILABLE = False
+    _PTY_AVAILABLE = _BITTTY_AVAILABLE = False
 
-REAL_PTY = _PYTE_AVAILABLE and _PTY_AVAILABLE and sys.platform != "win32"
+REAL_PTY = _BITTTY_AVAILABLE and _PTY_AVAILABLE and sys.platform != "win32"
 
 
 def _view(value: str = "{{ page.get() }}", default: str | None = None) -> dict:
@@ -154,7 +154,7 @@ def test_host_dispose_cleans_up_the_currently_active_page() -> None:
     assert home._effect is None
 
 
-@pytest.mark.skipif(not REAL_PTY, reason="pyte/pexpect not installed, or not POSIX")
+@pytest.mark.skipif(not REAL_PTY, reason="bittty/pexpect not installed, or not POSIX")
 def test_a_terminal_page_does_not_spawn_until_its_page_is_active() -> None:
     """The actual point of the whole widget, proven end to end: a live shell
     process only exists while its page is the one showing."""
