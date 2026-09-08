@@ -9,11 +9,12 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from .config import Settings
 from .layout import OFFSET_ZERO, Constraints, LayoutOwner, Size
 from .motion import Ticker
+from .motion.animation import MAX_FRAME_DELTA
 from .paint import DisplayList
 from .render.atlas import ImageAtlas
 from .runtime.accessibility import AccessibleNode, Bridge, accessibility_tree
@@ -37,6 +38,19 @@ _POINTER_EVENTS = {
     "pointer_up": EventType.POINTER_UP,
     "pointer_move": EventType.POINTER_MOVE,
 }
+
+#: Held-key repeat, in seconds. Not sourced from anywhere -- there is no M3
+#: spec for keyboard repeat timing -- chosen to read as an ordinary desktop
+#: default rather than a jump or a stutter. Needed because `rendercanvas`'s
+#: GLFW backend drops every `glfw.REPEAT` action outright (confirmed by
+#: reading `glfw.py`'s own `_on_key`: `else: # glfw.REPEAT / return`), so
+#: without this, holding Backspace/Delete/an arrow key deletes or moves
+#: exactly once and then does nothing until released and pressed again.
+#: `_on_char` is unaffected -- GLFW's separate char callback already repeats
+#: printable text input on its own, which is why only *action* keys (no
+#: `char` event of their own) ever needed this.
+KEY_REPEAT_DELAY: Final = 0.5
+KEY_REPEAT_INTERVAL: Final = 0.05
 
 
 class App:
@@ -80,6 +94,16 @@ class App:
         #: setting it each frame would churn GLFW resources 60 times a second.
         self._cursor = "default"
         self._last_tick: float | None = None
+        #: The key currently synthesizing repeats, and how long it has been
+        #: held -- see `KEY_REPEAT_DELAY`/`KEY_REPEAT_INTERVAL`. None means no
+        #: key is tracked for repeat, either because nothing is held or
+        #: because a `key_up` for it already arrived.
+        self._repeat_key: str | None = None
+        self._repeat_modifiers: frozenset[str] = frozenset()
+        self._repeat_elapsed = 0.0
+        #: Whether `_repeat_elapsed` is still counting down the initial delay
+        #: (False) or is now firing every `KEY_REPEAT_INTERVAL` (True).
+        self._repeating = False
 
         self.overlays = OverlayHost()
         self.overlays.build(
@@ -287,13 +311,40 @@ class App:
         """Frame steps 1-5: drain events, advance motion, flush signals, relayout."""
         self.poll_reload()
         self.dispatcher.drain()
-        self.motion.tick(self._frame_delta())
+        dt = self._frame_delta()
+        self.motion.tick(dt)
+        self._advance_key_repeat(dt)
         self.layout_owner.flush()
         self._drain_accessibility()
         size = self.logical_size()
         self.root.layout(Constraints.tight(size))
         self.overlays.layout(size, self.root)
         self._sync_cursor()
+
+    def _advance_key_repeat(self, dt: float) -> None:
+        """Fire a synthetic `key_down` for whatever key is held, once
+        `KEY_REPEAT_DELAY` has passed and then every `KEY_REPEAT_INTERVAL`
+        after -- see that constant's own comment for why this exists at
+        all. A `while` loop rather than a single check, so a delayed frame
+        (clamped to `MAX_FRAME_DELTA`, the same clamp `Ticker.tick` already
+        uses) still fires every repeat it owes rather than dropping time.
+        """
+        if self._repeat_key is None:
+            return
+        self._repeat_elapsed += min(dt, MAX_FRAME_DELTA)
+        fired = False
+        while self._repeat_key is not None:
+            threshold = KEY_REPEAT_INTERVAL if self._repeating else KEY_REPEAT_DELAY
+            if self._repeat_elapsed < threshold:
+                break
+            self._repeat_elapsed -= threshold
+            self._repeating = True
+            self.dispatcher.post(
+                KeyEvent(EventType.KEY_DOWN, key=self._repeat_key, modifiers=self._repeat_modifiers)
+            )
+            fired = True
+        if fired:
+            self.dispatcher.drain()
 
     def _sync_cursor(self) -> None:
         shape = self.dispatcher.cursor
@@ -326,9 +377,12 @@ class App:
             # no screen reader is attached, which is what makes a per-frame
             # push affordable rather than needing change detection of its own.
             self._a11y.update(self.accessibility_tree())
-        # The one legitimate reason to ask for another frame unprompted. An
-        # application with nothing animating still renders nothing.
-        if self.motion.active and self.engine is not None:
+        # The legitimate reasons to ask for another frame unprompted. An
+        # application with nothing animating and no key held still renders
+        # nothing. A held key needs its own frames the same way motion does
+        # -- `_advance_key_repeat` only ever runs from inside `update()`,
+        # which only runs when a frame is actually drawn.
+        if (self.motion.active or self._repeat_key is not None) and self.engine is not None:
             self.engine.request_draw()
 
     def bind_accessibility(self, bridge: Bridge) -> Bridge:
@@ -449,13 +503,19 @@ class App:
                 )
             )
         elif kind == "key_down":
-            self.dispatcher.post(
-                KeyEvent(
-                    EventType.KEY_DOWN,
-                    key=str(event.get("key", "")),
-                    modifiers=frozenset(event.get("modifiers", ())),
-                )
-            )
+            key = str(event.get("key", ""))
+            modifiers = frozenset(event.get("modifiers", ()))
+            self.dispatcher.post(KeyEvent(EventType.KEY_DOWN, key=key, modifiers=modifiers))
+            # A fresh press (this key wasn't already the one repeating)
+            # restarts the delay -- switching keys while one is held should
+            # not inherit however far the previous key's repeat had gotten.
+            self._repeat_key = key
+            self._repeat_modifiers = modifiers
+            self._repeat_elapsed = 0.0
+            self._repeating = False
+        elif kind == "key_up":
+            if str(event.get("key", "")) == self._repeat_key:
+                self._repeat_key = None
         elif kind == "char":
             self.dispatcher.post(KeyEvent(EventType.TEXT, text=str(event.get("data", ""))))
         else:
