@@ -53,6 +53,7 @@ class Gallery(ViewModel):
         self.segment = Signal("s0", name="segment")
         self.rail = Signal("r0", name="rail")
         self.tree_selection = Signal("main", name="tree_selection")
+        self.tree_src_expanded = Signal(True, name="tree_src_expanded")
         self.accordion_open = Signal(True, name="accordion_open")
 
         # --- SpinBox / Pagination hand their new value to on_change instead,
@@ -130,6 +131,10 @@ class Gallery(ViewModel):
 
     def select_tree(self, event: Any) -> None:
         self.tree_selection.set(event.target.name)
+
+    def toggle_tree_src(self, event: Any) -> None:
+        self.tree_selection.set(event.target.name)
+        self.tree_src_expanded.update(lambda expanded: not expanded)
 
     def toggle_accordion(self, event: Any) -> None:
         self.accordion_open.update(lambda on: not on)

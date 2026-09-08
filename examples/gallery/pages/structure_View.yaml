@@ -51,8 +51,8 @@ children:
           - name: src
             widget: TreeItem
             text: "src"
-            value: "true"
-            handlers: {on_click: select_tree}
+            value: "{{ tree_src_expanded.get() }}"
+            handlers: {on_click: toggle_tree_src}
             children:
               - {name: main, widget: TreeItem, text: "main.py", handlers: {on_click: select_tree}}
               - {name: widgets_dir, widget: TreeItem, text: "widgets/", handlers: {on_click: select_tree}}
