@@ -204,7 +204,11 @@ class DatePickerElement(_StyledMixin, Padding):
         self, ctx: PaintContext, absolute: Any, caption: int, headline: int
     ) -> None:
         selected = self._selected()
-        label = selected.strftime("%a, %b %-d") if selected else "Select date"
+        # `%-d` (non-padded day) is a glibc/macOS strftime extension; Windows'
+        # CRT raises ValueError on it outright. Building the day as a plain
+        # int sidesteps the platform difference entirely rather than
+        # branching on it.
+        label = f"{selected.strftime('%a, %b')} {selected.day}" if selected else "Select date"
         paint_text(ctx, absolute.x + 24.0, absolute.y + 16.0, "Select date", _LABEL_ROLE, caption)
         paint_text(ctx, absolute.x + 24.0, absolute.y + 40.0, label, _HEADLINE_ROLE, headline)
 

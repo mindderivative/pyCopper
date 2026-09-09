@@ -6,7 +6,6 @@ See app.py in this directory for the entry point.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from pycopper import Signal, ViewModel
 
