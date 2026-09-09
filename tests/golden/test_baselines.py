@@ -1716,6 +1716,67 @@ def test_text_field_baseline(render_scene, assert_golden) -> None:
     assert_golden("text_field", np.asarray(engine.canvas.draw()))
 
 
+def test_bidi_text_field_baseline(render_scene, assert_golden) -> None:
+    """Real UAX #9 bidi, through a real App with the bundled Arabic and
+    Hebrew fonts -- the demonstrable proof for the whole RTL rewrite this
+    baseline exists to guard against a regression in.
+
+    Two unfocused fields show real Arabic and Hebrew glyphs (not tofu boxes
+    -- the fonts these need did not exist in the bundle until this feature).
+    The third, focused field holds a selection that crosses the direction
+    boundary in `"Hello مرحبا"` (offsets 3-9, spanning "lo " into "مرح"):
+    it must paint as two disjoint rects, not one rect stretched across the
+    gap between them -- `rects_for`'s multi-rect behaviour, the thing a
+    property assertion on `_spans_x` cannot show but a rendered frame can.
+    """
+    view = {
+        "root": {
+            "name": "root",
+            "widget": "Vertical",
+            "style": {"background": "surface", "padding": 16, "spacing": 16},
+            "children": [
+                {
+                    "name": "arabic",
+                    "widget": "TextField",
+                    "text": "Arabic",
+                    "value": "Hello مرحبا",
+                    "style": {"width": 288},
+                },
+                {
+                    "name": "hebrew",
+                    "widget": "TextField",
+                    "text": "Hebrew",
+                    "value": "Shalom שלום",
+                    "style": {"width": 288},
+                },
+                {
+                    "name": "selected",
+                    "widget": "TextField",
+                    "text": "Selection across a boundary",
+                    "value": "Hello مرحبا",
+                    "style": {"width": 288},
+                },
+            ],
+        }
+    }
+    _, engine = render_scene(
+        lambda dl: None, width=320, height=280, theme=Theme(seed=SEED, dark=True)
+    )
+    app = App(view, theme=Theme(seed=SEED, dark=True))
+    app.attach(engine)
+    app.mount()
+    field = app.root.find("selected")
+    assert field is not None
+    field.editor.select(3, 9)
+    app.dispatcher.focus(field)
+    # The caret blinks, so pin it: with the ticker never advanced the
+    # repeating animation sits at zero, which is the visible half of the
+    # cycle -- same reasoning as `test_text_field_baseline`.
+    app.update()
+    engine.canvas.request_draw(engine.draw_frame)
+    assert_golden("bidi_text_field", np.asarray(engine.canvas.draw()))
+
+
 def test_multiline_field_baseline(render_scene, assert_golden) -> None:
     """The three shapes M3 names, side by side and to scale.
 
