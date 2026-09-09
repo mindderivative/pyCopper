@@ -36,17 +36,52 @@ import numpy as np
 from PIL import Image as PILImage
 
 from ..layout import Constraints, EdgeInsets, Offset, Padding, Size
-from ..render.atlas import ImageEntry
+from ..render.atlas import ImageAtlas, ImageEntry
 from ..spec import WidgetSpec
 from ..tree.element import PaintContext
 from .base import _StyledMixin
 
-__all__ = ["ImageElement"]
+__all__ = ["ImageElement", "resolve_image"]
 
 
 def _decode(path: Path) -> np.ndarray:
     """Straight (non-premultiplied) RGBA, as `ImageAtlas.add` requires."""
     return np.asarray(PILImage.open(path).convert("RGBA"))
+
+
+def resolve_image(
+    atlas: ImageAtlas,
+    path: str | None,
+    *,
+    key: Path | None,
+    entry: ImageEntry | None,
+    label: str,
+) -> tuple[Path | None, ImageEntry | None]:
+    """`(new_key, new_entry)` for `path`, re-resolving on a changed path or a
+    stale atlas generation -- `ImageAtlas.reset` (a wholesale eviction forced
+    by some other image needing room) invalidates every entry it packed, not
+    just one widget's, so a widget whose `path:` never changes still has to
+    notice and re-resolve. Factored out of `ImageElement._entry` once
+    `Slider`'s own `handle_image:` needed the identical resolve-cache-decode
+    dance -- this staleness check is non-trivial enough that a second,
+    subtly different copy is a real risk, not a hypothetical one.
+
+    A missing path, or a decode failure, resolves to `(new_key_or_None,
+    None)` rather than raising -- the caller draws nothing for that frame,
+    the same "blank rather than a crashed paint pass" choice `ImageElement`
+    already makes; `label` only changes the stderr line's prefix.
+    """
+    if not path:
+        return None, None
+    new_key = Path(path).expanduser().resolve()
+    stale = entry is not None and entry.generation != atlas.generation
+    if new_key == key and not stale:
+        return key, entry
+    try:
+        return new_key, atlas.get_or_add(new_key, lambda: _decode(new_key))
+    except Exception as exc:  # decode, or the atlas rejecting the shape
+        print(f"{label}: could not load {new_key}: {exc}", file=sys.stderr)
+        return new_key, None
 
 
 def _fit_image(
@@ -109,27 +144,13 @@ class ImageElement(_StyledMixin, Padding):
         self._resolved_entry: ImageEntry | None = None
 
     def _entry(self) -> ImageEntry | None:
-        if not self.path:
-            self._resolved_key = None
-            self._resolved_entry = None
-            return None
-        key = Path(self.path).expanduser().resolve()
-        # A wholesale eviction (`ImageAtlas.reset`, forced by some other image
-        # needing room) invalidates every entry it packed, not just this
-        # widget's -- re-resolve on a stale generation too, the same
-        # every-call check `GlyphAtlas.get` makes for exactly this reason,
-        # or a widget whose `path:` never changes would go on pointing at a
-        # rectangle the atlas has since overwritten.
-        stale = self._resolved_entry is not None and (
-            self._resolved_entry.generation != self.image_atlas.generation
+        self._resolved_key, self._resolved_entry = resolve_image(
+            self.image_atlas,
+            self.path,
+            key=self._resolved_key,
+            entry=self._resolved_entry,
+            label="Image",
         )
-        if key != self._resolved_key or stale:
-            self._resolved_key = key
-            try:
-                self._resolved_entry = self.image_atlas.get_or_add(key, lambda: _decode(key))
-            except Exception as exc:  # decode, or the atlas rejecting the shape
-                print(f"Image: could not load {key}: {exc}", file=sys.stderr)
-                self._resolved_entry = None
         return self._resolved_entry
 
     def perform_layout(self, constraints: Constraints) -> Size:

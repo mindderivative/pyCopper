@@ -23,6 +23,13 @@ class SliderDemo(ViewModel):
         self.volume_l = Signal(40, name="volume_l")
         self.volume_xl = Signal(40, name="volume_xl")
 
+        # One per handle-shape example, same reasoning.
+        self.shape_line = Signal(40, name="shape_line")
+        self.shape_circle = Signal(40, name="shape_circle")
+        self.shape_square = Signal(40, name="shape_square")
+        self.shape_hexagon = Signal(40, name="shape_hexagon")
+        self.shape_image = Signal(40, name="shape_image")
+
         self.view_source = (Path(__file__).parent / "Slider_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
 
@@ -40,3 +47,18 @@ class SliderDemo(ViewModel):
 
     def change_volume_xl(self, event: Any) -> None:
         self.volume_xl.set(event.value)
+
+    def change_shape_line(self, event: Any) -> None:
+        self.shape_line.set(event.value)
+
+    def change_shape_circle(self, event: Any) -> None:
+        self.shape_circle.set(event.value)
+
+    def change_shape_square(self, event: Any) -> None:
+        self.shape_square.set(event.value)
+
+    def change_shape_hexagon(self, event: Any) -> None:
+        self.shape_hexagon.set(event.value)
+
+    def change_shape_image(self, event: Any) -> None:
+        self.shape_image.set(event.value)

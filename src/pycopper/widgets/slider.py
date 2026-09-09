@@ -76,20 +76,56 @@ telling the application what changed.
 **Deliberately out of scope for this pass**, matching M3's own "optional"
 anatomy: the value indicator (a label that appears above the handle while
 dragging), stop indicators, the inset icon, and vertical orientation.
+
+**Pluggable handle shapes, pyCopper's own -- not M3.** phil asked directly
+for a genuinely pluggable handle, "not just pyCopper's shipped line/circle
+pair": `style.handle_shape` now also takes `"square"`/`"hexagon"`, and a new
+`style.handle_image:` (a path, same resolution convention as `Image.path:`)
+draws a decoded image as the handle instead of any shape, winning over
+`handle_shape` when set. Square/hexagon cost no new engine work -- both
+reuse `Shape`'s own regular-polygon primitive (`DisplayList.add_polygon`),
+the same shader branch `Shape` already exercises for exactly this reason
+(parametric, no atlas, animates for free). `handle_image` reuses `Image`'s
+own decode/cache path (`ImageAtlas`, Pillow) via `resolve_image` (factored
+out of `ImageElement._entry` in `image.py` once this needed the identical
+staleness-checked resolve-and-cache dance) -- raster only, since Pillow has
+no SVG decoder and pyCopper has no other one yet.
+
+**A true star was asked for and dropped, not silently skipped.** M3 gives
+no handle-shape guidance at all (this whole feature is pyCopper's own), but
+`add_polygon`'s shader is strictly a *regular* polygon -- one `sides` count,
+no alternating inner/outer radius -- so it cannot draw a star shape at any
+value of `sides`. A six-pointed hexagram *could* be approximated with two
+overlapping `sides=3` triangles, but a real star (five points, the shape
+most people mean) needs a genuinely new primitive. Asked phil directly
+(`AskUserQuestion`) rather than shipping a shape that only resembles what
+was asked for; he chose to drop it from this pass over the hexagram
+workaround or new shader work -- logged as a real, disclosed gap, not
+solved here.
 """
 
 from __future__ import annotations
 
+import math
+from pathlib import Path
 from typing import Any, Final
 
 from ..layout import Constraints, EdgeInsets, Padding, Size
+from ..render.atlas import ImageEntry
 from ..runtime.events import ChangeEvent, EventType
 from ..spec import WidgetSpec
 from ..tree.element import PaintContext
 from .base import _StyledMixin
+from .image import resolve_image
 from .material import _box, _state_alpha
 
 __all__ = ["SliderElement"]
+
+#: `add_polygon`'s own convention: `sides=4` at `rotation=0` is a diamond
+#: (confirmed directly against the Shape demo's own labelled example,
+#: `examples/widgets/shape/`); `pi/4` turns it axis-aligned -- what "square"
+#: actually means here.
+_SQUARE_ROTATION: Final = math.pi / 4
 
 
 class SliderElement(_StyledMixin, Padding):
@@ -109,10 +145,13 @@ class SliderElement(_StyledMixin, Padding):
     }
     HANDLE_WIDTH: Final = 4.0
     HANDLE_RADIUS: Final = 2.0
-    #: M2's circular handle, opt-in via `style.handle_shape: circle`. Not a
-    #: scraped M3 figure -- the current spec documents only the line handle
-    #: that replaced it, so this is a reasoned approximation of M2's own
-    #: historical thumb size, not sourced from `COMPONENT_SLIDERS.md`.
+    #: The bounding box every non-`"line"` handle draws in -- M2's circular
+    #: handle originally (opt-in via `style.handle_shape: circle`), now
+    #: shared by `"square"`/`"hexagon"` and `handle_image:` too, so every
+    #: alternate handle reads as the same size rather than each shape
+    #: picking its own. Not a scraped M3 figure for any of them -- the
+    #: circle case is a reasoned approximation of M2's own historical thumb
+    #: size, and the rest are pyCopper's own feature entirely.
     HANDLE_CIRCLE_DIAMETER: Final = 20.0
     #: The halo a hover/press/focus state layer draws around the handle --
     #: not an M3-quoted figure (the state-layer table gives opacities, not a
@@ -128,6 +167,8 @@ class SliderElement(_StyledMixin, Padding):
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
         self.init_element(spec)
+        self._handle_image_key: Path | None = None
+        self._handle_image_entry: ImageEntry | None = None
 
     # ------------------------------------------------------------ geometry
 
@@ -237,9 +278,39 @@ class SliderElement(_StyledMixin, Padding):
 
     # --------------------------------------------------------------- paint
 
+    def _resolve_handle_image(self) -> ImageEntry | None:
+        """The decoded `handle_image:`, or `None` if unset/unresolved.
+
+        Resolved (and re-resolved, on a changed path or a stale atlas
+        generation) via the shared `resolve_image` -- see that function's own
+        docstring for why the staleness check is factored out rather than
+        duplicated. Called from both `_handle_half_extent` and `paint_self`
+        so a failed resolution (bad path, decode error) falls back to the
+        default line handle *consistently* -- the track's own cradle-gap
+        clearance and the actually-painted handle never disagree about which
+        shape is really showing.
+        """
+        self._handle_image_key, self._handle_image_entry = resolve_image(
+            self.image_atlas,
+            self.style.handle_image,
+            key=self._handle_image_key,
+            entry=self._handle_image_entry,
+            label="Slider handle_image",
+        )
+        return self._handle_image_entry
+
     def _handle_half_extent(self) -> float:
-        """Half the current handle shape's own width, line or circle."""
-        if self.style.handle_shape == "circle":
+        """Half the current handle shape's own width.
+
+        `"line"` is the narrow default; every other shape -- circle, square,
+        hexagon, or a resolved `handle_image:` -- shares the wider
+        `HANDLE_CIRCLE_DIAMETER` bounding box, so the cradle-gap clearance is
+        always right for whatever is actually painted (see
+        `_resolve_handle_image`'s own docstring for the image fallback case).
+        """
+        if self._resolve_handle_image() is not None:
+            return self.HANDLE_CIRCLE_DIAMETER / 2
+        if self.style.handle_shape in ("circle", "square", "hexagon"):
             return self.HANDLE_CIRCLE_DIAMETER / 2
         return self.HANDLE_WIDTH / 2
 
@@ -266,6 +337,71 @@ class SliderElement(_StyledMixin, Padding):
             token=token,
             color=(1.0, 1.0, 1.0, 1.0),
             radii=tuple(r * dpr for r in radii),  # type: ignore[arg-type]
+        )
+
+    def _paint_handle_polygon(
+        self,
+        ctx: PaintContext,
+        absolute: Any,
+        handle_x: float,
+        *,
+        sides: float,
+        rotation: float,
+        token: int,
+    ) -> None:
+        """`style.handle_shape: square`/`hexagon` -- both regular polygons,
+        so both are one `add_polygon` call apart (`Shape`'s own primitive,
+        `sides=4`/`6`), sized to the shared `HANDLE_CIRCLE_DIAMETER` box
+        every non-`"line"` handle uses.
+        """
+        diameter = self.HANDLE_CIRCLE_DIAMETER
+        dpr = ctx.pixel_ratio
+        ctx.display_list.add_polygon(
+            (handle_x + self.HANDLE_WIDTH / 2 - diameter / 2) * dpr,
+            (absolute.y + (self.size.height - diameter) / 2) * dpr,
+            diameter * dpr,
+            diameter * dpr,
+            sides=sides,
+            rotation=rotation,
+            corner_radius=self.HANDLE_RADIUS * dpr,
+            token=token,
+        )
+
+    def _paint_handle_image(
+        self, ctx: PaintContext, absolute: Any, handle_x: float, entry: ImageEntry
+    ) -> None:
+        """`style.handle_image:` -- fit the decoded image into the same
+        `HANDLE_CIRCLE_DIAMETER` box every non-`"line"` handle shares,
+        preserving its own aspect ratio (letterboxed, never cropped -- a
+        handle image is content the caller chose, not a photo to fill a
+        frame with) and centred. No tint, no corner rounding: `Image` itself
+        makes the identical "show the decoded colours as-is" call for the
+        same reason (`ARCHITECTURE.md` 5's "emit tokens, not colours" --
+        baking a tint would silently stop re-theming on a live palette
+        swap), and a handle glyph the caller supplied is exactly the kind of
+        asset that should not be silently reshaped.
+        """
+        diameter = self.HANDLE_CIRCLE_DIAMETER
+        box_x = handle_x + self.HANDLE_WIDTH / 2 - diameter / 2
+        box_y = absolute.y + (self.size.height - diameter) / 2
+        natural_w, natural_h = float(entry.width), float(entry.height)
+        scale = (
+            min(diameter / natural_w, diameter / natural_h)
+            if natural_w > 0 and natural_h > 0
+            else 1.0
+        )
+        w, h = natural_w * scale, natural_h * scale
+        dpr = ctx.pixel_ratio
+        ctx.display_list.add_image(
+            (box_x + (diameter - w) / 2) * dpr,
+            (box_y + (diameter - h) / 2) * dpr,
+            w * dpr,
+            h * dpr,
+            uv=entry.uv(self.image_atlas.size),
+            tint=(1.0, 1.0, 1.0, 1.0),
+            radii=(0.0, 0.0, 0.0, 0.0),
+            clip=ctx.clip,
+            clip_radii=ctx.clip_radii,
         )
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
@@ -327,7 +463,18 @@ class SliderElement(_StyledMixin, Padding):
                 alpha=alpha,
             )
 
-        if style.handle_shape == "circle":
+        image_entry = self._handle_image_entry
+        if image_entry is not None:
+            self._paint_handle_image(ctx, absolute, handle_x, image_entry)
+        elif style.handle_shape == "square":
+            self._paint_handle_polygon(
+                ctx, absolute, handle_x, sides=4.0, rotation=_SQUARE_ROTATION, token=active
+            )
+        elif style.handle_shape == "hexagon":
+            self._paint_handle_polygon(
+                ctx, absolute, handle_x, sides=6.0, rotation=0.0, token=active
+            )
+        elif style.handle_shape == "circle":
             diameter = self.HANDLE_CIRCLE_DIAMETER
             _box(
                 ctx,

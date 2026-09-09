@@ -7,7 +7,11 @@ section) -- plus the dimensions its own measurement table gives for XS.
 
 from __future__ import annotations
 
+import math
+
+import numpy as np
 import pytest
+from PIL import Image as PILImage
 
 from pycopper.layout import INF, Constraints, Offset
 from pycopper.paint import DisplayList, Kind
@@ -18,6 +22,15 @@ from pycopper.tree.element import PaintContext
 from pycopper.widgets import build_element
 from pycopper.widgets.base import _REGISTRY, create_element
 from pycopper.widgets.slider import SliderElement
+
+
+def make_png(path, width: int, height: int, rgb=(200, 50, 50)) -> None:
+    """Same tiny-fixture helper `test_image.py` already uses."""
+    arr = np.zeros((height, width, 4), dtype=np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = rgb
+    arr[..., 3] = 255
+    PILImage.fromarray(arr, "RGBA").save(path)
+
 
 PAL = Palette(Theme(dark=True))
 XS_TRACK_HEIGHT, XS_HANDLE_HEIGHT, XS_TRACK_RADIUS = SliderElement.SIZES["extra_small"]
@@ -371,3 +384,136 @@ def test_handle_shape_circle_paints_a_round_handle_instead_of_the_line() -> None
 
     heights = {round(float(s["rect"][3]), 3) for s in dl.view if s["flags"][0] == Kind.BOX}
     assert round(XS_HANDLE_HEIGHT, 3) not in heights
+
+
+def test_handle_shape_square_paints_an_axis_aligned_polygon() -> None:
+    """pyCopper's own, not M3 -- phil asked for a genuinely pluggable handle.
+    `sides=4` at `rotation=0` is a *diamond* in `add_polygon`'s own
+    convention (confirmed against the Shape demo's labelled example), so a
+    real square needs `rotation=pi/4` -- assert the actual value, not just
+    that a polygon exists, since a diamond would satisfy a weaker check."""
+    e = slider(value="50", style={"min": 0, "max": 100, "handle_shape": "square"})
+    dl = painted(e)
+    diameter = SliderElement.HANDLE_CIRCLE_DIAMETER
+
+    polygons = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.POLYGON
+        and round(float(s["rect"][2]), 3) == round(diameter, 3)
+        and round(float(s["rect"][3]), 3) == round(diameter, 3)
+    ]
+    assert len(polygons) == 1
+    _border_width, sides, rotation, corner_radius = (float(v) for v in polygons[0]["params"])
+    assert sides == 4.0
+    assert rotation == pytest.approx(math.pi / 4)
+    assert corner_radius == pytest.approx(SliderElement.HANDLE_RADIUS)
+
+
+def test_handle_shape_hexagon_paints_a_six_sided_polygon() -> None:
+    e = slider(value="50", style={"min": 0, "max": 100, "handle_shape": "hexagon"})
+    dl = painted(e)
+    diameter = SliderElement.HANDLE_CIRCLE_DIAMETER
+
+    polygons = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.POLYGON
+        and round(float(s["rect"][2]), 3) == round(diameter, 3)
+        and round(float(s["rect"][3]), 3) == round(diameter, 3)
+    ]
+    assert len(polygons) == 1
+    _border_width, sides, rotation, _corner_radius = (float(v) for v in polygons[0]["params"])
+    assert sides == 6.0
+    assert rotation == 0.0
+
+
+@pytest.mark.parametrize("shape", ["square", "hexagon"])
+def test_square_and_hexagon_widen_the_cradle_clearance_like_circle(shape: str) -> None:
+    """The new shapes must not leave the track colour touching a wider
+    handle than the clearance math assumes -- same check
+    `test_a_gap_separates_the_track_from_the_handle` makes for the line
+    handle, extended to the two new shapes."""
+    e = slider(value="50", style={"min": 0, "max": 100, "handle_shape": shape, "cradle_gap": 10.0})
+    dl = painted(e)
+    rect = e.absolute_rect()
+    handle_center = rect.x + 0.5 * (e.size.width - e.HANDLE_WIDTH) + e.HANDLE_WIDTH / 2
+    clearance = SliderElement.HANDLE_CIRCLE_DIAMETER / 2 + 10.0
+
+    tracks = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX and round(float(s["rect"][3]), 3) == round(XS_TRACK_HEIGHT, 3)
+    ]
+    assert len(tracks) == 2
+    for s in tracks:
+        token = int(s["flags"][2])
+        x, w = float(s["rect"][0]), float(s["rect"][2])
+        if token == PAL.index("primary"):
+            assert x + w <= handle_center - clearance + 1e-3
+        else:
+            assert x >= handle_center + clearance - 1e-3
+
+
+def test_handle_image_paints_a_kind_image_instance_instead_of_any_shape(tmp_path) -> None:
+    png = tmp_path / "handle.png"
+    make_png(png, 32, 32)
+    e = slider(value="50", style={"min": 0, "max": 100, "handle_image": str(png)})
+    dl = painted(e)
+
+    images = [s for s in dl.view if s["flags"][0] == Kind.IMAGE]
+    assert len(images) == 1
+    # No shape handle painted alongside it -- image wins outright, not layered.
+    diameter = SliderElement.HANDLE_CIRCLE_DIAMETER
+    shape_handles = [
+        s
+        for s in dl.view
+        if s["flags"][0] in (Kind.POLYGON,)
+        or (
+            s["flags"][0] == Kind.BOX
+            and round(float(s["rect"][2]), 3) == round(diameter, 3)
+            and round(float(s["rect"][3]), 3) == round(diameter, 3)
+        )
+    ]
+    assert shape_handles == []
+
+
+def test_handle_image_wins_over_an_explicit_handle_shape(tmp_path) -> None:
+    """`handle_image:` takes precedence when both are set -- not a silent
+    conflict, an explicit precedence rule stated in the module docstring."""
+    png = tmp_path / "handle.png"
+    make_png(png, 32, 32)
+    e = slider(
+        value="50",
+        style={"min": 0, "max": 100, "handle_shape": "circle", "handle_image": str(png)},
+    )
+    dl = painted(e)
+
+    assert len([s for s in dl.view if s["flags"][0] == Kind.IMAGE]) == 1
+    diameter = SliderElement.HANDLE_CIRCLE_DIAMETER
+    circles = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX
+        and round(float(s["rect"][2]), 3) == round(diameter, 3)
+        and round(float(s["rect"][3]), 3) == round(diameter, 3)
+    ]
+    assert circles == []
+
+
+def test_an_unresolvable_handle_image_falls_back_to_the_line_handle(tmp_path, capsys) -> None:
+    """A bad path must not leave the slider with no visible handle at all --
+    falls back to the default line, consistently (the cradle-gap clearance
+    matches what's actually painted)."""
+    e = slider(
+        value="50", style={"min": 0, "max": 100, "handle_image": str(tmp_path / "missing.png")}
+    )
+    dl = painted(e)
+
+    assert not any(s["flags"][0] == Kind.IMAGE for s in dl.view)
+    lines = [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX and round(float(s["rect"][2]), 3) == round(e.HANDLE_WIDTH, 3)
+    ]
+    assert len(lines) == 1

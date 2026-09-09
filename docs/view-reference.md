@@ -1559,7 +1559,8 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `collapses_with` | `TopAppBar` — `name:` of the `ScrollView` it collapses with |
 | `multi_select` | `SegmentedButton` — M3's multi-select form (default off, single-select). On, `value:` is a comma-separated set of selected names instead of one |
 | `min`, `max`, `step` | `SpinBox`/`Slider` — bounds and increment; `min`/`max` default to unbounded for `SpinBox`, 0.0/1.0 for `Slider` |
-| `handle_shape` | `Slider` — `line` (default, current M3: a narrow vertical bar) or `circle` (an opt-in back to M2's round handle) |
+| `handle_shape` | `Slider` — `line` (default, current M3: a narrow vertical bar), `circle` (an opt-in back to M2's round handle), or pyCopper's own `square`/`hexagon` (a regular polygon, same primitive `Shape` uses) |
+| `handle_image` | `Slider` — a path to a raster image (PNG/JPG/etc, same resolution convention as `Image`'s own `path:`) drawn as the handle instead of any `handle_shape`; wins over it when set. No SVG support |
 | `cradle_gap` | `Slider` — gap between the handle and each track segment, logical px (default 6) |
 | `cradle_radius` | `Slider` — corner radius on each track segment's handle-facing end, more square than `track_radius` (default 2) |
 | `track_radius` | `Slider` — corner radius on each track segment's outer end; defaults to the size-appropriate value below unless set explicitly (default 8, `extra_small`'s figure) |

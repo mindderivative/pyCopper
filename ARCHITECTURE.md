@@ -3388,6 +3388,23 @@ than approximated.
 value indicator (a label above the handle while dragging), stop indicators,
 the inset icon, and vertical orientation.
 
+**Pluggable handle shapes, pyCopper's own -- not M3.** phil asked directly
+for a genuinely pluggable handle rather than just the shipped line/circle
+pair. `style.handle_shape` also takes `"square"`/`"hexagon"` now, both free
+reuses of `Shape`'s own regular-polygon primitive (`DisplayList.
+add_polygon`, `sides=4`/`6` -- no new engine work); a new `style.
+handle_image:` draws a decoded image as the handle instead, winning over
+`handle_shape` when set, via `resolve_image` (factored out of `Image`'s own
+`_entry` in `image.py` once this needed the identical resolve/cache/
+staleness dance) -- raster only, since Pillow has no SVG decoder and
+pyCopper has none of its own yet. A true star was asked for and explicitly
+dropped rather than approximated: `add_polygon` is strictly a *regular*
+polygon (one `sides` count, no alternating inner/outer radius) and cannot
+draw a star shape at all; asked phil directly (`AskUserQuestion`) rather
+than shipping something star-shaped-but-not-really, and he chose to drop it
+over a hexagram workaround or new shader work -- a real, disclosed gap, not
+solved here.
+
 ### 5.29 Search — `widgets/search.py`
 
 M3's search bar, built new on the shared editing model `TextField`/

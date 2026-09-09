@@ -111,6 +111,84 @@ children:
                 handlers: {on_change: change_volume_xl}
               - {widget: Text, text: "{{ volume_xl.get() }}", style: {color: on_surface_variant}}
 
+      - {name: div_shapes, widget: Divider, style: {width: expand}}
+
+      - name: shapes_heading
+        widget: Text
+        text: "Handle shapes -- pyCopper's own, not M3"
+        style: {text_style: title-medium, color: primary}
+
+      - name: shapes_explanation
+        widget: Text
+        text: |
+          `style.handle_shape` also takes `square`/`hexagon` (the same
+          regular-polygon primitive `Shape` uses -- no new engine work);
+          `style.handle_image:` draws a decoded image instead, winning over
+          `handle_shape` when both are set. A true star was asked for and
+          dropped from this pass on purpose: `add_polygon` only draws
+          regular polygons and cannot express one at all.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - name: shapes_demo
+        widget: Vertical
+        style: {spacing: 20, width: expand, cross_alignment: stretch}
+        children:
+          - name: row_line
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "line (default)", style: {width: 140, color: on_surface_variant}}
+              - name: handle_line
+                widget: Slider
+                value: "{{ shape_line.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5}
+                handlers: {on_change: change_shape_line}
+          - name: row_circle
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "circle", style: {width: 140, color: on_surface_variant}}
+              - name: handle_circle
+                widget: Slider
+                value: "{{ shape_circle.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, handle_shape: circle}
+                handlers: {on_change: change_shape_circle}
+          - name: row_square
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "square", style: {width: 140, color: on_surface_variant}}
+              - name: handle_square
+                widget: Slider
+                value: "{{ shape_square.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, handle_shape: square}
+                handlers: {on_change: change_shape_square}
+          - name: row_hexagon
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "hexagon", style: {width: 140, color: on_surface_variant}}
+              - name: handle_hexagon
+                widget: Slider
+                value: "{{ shape_hexagon.get() }}"
+                style: {width: expand, min: 0, max: 100, step: 5, handle_shape: hexagon}
+                handlers: {on_change: change_shape_hexagon}
+          - name: row_image
+            widget: Horizontal
+            style: {spacing: 16, width: expand, cross_alignment: center}
+            children:
+              - {widget: Text, text: "handle_image:", style: {width: 140, color: on_surface_variant}}
+              - name: handle_image_slider
+                widget: Slider
+                value: "{{ shape_image.get() }}"
+                # `style.*` fields aren't `{{ }}`-bindable (unlike `path:`,
+                # a WidgetSpec-level TEMPLATED_FIELD) -- a literal path,
+                # relative to the repo root this demo is launched from
+                # ("python examples/widgets/slider/app.py"), same
+                # resolution convention `Image.path:` documents.
+                style: {width: expand, min: 0, max: 100, step: 5, handle_image: "examples/gallery/assets/sample.png"}
+                handlers: {on_change: change_shape_image}
+
       - {name: div3, widget: Divider, style: {width: expand}}
 
       - name: code_heading

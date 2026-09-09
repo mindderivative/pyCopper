@@ -419,8 +419,25 @@ class StyleSpec(_Frozen):
     #: vertical handle", explicitly replacing M2's circular one in the same
     #: revision). `"circle"` is an opt-in back to that M2 shape for an
     #: application that wants it; not a scraped M3 figure, since the current
-    #: spec no longer documents the M2 handle's own dimensions.
-    handle_shape: Literal["line", "circle"] = "line"
+    #: spec no longer documents the M2 handle's own dimensions. `"square"`
+    #: and `"hexagon"` are pyCopper's own, not M3 at all -- phil asked
+    #: directly for a genuinely pluggable handle shape, "not just pyCopper's
+    #: shipped line/circle pair"; both reuse `Shape`'s own regular-polygon
+    #: primitive (`DisplayList.add_polygon`, `sides=4`/`6`), so they cost no
+    #: new engine work. A true star (alternating inner/outer points) is NOT
+    #: one of the choices -- `add_polygon` only draws regular polygons and
+    #: cannot express that shape at all; dropped from this pass rather than
+    #: shipped as a misleading approximation, see `SliderElement`'s own
+    #: module docstring for the real gap this leaves.
+    handle_shape: Literal["line", "circle", "square", "hexagon"] = "line"
+    #: An image as a Slider's handle instead of any shape above -- wins over
+    #: `handle_shape` when set. Same resolution convention as `Image.path`
+    #: (absolute as given, relative to the working directory otherwise), and
+    #: the same raster-only reach: decoded through Pillow via the shared
+    #: `ImageAtlas` `Image` already uses, so SVG is not supported (Pillow has
+    #: no SVG decoder, and pyCopper has no other one yet). `None` (default)
+    #: means no image handle -- every existing slider is unaffected.
+    handle_image: str | None = None
     #: Gap between a Slider's handle and each track segment, in logical px.
     #: Real M3 leaves the background showing on both sides of the handle
     #: rather than running the active colour flush against it -- confirmed
