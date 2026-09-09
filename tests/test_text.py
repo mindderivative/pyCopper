@@ -20,6 +20,7 @@ from pycopper.text import (
     layout_text,
     shape_run,
 )
+from pycopper.text.itemize import script_runs
 from pycopper.text.layout import Alignment
 from pycopper.text.segment import (
     break_opportunities,
@@ -173,6 +174,13 @@ def test_direction_follows_script(db: FontDB) -> None:
     assert runs[0].direction == Direction.LTR
     assert runs[1].direction == Direction.RTL
     assert runs[1].is_rtl
+    # `.level` (text/bidi.py's UAX #9 resolution) is the source of truth
+    # `.direction`/`.is_rtl` are derived from -- base is LTR (first strong
+    # char 'H'), so the embedded Arabic is bumped exactly one level up
+    # (rule I1: even base + AL type -> +1), not reset to some fixed "RTL"
+    # constant.
+    assert runs[0].level == 0
+    assert runs[1].level == 1
 
 
 def test_rtl_paragraph_reverses_run_order(db: FontDB) -> None:
@@ -180,6 +188,26 @@ def test_rtl_paragraph_reverses_run_order(db: FontDB) -> None:
     rtl = itemize("مرحبا Hello", db)
     assert ltr[0].script == "Latn"
     assert rtl[0].script == "Latn", "RTL paragraph should place runs in visual order"
+
+
+def test_a_level_boundary_splits_a_run_even_when_script_alone_would_not(db: FontDB) -> None:
+    """A digit span inside Arabic is script-neutral ('Zyyy'), which
+    `script_runs` alone would glue onto the preceding Arabic run -- but it
+    sits at its own, higher bidi level (rule I2), so `itemize` must still
+    split it into its own `ItemRun`. Confirmed first that `script_runs`
+    really would merge the whole string into one span before asserting
+    `itemize` doesn't."""
+    text = "مرحبا 123 يا"
+    assert script_runs(text) == [(0, len(text), "Arab")], (
+        "script alone should merge this whole string -- the real test is that level "
+        "splitting still separates it"
+    )
+    runs = itemize(text, db, visual_order=False)
+    digit_runs = [r for r in runs if r.text == "123"]
+    assert len(digit_runs) == 1
+    assert digit_runs[0].level == 2
+    # And its neighbours on both sides stay at the surrounding Arabic level.
+    assert all(r.level == 1 for r in runs if r is not digit_runs[0])
 
 
 # ----------------------------------------------------------------- shaping

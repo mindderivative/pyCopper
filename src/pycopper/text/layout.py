@@ -22,6 +22,7 @@ from typing import Final
 import numpy as np
 
 from ..layout import SIZE_ZERO, Size
+from .bidi import resolve_levels
 from .font import Face
 from .fontdb import FontDB, FontRequest
 from .itemize import Direction, itemize
@@ -68,11 +69,9 @@ class GlyphPlacement:
     #: syntax highlighter or an ANSI parser produces spans over the source, so
     #: without this every consumer would have to re-derive the mapping through
     #: line and run offsets, and each would get ligatures wrong differently.
-    #:
-    #: Only meaningful for left-to-right text: an RTL paragraph's runs are
-    #: reordered into visual order, so accumulating their lengths no longer
-    #: tracks source position. Stated rather than silently wrong -- it is the
-    #: same boundary as R9.
+    #: Correct for RTL/mixed-direction text too, via `TextLine.run_starts`
+    #: (each run's own true logical start, recorded once at layout time
+    #: rather than reconstructed later by walking already-reordered runs).
     offset: int = 0
 
 
@@ -81,6 +80,14 @@ class TextLine:
     """One laid-out line."""
 
     runs: list[ShapedRun] = field(default_factory=list)
+    #: Each run's own logical (paragraph-text) start offset, parallel to
+    #: `runs` and in the SAME (visual) order. Recorded once, here, at the
+    #: one point `ItemRun.start` is still trustworthy -- `layout_text`'s own
+    #: `shape_segment` populates it directly from `itemize()`'s output,
+    #: rather than something reconstructing it later by walking already
+    #: visually-reordered runs (which only works for pure LTR text, the
+    #: bug this field exists to fix at its root).
+    run_starts: list[int] = field(default_factory=list)
     start: int = 0
     end: int = 0
     width: float = 0.0
@@ -126,16 +133,13 @@ class Paragraph:
         out: list[GlyphPlacement] = []
         for line in self.lines:
             pen = line.x
-            # Runs partition the line's text in order, so a run's position
-            # within the line is the total length of the runs before it. There
-            # is nowhere better to keep this: a ShapedRun is cached by (text,
-            # face, direction, script), so giving it a position would poison
-            # the cache for every other place the same word appears.
-            run_start = 0
-            for run in line.runs:
+            # `run_starts` is parallel to `runs`, in the SAME (visual) order
+            # -- each run's own true logical start, recorded once at layout
+            # time (see `TextLine.run_starts`), not reconstructed here by
+            # accumulating run lengths (which only works for pure LTR text).
+            for run, run_start in zip(line.runs, line.run_starts, strict=True):
                 scale = run.face.scale_for(self.px)
                 advances = run.advances_px(self.px, self.tracking)
-                base = line.start + run_start
                 for i in range(len(run)):
                     ox, oy = run.offsets[i]
                     cluster = int(run.clusters[i])
@@ -146,11 +150,10 @@ class Paragraph:
                             x=pen + float(ox) * scale,
                             y=line.baseline - float(oy) * scale,
                             cluster=cluster,
-                            offset=base + cluster,
+                            offset=run_start + cluster,
                         )
                     )
                     pen += float(advances[i])
-                run_start += len(run.text)
         return out
 
 
@@ -194,17 +197,30 @@ def layout_text(
         para.box_width = max_width or 0.0
         return para
 
-    items = itemize(text, db, req)
-    para.base_direction = items[0].direction if items else Direction.LTR
+    # A cheap, whole-paragraph-once call: only the base LEVEL is needed
+    # here, not a full itemize() (script/font splitting the paragraph is
+    # wasted work when the only thing this line ever consumed was
+    # `items[0].direction`). Every segment shaped below inherits this same
+    # `base` explicitly (`base_direction=base`), rather than each
+    # independently re-detecting its own from whatever character happens
+    # to start it -- a wrapped line's own first character is not
+    # necessarily a reliable signal of the paragraph's real base direction.
+    base_level = resolve_levels(text).base_level
+    base = Direction.RTL if base_level % 2 else Direction.LTR
+    para.base_direction = base
 
-    def shape_segment(segment: str) -> tuple[list[ShapedRun], float]:
+    def shape_segment(
+        segment: str, segment_offset: int
+    ) -> tuple[list[ShapedRun], list[int], float]:
         runs: list[ShapedRun] = []
+        run_starts: list[int] = []
         width = 0.0
-        for item in itemize(segment, db, req):
+        for item in itemize(segment, db, req, base_direction=base):
             run = shaper.get(item.text, item.face, direction=item.direction, script=item.script)
             runs.append(run)
+            run_starts.append(segment_offset + item.start)
             width += run.width(px, tracking)
-        return runs, width
+        return runs, run_starts, width
 
     def prefix_widths(segment: str) -> np.ndarray | None:
         """Pen x at every source offset in *segment*: ``table[o]`` is the width
@@ -231,7 +247,7 @@ def layout_text(
         anything but its own bail-out (R9).
         """
         per_char = np.zeros(len(segment), dtype=np.float64)
-        for item in itemize(segment, db, req):
+        for item in itemize(segment, db, req, base_direction=base):
             if item.is_rtl:
                 return None
             run = shaper.get(item.text, item.face, direction=item.direction, script=item.script)
@@ -294,17 +310,17 @@ def _wrap_block(
     block: str,
     offset: int,
     max_width: float | None,
-    shape_segment: Callable[[str], tuple[list[ShapedRun], float]],
+    shape_segment: Callable[[str, int], tuple[list[ShapedRun], list[int], float]],
     prefix_widths: Callable[[str], np.ndarray | None],
 ) -> list[TextLine]:
     """Greedy wrap of one hard-break-delimited block."""
     stripped = block.rstrip(HARD_BREAK_CHARS)
     if not stripped.strip():
-        return [TextLine([], offset, offset + len(block), 0.0)]
+        return [TextLine([], [], offset, offset + len(block), 0.0)]
 
     if max_width is None:
-        runs, width = shape_segment(stripped)
-        return [TextLine(runs, offset, offset + len(block), width)]
+        runs, run_starts, width = shape_segment(stripped, offset)
+        return [TextLine(runs, run_starts, offset, offset + len(block), width)]
 
     table = prefix_widths(stripped)
 
@@ -319,7 +335,7 @@ def _wrap_block(
             end -= 1
         if table is not None:
             return float(table[end] - table[start])
-        return shape_segment(stripped[start:end])[1] if end > start else 0.0
+        return shape_segment(stripped[start:end], offset + start)[2] if end > start else 0.0
 
     lines: list[TextLine] = []
     line_start = 0
@@ -354,10 +370,10 @@ def _wrap_block(
         # several sibling widgets (a `Text`, a `Link`, another `Text`) keep
         # the gaps between them, and stripping it collapsed "Read the " and
         # a following `Link` together with no space at all.
-        runs, w = shape_segment(stripped[line_start:])
-        lines.append(TextLine(runs, offset + line_start, offset + len(block), w))
+        runs, run_starts, w = shape_segment(stripped[line_start:], offset + line_start)
+        lines.append(TextLine(runs, run_starts, offset + line_start, offset + len(block), w))
 
-    return lines or [TextLine([], offset, offset + len(block), 0.0)]
+    return lines or [TextLine([], [], offset, offset + len(block), 0.0)]
 
 
 def _emit(
@@ -365,7 +381,7 @@ def _emit(
     offset: int,
     start: int,
     cut: int,
-    shape_segment: Callable[[str], tuple[list[ShapedRun], float]],
+    shape_segment: Callable[[str, int], tuple[list[ShapedRun], list[int], float]],
 ) -> TextLine:
     """One finished line, shaped for real.
 
@@ -374,5 +390,5 @@ def _emit(
     true width -- and it is not extra work, because a line needs its own runs
     to paint whatever decided where it ended.
     """
-    runs, width = shape_segment(stripped[start:cut].rstrip())
-    return TextLine(runs, offset + start, offset + cut, width)
+    runs, run_starts, width = shape_segment(stripped[start:cut].rstrip(), offset + start)
+    return TextLine(runs, run_starts, offset + start, offset + cut, width)
