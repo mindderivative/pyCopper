@@ -52,8 +52,11 @@ means knowing which of its rules are about *fingers* and which are about
   Large, and Extra Large classes. Window *resizing* still matters; phone-shaped
   layout does not.
 - **Bottom-anchored navigation.** Navigation Bar and Bottom App Bar are
-  explicitly mobile patterns in M3's own catalogue. Navigation Rail and
-  Navigation Drawer are their desktop counterparts and take priority.
+  explicitly mobile patterns in M3's own catalogue. Navigation Rail is its
+  desktop counterpart and takes priority (M3 Expressive folded Navigation
+  Drawer into Navigation Rail's own expanded state — see §5.12's
+  `NavigationRail` entry — so there is no separate desktop-drawer widget
+  to weigh here either).
 
 Correspondingly, affordances M3 treats as secondary are **primary** here, and
 should be built before mobile-shaped components:
@@ -3751,12 +3754,13 @@ pyCopper/
 │       └── widgets/
 │           ├── base.py          # primitives: container, row/column, stack, text, button, icon
 │           ├── material.py      # M3 catalogue: card, checkbox, chip, fab, ...
-│           ├── navigation.py    # rail, drawer, app bar, tabs, list item, progress
+│           ├── navigation.py    # rail (collapsed/expanded, no separate drawer), app bar, tabs, list item, progress
 │           ├── overlays.py      # dialog, menu, tooltip, snackbar, sheets
 │           ├── scroll.py        # clipped viewport + wheel handling
 │           ├── textfield.py     # TextField (§5.9.1)
 │           ├── carousel.py      # Carousel + CarouselItem (§5.16)
 │           ├── dock.py          # DockSplit / DockGroup / DockPanel (§5.20)
+│           ├── dock_drag.py     # Dock's runtime half: drag a tab, drop as a tab or split an edge
 │           ├── canvas.py        # Canvas: imperative drawing surface (§5.21)
 │           ├── image.py         # Image (§5.22)
 │           ├── video.py         # Video: frame-sink widget (§5.23)
@@ -3773,7 +3777,8 @@ pyCopper/
 ├── examples/
 │   ├── hello/            {app.py, view.yaml}
 │   ├── counter/          # signals + handlers
-│   └── gallery/          # every widget; doubles as the golden-image corpus
+│   ├── gallery/          # a real navigation-shell app covering every widget; doubles as the golden-image corpus
+│   └── widgets/          # one standalone demo window per widget kind (64), <Name>_View.yaml + _ViewModel.py + app.py each -- the widget-by-widget design review's own corpus
 ├── tests/
 │   ├── test_layout.py           # pure, no GPU — the largest suite
 │   ├── test_constraints.py
@@ -3952,6 +3957,7 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | **M11** ✅ | Correctness and latency: intrinsic widget sizes locked in by golden and by assertion, the quadratic line wrap closed (§5.7.1), and the swapchain pinned during a resize (§5.8.1) | **Done.** The pointer trailing on Wayland is gone — the swapchain rebuild it came from is amortised, after the note saying that was impossible turned out to be wrong. Did not touch the view format or `__all__`, so no version moved for it |
 | **M12** ✅ `1.6.0` | The desktop widget catalogue: sixteen widgets with no M3 catalogue entry of their own — `Popover`, `Accordion`, `TreeView`/`TreeItem`, submenu support for `Menu`/`MenuItem`, `Link`, `SpinBox`, `Pagination`, `StatusBar`, `DockSplit`/`DockGroup`/`DockPanel` (§5.20), `Canvas` (§5.21), `Image` (§5.22), `Video` (§5.23), `NodeGraph`/`Node` (§5.24), `CodeEditor` (§5.25), and `Terminal` (§5.26) — plus SVG icon compilation. Two new optional extras, neither a hard dependency: `pycopper[code]` (Pygments syntax highlighting) and `pycopper[terminal]` (`pyte`/`pexpect`, POSIX only). A full-codebase review (60 subagents, four phases, `docs/CODE_REVIEW_2026-09.md`) ran alongside it | **Done.** 1917 tests collected. Genuinely cross-cutting bugs found and fixed along the way, not scoped to one widget: a `repeat=True` `Ticker` animation leak, `PaintContext` clones silently dropping `images` at nine clip sites, three hot-reload no-ops (overlays never rebuilt, `image_atlas` never threaded to them, a `watchfiles` enum-casing miss), a `Signal.set` ordering race, and literal (non-token) display-list colours being written as sRGB when the render target treats them as linear, washing out every one that was not re-derived from a palette token |
 | **M13** ✅ | A real navigation-shell redesign of `examples/gallery`: `PageHost` (§5.27, a genuine single-active-child container, not a workaround), `CodeEditor.read_only` (§5.25), and a `NavigationRail`/`NavigationDrawer` `collapsed:` field, all built for it rather than speculatively. The gallery itself became seven pages behind a collapsible rail/drawer, each with real M3-grounded documentation prose and a read-only Python code sample. Alongside it, the resize-trailing report was traced past two real-but-tangential fixes to its actual cause: `rendercanvas.glfw`'s uncoalesced per-native-event synchronous repaint, fixed by rate-limiting `RenderCanvas._on_size_change` at the class level before any canvas is constructed | **Done.** 1944 tests collected. Two things assumed from the plan and found wrong by testing rather than by reading: `style.width` cannot be `{{ }}`-bound (state fields like `disabled:`/`collapsed:` can; style fields are load-time only), and a zero-size *clip* rect is this codebase's own sentinel for "unclipped," not "clip away everything" — a collapsed rail's children needed `paint()` skipped outright, not clipped to nothing |
+| **M14** ✅ `1.7.0` | The widget-by-widget design review: a standalone one-window demo for all 64 widgets (`examples/widgets/`), then a systematic live pass over each against its M3 source — offscreen render, cross-check, fix-or-defer, live native window per widget by request. Real, previously-invisible bugs found and fixed along the way rather than scoped to one widget: keyboard typing silently broken in every live window since the framework's first commit (`rendercanvas`'s "char" event carries `data`, not `char`); all **eight** overlay-trigger demos (Dialog, Menu, Snackbar, BottomSheet, SideSheet, Popover, Tooltip, SplitButton) declaring their overlay as a plain nested child instead of under `overlays:`, so it rendered permanently inline; `ListItem`'s leading icon never laid out at all; `Snackbar`'s action label painted but never hit-tested; `Stack` ignoring each child's own `align_x`/`align_y`; `Menu` filling the offered width instead of shrink-wrapping to its widest item; plus outlined-`TextField` label/border and caret bugs, `DatePicker`/`Tabs`/`TopAppBar`/`DockGroup` indicator and label-overlap fixes, and `Node`'s title-bar cursor crashing the app on hover. `NavigationRail`/`NavigationDrawer` merged into one widget with two animated states, matching M3 Expressive's current model (`WidgetKind.NAVIGATION_DRAWER` removed, no alias). The review's own punch list then shipped as real features: `TEMPLATED_FIELDS` collapsed nine hand-wired bindable-field call sites into one registry, and added `icon:`/`label:` on top of it (migrating `Icon`/`IconButton`/`Fab`/`NavItem`/`SearchBar` off overloaded `text:`/`supporting_text:`); `Tab`, `Dialog`, and `MenuItem` gained icon anatomy on those same fields; `ButtonGroup` gained M3's shape-morph (press → 12dp, selected → 16dp, for every `Button` app-wide) and toggle selection, including a standard group's selected button widening and shifting its siblings — an ordinary `Flex` reflow consequence, no new cross-element coupling needed; `Slider` gained its full XS–XL size ladder (`style.size`) and pluggable handle shapes (`square`/`hexagon` via `Shape`'s own polygon primitive, plus a raster `handle_image:` — a true star was asked for and deliberately dropped, since the polygon primitive can only draw regular shapes); `Snackbar` gained its `style.auto_dismiss` timer, gated to actionless snackbars per M3's own rule; and `Dock` gained the runtime half it had shipped without — dragging a tab into another group as a new tab, or onto an edge to split a pane, via a new element-to-dispatcher seam and an `OverlayHost.push_transient` escape hatch for the drag ghost. Also landed in this stretch: held-key repeat synthesized at the `App` level (`rendercanvas`'s GLFW backend drops OS key-repeat, breaking Backspace/Delete/arrows everywhere), and `Terminal` moved off `pyte` onto `bittty` after a real `pyte` parsing defect corrupted typed input under zsh-syntax-highlighting (scrollback dropped as a disclosed, to-be-reimplemented regression) | **Done.** 2337 tests collected. A `curve="standard"` M3 easing curve's derivative flattening near its endpoint can silently eat an `Animation.on_change` completion callback — the exact bug in `Snackbar`'s own auto-dismiss timer, found by tracing a real run where the countdown finished but never fired; fixed with `curve="linear"` for any one-shot completion timer built the same way |
 
 ---
 

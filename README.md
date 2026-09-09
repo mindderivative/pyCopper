@@ -59,9 +59,11 @@ count, focus, or scroll position.
 - **Real text.** HarfBuzz shaping with kerning and ligatures, Unicode line
   breaking and grapheme segmentation, bidi, and font fallback. Not a bitmap-font
   approximation.
-- **Material Design 3.** A full 59-token tonal palette from one seed colour, and
-  54 components built to their published specs. Switching theme is a single
-  buffer upload — no relayout, no display-list rebuild.
+- **Material Design 3.** A full 59-token tonal palette from one seed colour,
+  and 64 widgets — the great majority built to M3's own published specs, the
+  rest pyCopper's own for gaps M3 doesn't cover (layout primitives, `Canvas`,
+  `Terminal`, and the like). Switching theme is a single buffer upload — no
+  relayout, no display-list rebuild.
 - **Fine-grained reactivity.** A signal write invalidates exactly the affected
   subtree with a typed reason — build, layout, or paint — not the frame.
 - **Genuinely idle.** An app that is not doing anything renders zero frames.
@@ -99,6 +101,30 @@ tracks the phase.
 versioning and pinned by a test; adding to it is a minor release, changing or
 removing anything in it is a major one. (1.1 was that rule in action: motion
 added four names and nothing else moved.)
+
+**v1.7 — the widget-by-widget design review.** Every widget got its own
+standalone demo window (`examples/widgets/<slug>/`, all 64), then a systematic
+live pass over each one against its M3 source, finding and fixing real bugs
+that had shipped invisibly: keyboard typing silently broken in every window
+since the framework's first commit (`rendercanvas`'s "char" event uses `data`,
+not `char`), eight overlay-trigger demos declaring their own overlay as a
+plain child instead of under `overlays:`, `ListItem`'s leading icon never
+actually laid out, and a dozen more, each fixed and golden-verified rather
+than deferred. `NavigationRail` and `NavigationDrawer` — separate widgets
+before this release — are now one, matching M3 Expressive's own current model
+of a single rail with a collapsed (icon-only) and expanded (labelled) state
+that animates between them; `WidgetKind.NAVIGATION_DRAWER` is gone, with no
+deprecated alias. The review's own punch list became real features: `Tab`,
+`Dialog`, and `MenuItem` gained icon anatomy (on the already-generic
+`icon:`/`label:` fields, added by collapsing nine hand-wired bindable fields
+into one `TEMPLATED_FIELDS` registry so a new one costs a schema line, not a
+five-spot change); `ButtonGroup` gained M3's real shape-morph and toggle
+selection; `Slider` gained its full XS–XL size ladder and pluggable handle
+shapes (`square`/`hexagon`, plus an arbitrary `handle_image:`); `Snackbar`
+gained its auto-dismiss timer; and `Dock` gained the runtime half it shipped
+without — dragging a tab into another group or onto an edge to split a new
+pane. None of it touched `__all__`; the version moves for the view format's
+sake, the same rule v1.2 established.
 
 **v1.6 — the desktop widget catalogue.** Sixteen widgets with no M3 catalogue
 entry of their own, designed from pyCopper's own precedent and grounded in the
@@ -182,7 +208,7 @@ work off the per-frame path. §12 of ARCHITECTURE.md has the measurements.
 
 ## Testing
 
-1800 tests, `ruff` and `mypy --strict` clean. Golden-image baselines cover the
+2337 tests, `ruff` and `mypy --strict` clean. Golden-image baselines cover the
 rendered output; everything else — layout, reactivity, reconciliation, text
 segmentation, event dispatch — runs with no GPU on any runner.
 

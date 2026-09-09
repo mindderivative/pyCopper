@@ -376,6 +376,29 @@ Commits: `b98471f` (disable hinting), `187223f` (gamma correction).
   the widget's own heartbeat) instead of `perform_layout`. **Before reusing
   `_pin_surface`'s exact shape elsewhere, confirm the new call site has the
   same "runs every frame no matter what" guarantee.**
+- **`Animation.on_change` can silently skip firing on the exact frame
+  `.done` becomes true, for an eased curve.** `advance()` only calls
+  `on_change` when `.value` actually changed from the previous tick; the
+  default `"standard"` M3 curve's derivative flattens near its endpoint, so
+  two ticks close to completion can round to the identical float once
+  eased — exactly the bug in `Snackbar`'s own auto-dismiss timer, found by
+  tracing a real run where the countdown finished (`.done` became `True`,
+  removed from `Ticker._running`) but never actually requested a dismiss.
+  Fixed with `curve="linear"`: a one-shot wall-clock timer has no reason to
+  ease in the first place, and a linear ramp has no flattening tail to
+  collide on. **Any future "fire once when this animation completes"**
+  built on `on_change` should default to `curve="linear"` unless there's a
+  specific reason to ease it.
+- **`style.*` (StyleSpec) fields are not `{{ }}`-bindable at all** — only
+  `WidgetSpec`-level fields registered in `TEMPLATED_FIELDS` (`text:`,
+  `value:`, `icon:`, `path:`, …) are resolved and reactively re-bound. A
+  `style.some_field: "{{ signal.get() }}"` silently keeps the literal
+  unprocessed template string as the value, no error. (`params:`-based
+  view-composition macros, e.g. `swatch_View.yaml`'s `background: "{{
+  token }}"`, look similar but are a completely different, include-time
+  text-substitution mechanism — don't mistake one for evidence the other
+  works.) A future StyleSpec field that needs live binding has to move to
+  `WidgetSpec` (through `TEMPLATED_FIELDS`) instead.
 
 ### Events
 - **A handler on an ancestor fires twice** — capture *and* bubble.
@@ -475,17 +498,50 @@ Systematic live-demo review, batch of ~8 widgets at a time, offscreen render
 
 **Batch 4, NavigationRail/NavigationDrawer merge** — see §10.
 
-**Confirmed-but-deferred bug, same shape as SplitButton's:** all **8**
+**Overlay-as-plain-child bug: RESOLVED, all 8, 2026-09-08.** All eight
 overlay-trigger widget demos (Dialog, Menu, Snackbar, BottomSheet,
 SideSheet, Popover, Tooltip, SplitButton) originally declared their overlay
-node as a plain nested child instead of under `overlays:`. **Only
-SplitButton is fixed** (`c3a1f11`, the reference fix) — phil explicitly
-chose to fix just that one for now (2026-09-06). **Dialog, Menu, Snackbar,
-BottomSheet, SideSheet, Popover, and Tooltip still have this bug** and need
-the identical fix when the review reaches the overlay/trigger batch — don't
-assume they're fine. Tracked in Claude memory
+node as a plain nested child instead of under `overlays:`, same shape as
+SplitButton's own reference fix (`c3a1f11`). Fixed for the remaining seven
+when the review reached the overlay/trigger batch: Menu (`3bddd38`), Dialog
+(`e3e60d6`), Snackbar (`a4e1766`, which also fixed the action label being
+painted but never hit-tested), BottomSheet (`9e208ab`, plus a missing
+`handle: true`), SideSheet (`7786e72`, plus `ededbf8`/`9049970` for a
+missing close control), Popover (`ddef90a`), and Tooltip (`b999085`, plus a
+click→hover trigger fix and a deliberate `phil`-approved colour override,
+`37db852`/`f0ea09f`). No known remaining instance. Tracked in Claude memory
 `pycopper-widget-review-backlog.md`, graph entity `pyCopper Overlay Demo
 YAML Bug`.
+
+**Batches 4–9, plus the review's own follow-up features — summary, not
+full detail (see the graph entities and `ARCHITECTURE.md` §14's M14 row for
+the complete account).** The full 65-widget review finished 2026-09-08.
+Real bugs fixed along the way beyond Batch 3's table: `Menu` filling the
+offered width instead of shrink-wrapping to its widest `MenuItem`
+(`3b652fc`); `Stack` ignoring each child's own `align_x`/`align_y`
+(`7f42eb0`); `Tabs`' active indicator using the wrong height with no inset
+(`f692749`); `TopAppBar`'s large variant using the wrong type-scale role
+(`073be01`); `DockGroup`'s tab indicator missing the same inset `Tabs` had
+(`bece365`); `DockSplit`'s divider cursor silently broken by a non-vocabulary
+cursor name (`7f7f5a2`); `Node`'s title-bar cursor crashing the app on hover
+(`2795281`); and the NavigationRail/NavigationDrawer merge itself (§10).
+The review's own punch list then shipped as real, planned features, each
+with its own `AskUserQuestion`/plan checkpoint where a real design branch
+existed: the `TEMPLATED_FIELDS` refactor (`6abd57b`, one registry replacing
+nine hand-wired bindable-field call sites, plus `icon:`/`label:` and the
+migration of `Icon`/`IconButton`/`Fab`/`NavItem`/`SearchBar` off overloaded
+`text:`/`supporting_text:`); icon anatomy for `Tab` (`037d174`, `9b45143`),
+`Dialog` (`dd1f35f`, plus a real actions-row `main_alignment` bug,
+`f85a033`), and `MenuItem` (`d0868e3`); `ButtonGroup`'s shape-morph and
+toggle selection (`0c2f5e5`); `Slider`'s size ladder (`b4dcad8`) and
+pluggable handle shapes (`cd39132` — square/hexagon/image; a true star was
+asked for and dropped, since `add_polygon` only draws regular polygons and
+cannot express one); `Snackbar`'s auto-dismiss timer (`387e8e4` — also
+found a real `Animation.on_change` gotcha, see [§8](#8-engineering-traps-grouped));
+and Dock's runtime drag-and-drop half (`3207f5b` plus a dozen live-feedback
+follow-ups, `68c2086`..`804d3c2`). Also landed in this stretch, unrelated to
+the review itself: held-key repeat synthesis (`6ab3b45`, `f365f38`) and the
+Terminal `pyte`→`bittty` swap (`2b71227`, `fd2f944`, `063f796`).
 
 ---
 
@@ -550,22 +606,36 @@ amend, per §2's no-amend rule).
 
 ## 11. Open / deferred items (don't assume these are done)
 
-- **7 of 8 overlay-trigger demos still have the "overlay-as-plain-child"
-  YAML bug** (Dialog, Menu, Snackbar, BottomSheet, SideSheet, Popover,
-  Tooltip) — see §9.
-- **Slider**: M3's XS/S/M/L/XL size ladder (track thickness + handle size
-  scaling by 5 named sizes) not implemented; no pluggable custom handle
-  shapes (square/hexagon/star/image/SVG) — only pyCopper's shipped
-  line/circle pair. Graph entity `pyCopper Slider Design Backlog`.
-- **ButtonGroup**: no real selection/toggle state on children yet, and no
-  M3 shape-morph animation on press/selection — a STANDARD group's
-  selection also resizes adjacent siblings, a cross-element layout coupling
-  nothing in the framework does today. Shares the size-ladder gap with
-  Slider. Graph entity `pyCopper ButtonGroup Design Backlog`.
-- **Dock's runtime drag-to-redock half** — only the static half (resizable
-  splits + tabbed groups arranged once in the view file) shipped; dragging
-  a tab to an edge to split/rearrange at runtime is explicitly deferred as
-  its own future task.
+- ~~7 of 8 overlay-trigger demos still have the "overlay-as-plain-child" YAML
+  bug~~ **RESOLVED 2026-09-08 — all 8, see §9.**
+- ~~Slider: size ladder not implemented; no pluggable handle shapes~~
+  **RESOLVED 2026-09-08 — both shipped.** `style.size` (extra_small default
+  through extra_large) scales track/handle height and track corner radius;
+  `style.handle_shape` also takes `square`/`hexagon` (`Shape`'s own
+  regular-polygon primitive), and `style.handle_image:` draws a raster
+  image, winning over `handle_shape`. A true star was asked for and
+  **deliberately dropped, not approximated** — `add_polygon` only draws
+  regular polygons, so it cannot express a star at any setting; SVG was
+  dropped the same way (Pillow has no decoder). Graph entity `pyCopper
+  Slider Design Backlog`. **Still open**: nothing on this widget.
+- ~~ButtonGroup: no selection/toggle, no shape-morph~~ **RESOLVED
+  2026-09-08 — shape-morph and toggle selection both shipped**, sourced
+  from `COMPONENT_BUTTONS.md`'s own Corner sizes table, applied to every
+  `Button` app-wide (phil's explicit choice), not just grouped ones. A
+  standard group's selected button really does widen and shift its
+  siblings — an ordinary `Flex` reflow consequence of the button reporting
+  a wider `perform_layout` size, no new cross-element coupling built.
+  Graph entity `pyCopper ButtonGroup Design Backlog`. **Still open**: the
+  XS/S/M/L/XL size ladder button groups are meant to span, which has
+  nowhere to attach until `Button` itself grows a size axis (shares this
+  gap with `Slider`'s own, now-shipped ladder).
+- ~~Dock's runtime drag-to-redock half~~ **RESOLVED 2026-09-08 — shipped.**
+  Dragging a tab into another `DockGroup` inserts it as a tab; dragging
+  onto a `DockSplit` edge splits a new pane. New `widgets/dock_drag.py`,
+  an `ElementMixin.dispatcher` seam, and `OverlayHost.push_transient` for
+  the drag ghost. Explicitly still out of scope: layout serialization
+  across reloads, floating/undocked windows, tab reordering within one
+  group, multi-panel drag.
 - **NodeGraph has no zoom** — deliberately scoped out: scaling would either
   thrash the glyph atlas (the same per-frame-rasterisation-key trap the
   icon `FILL` axis quantisation exists to avoid) or force re-shaping text
@@ -614,9 +684,10 @@ detail):
   through the `m3-lookup` skill, not directly (filenames don't map 1:1 to
   component names; several files describe the May 2025 M3 Expressive
   revision).
-- `/home/phil/.claude/plans/zesty-skipping-walrus.md` — the active
-  widget-by-widget review plan (batches 1–9) plus the completed
-  NavigationRail/Drawer merge plan.
+- `/home/phil/.claude/plans/zesty-skipping-walrus.md` — the widget-by-widget
+  review plan (batches 1–9, **complete** 2026-09-08) plus the completed
+  NavigationRail/Drawer merge, Templated-fields, and Dock drag-and-drop
+  plans it grew to include.
 
 **Claude Code project memory** (`.claude` memory directory, this project):
 `pycopper-architecture-decisions.md`, `pycopper-milestone-history.md`,
@@ -640,7 +711,7 @@ Tech Stack`, `pyCopper Text Rendering Quality`, `pyCopper Font Bundle`,
 
 ---
 
-*This document reflects the state of the project as of 2026-09-07. Update
+*This document reflects the state of the project as of 2026-09-08. Update
 it (or its pointed-to memory files) as new lessons land — don't let it
 silently drift the way `ARCHITECTURE.md` almost did before the
 verify-empirically discipline in §3 was established.*
