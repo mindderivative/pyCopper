@@ -127,6 +127,27 @@ own embedded license metadata is MIT + Bitstream Vera, not the OFL the
 verified directly against the shipped font file, not assumed from the
 project's README; see `assets/fonts/README.md`.
 
+**The spawned shell now gets a real `TERM`, found live 2026-09-08.**
+`_PtySession.start` used to call `pexpect.spawn` with no `env=`, inheriting
+`os.environ` verbatim -- fine for a CLI tool always itself launched from
+inside a real terminal, wrong for a GUI widget launched from anywhere (a
+desktop icon, an IDE run button, a bare subprocess with no controlling
+terminal). With `TERM` genuinely unset, `/bin/sh` falls back to its own
+internal default of `TERM=dumb`, and zsh under zsh-syntax-highlighting,
+seeing `dumb`, emits its per-keystroke recolour redraw WITHOUT the
+cursor-backspace bytes it uses for a real terminal -- reproduced directly by
+capturing the raw pty bytes both ways -- so typed characters visibly
+duplicated and reordered on screen (typing "hello" then Backspace x3 showed
+"hhheellllol l e" instead of "he"). Fixed by defaulting `TERM` (and, as a
+companion, `COLUMNS`/`LINES`) in the child's environment, matching the exact
+convention a comparable project (`termqt`, a Qt PTY-backed terminal widget)
+uses -- `env.get(..., default)` rather than an unconditional overwrite, so
+an application's own explicit `TERM` still wins. Not a `bittty` parsing
+defect and not a pyCopper threading/chunking race: confirmed by feeding
+`bittty.Board.feed_host_data` the exact captured byte sequence directly
+(zero pyCopper code involved) and getting the identical garbled result,
+then again with a corrected `TERM` and getting the correct one.
+
 **Deliberately out of scope for this pass**: mouse text selection and
 copy (Ctrl+C is always the interrupt byte here, never a copy shortcut,
 since there is nothing to copy without a selection), underline and
@@ -343,8 +364,29 @@ class _PtySession:
             self._loop = None
         cols, rows = size
         parts = shlex.split(self._command) or ["/bin/sh"]
+        # `pexpect.spawn` inherits `os.environ` verbatim when `env=` is
+        # omitted -- fine for a CLI tool that is always itself launched from
+        # inside a real terminal (TERM already set correctly by whatever
+        # spawned it), wrong for a GUI widget that can be launched from
+        # anywhere (a desktop icon, an IDE run button, a bare subprocess
+        # with no controlling terminal at all). With TERM genuinely unset,
+        # `/bin/sh` (dash) falls back to its own internal default of
+        # `TERM=dumb` -- confirmed directly (`env` shows no TERM reaches the
+        # child's real environment at all; the shell supplies "dumb" itself)
+        # -- and zsh under zsh-syntax-highlighting, seeing `dumb`, emits its
+        # per-keystroke recolour redraw WITHOUT the cursor-backspace bytes it
+        # uses for a real terminal, so typing visibly duplicated and
+        # reordered characters on screen. `TERM`/`COLUMNS`/`LINES` matches
+        # the exact convention a comparable real project (termqt, a Qt
+        # PTY-backed terminal widget) uses for the identical reason;
+        # `env.get(..., default)` rather than an unconditional overwrite so
+        # an application's own explicit TERM (or COLUMNS/LINES) still wins.
+        env = dict(os.environ)
+        env["TERM"] = env.get("TERM") or "xterm-256color"
+        env.setdefault("COLUMNS", str(cols))
+        env.setdefault("LINES", str(rows))
         self._child = pexpect.spawn(
-            parts[0], parts[1:], dimensions=(rows, cols), encoding=None, timeout=None
+            parts[0], parts[1:], dimensions=(rows, cols), encoding=None, timeout=None, env=env
         )
         self._thread = threading.Thread(target=self._run, name="pycopper-terminal", daemon=True)
         self._thread.start()

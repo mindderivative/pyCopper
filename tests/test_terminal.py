@@ -537,3 +537,38 @@ def test_a_real_shell_receives_keyboard_input() -> None:
         assert found, "typed input never echoed back through the real pty"
     finally:
         element.dispose()
+
+
+@pytest.mark.skipif(not REAL_PTY, reason="bittty/pexpect not available on this platform")
+def test_the_spawned_shell_gets_a_real_term_value() -> None:
+    """Found live: `pexpect.spawn` inherits `os.environ` verbatim unless
+    told otherwise, which is fine for a CLI tool (always itself launched
+    from inside a real terminal) but not for a GUI widget that can be
+    launched from anywhere -- a desktop icon, an IDE run button, a bare
+    subprocess with no controlling terminal. With TERM unset, `/bin/sh`
+    (dash) falls back to its own internal default of `TERM=dumb` --
+    confirmed directly (`/usr/bin/env` shows no TERM at all reaches the
+    child's real environment; the shell supplies "dumb" itself) -- and
+    zsh under zsh-syntax-highlighting, seeing `dumb`, emits its
+    per-keystroke recolour redraw WITHOUT the cursor-backspace bytes it
+    uses for a real terminal, so typed characters visibly duplicate and
+    reorder on screen. `_PtySession.start` now defaults TERM to a real
+    value (never overriding an application's own explicit one), the same
+    convention a comparable project (termqt) uses."""
+    element = terminal(width=400.0, height=200.0, style={"shell": "/bin/sh -c 'echo TERM=$TERM'"})
+    element.set_ticker(Ticker())
+    try:
+        deadline = time.monotonic() + 5.0
+        line = ""
+        while time.monotonic() < deadline:
+            element._drain_pty()
+            if element._board is not None:
+                line = "".join(_cell_text(element._board, c, 0) for c in range(30))
+                if "TERM=" in line:
+                    break
+            time.sleep(0.05)
+        assert "TERM=" in line, "the shell's own $TERM was never observed"
+        value = line.split("TERM=", 1)[1].strip()
+        assert value not in ("", "dumb"), f"TERM must name a real terminal, got {value!r}"
+    finally:
+        element.dispose()
