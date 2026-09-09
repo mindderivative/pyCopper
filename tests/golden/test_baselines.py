@@ -902,6 +902,17 @@ def test_arc_baseline(render_scene, assert_golden) -> None:
     `background`. The raw arc primitive itself -- an offset start angle and a
     full ring's seamless join -- is exercised directly in `test_arc.py` and
     `tests/golden/test_primitives.py`, not here.
+
+    This baseline is captured under lavapipe (CI's own software Vulkan, run
+    with `WGPU_FORCE_ADAPTER=cpu`), not a real GPU -- confirmed on 2026-09-09
+    that the two rasterise this specific arc's antialiased edge ~0.2%
+    differently (stable and reproducible either direction, not flaky), just
+    past `TOLERANCE`. CI is the environment this baseline has to agree with,
+    so a real-GPU run of this one test locally showing the same small,
+    expected delta is not a regression -- regenerate under lavapipe
+    (`WGPU_FORCE_ADAPTER=cpu LIBGL_ALWAYS_SOFTWARE=1 PYCOPPER_REGEN_GOLDEN=1
+    pytest tests/golden/test_baselines.py::test_arc_baseline -m gpu`) if it
+    ever needs updating again.
     """
     view = {
         "root": {

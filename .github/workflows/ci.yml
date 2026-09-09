@@ -70,33 +70,3 @@ jobs:
         with:
           name: golden-failures
           path: tests/golden/failures/
-
-  # Temporary, workflow_dispatch-only: regenerates the "arc" baseline under
-  # lavapipe (the golden job's own software Vulkan), since the committed
-  # baseline was captured on a real GPU and lavapipe draws that arc's
-  # antialiased edge ~0.2% differently -- stable and reproducible, not a
-  # regression. Never runs on a push/PR. Remove this job once the
-  # regenerated baseline is committed and the golden job is green.
-  regen-arc-baseline:
-    if: github.event_name == 'workflow_dispatch'
-    name: regenerate arc baseline (lavapipe)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y mesa-vulkan-drivers libvulkan1 vulkan-tools
-      - run: pip install -e ".[dev]"
-      - env:
-          WGPU_FORCE_ADAPTER: cpu
-          LIBGL_ALWAYS_SOFTWARE: "1"
-          PYCOPPER_REGEN_GOLDEN: "1"
-        run: pytest tests/golden/test_baselines.py::test_arc_baseline -m gpu -v
-        continue-on-error: true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: arc-baseline-lavapipe
-          path: tests/golden/baselines/arc.png
