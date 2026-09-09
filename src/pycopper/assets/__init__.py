@@ -32,7 +32,18 @@ MEDIUM_FONT: Final = FONT_DIR / "Roboto-Medium.ttf"
 
 #: Resolution order for FontDB. Mirrors M3's Roboto -> Noto Sans chain;
 #: Roboto Flex is excluded because M3 states it is not part of the typescale.
-FALLBACK_CHAIN: Final = (DEFAULT_FONT, FONT_DIR / "NotoSans-Regular.ttf")
+#: Arabic/Hebrew are appended, not inserted -- order between disjoint-script
+#: members doesn't matter, but appending after the existing Latin/Greek/
+#: Cyrillic member preserves every already-covered codepoint's golden-image
+#: bytes. Narrow, per-script Noto members, not the omnibus multi-script
+#: build M3's own full fallback collection would require (119 MB + 299 MB
+#: CJK, still excluded -- see `fonts/README.md`).
+FALLBACK_CHAIN: Final = (
+    DEFAULT_FONT,
+    FONT_DIR / "NotoSans-Regular.ttf",
+    FONT_DIR / "NotoSansArabic-Regular.ttf",
+    FONT_DIR / "NotoSansHebrew-Regular.ttf",
+)
 
 #: Not part of M3's type scale (M3 has no concept of a monospace role) --
 #: bundled specifically for Terminal/CodeEditor, whose cell/cursor grid math

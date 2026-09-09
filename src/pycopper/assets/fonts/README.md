@@ -18,12 +18,14 @@ deliberately: the same page states it "isn't yet part of the M3 typescale".
 |---|---|---|---|---|
 | `Roboto-Regular.ttf` | 154 KB | 400 | 927 | Default face |
 | `Roboto-Medium.ttf` | 154 KB | 500 | 927 | `label-large` and other medium-weight type-scale roles |
-| `NotoSans-Regular.ttf` | 612 KB | 400 | 3094 | Fallback tier |
+| `NotoSans-Regular.ttf` | 612 KB | 400 | 3094 | Fallback tier -- Latin/Greek/Cyrillic |
+| `NotoSansArabic-Regular.ttf` | 190 KB | 400 | 1561 | Fallback tier -- Arabic |
+| `NotoSansHebrew-Regular.ttf` | 47 KB | 400 | 464 | Fallback tier -- Hebrew |
 | `HackNerdFontMono-Regular.ttf` | 2.65 MB | 400 | 12,415 | `MONOSPACE_FONT` -- Terminal's and CodeEditor's default face |
 
 | `MaterialSymbolsOutlined-Subset.ttf` | 102 KB | variable | 218 icons | Material Symbols |
 
-Total ≈ 3.6 MB.
+Total ≈ 3.8 MB.
 
 ## Monospace
 
@@ -70,9 +72,16 @@ codepoints.
 Noto Sans adds 2,187 codepoints beyond Roboto — 841 extended Latin, 289 Greek,
 533 combining marks and modifiers, 129 Devanagari, 115 Cyrillic. It is the
 **Latin/Greek/Cyrillic** Noto family, so it widens coverage *within* those
-scripts; it does not add CJK, Arabic, or emoji. The full Noto Sans collection
-is 119 MB (plus 299 MB for CJK) and cannot be shipped in a Python package, so
-broader fallback depends on system font discovery, which is deferred past v1.
+scripts. `NotoSansArabic-Regular.ttf` (1561 codepoints) and
+`NotoSansHebrew-Regular.ttf` (464 codepoints) add real Arabic and Hebrew
+coverage on top of that — narrow, single-script Noto members, not the
+omnibus multi-script build M3's own full fallback collection would need
+(119 MB, plus 299 MB for CJK, still cannot be shipped in a Python package,
+so CJK and emoji stay deferred to system font discovery past v1). These two
+are what make real UAX #9 bidirectional text (`text/bidi.py`) actually
+demonstrable rather than structurally-present-but-untestable: the bundled
+stack had zero Arabic/Hebrew coverage before this, confirmed empirically
+(every codepoint fell through to `.notdef`).
 
 `HackNerdFontMono-Regular.ttf`'s ~9,000 Nerd Font icon glyphs are a separate,
 unrelated icon system from Material Symbols above — they live in Arrows,
@@ -86,18 +95,24 @@ ordinary `Text` widget never requests them.
 
 ## Provenance
 
-Roboto and Noto Sans were taken from the canonical `google/fonts` repository,
-which publishes them only as variable fonts. The static faces here were
-produced with `fontTools.varLib.instancer`, pinning `wght` (400 / 500) and
-`wdth` (100):
+Roboto, Noto Sans, Noto Sans Arabic, and Noto Sans Hebrew were taken from the
+canonical `google/fonts` repository, which publishes them only as variable
+fonts. The static faces here were produced with `fontTools.varLib.instancer`,
+pinning `wght` (400 / 500) and `wdth` (100):
 
 ```
 https://github.com/google/fonts/raw/main/ofl/roboto/Roboto[wdth,wght].ttf
 https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans[wdth,wght].ttf
+https://github.com/google/fonts/raw/main/ofl/notosansarabic/NotoSansArabic[wdth,wght].ttf
+https://github.com/google/fonts/raw/main/ofl/notosanshebrew/NotoSansHebrew[wdth,wght].ttf
 ```
 
 Instancing rather than shipping the variable fonts saves several MB and keeps
-the font loader simple: no variation axes to configure at load time.
+the font loader simple: no variation axes to configure at load time. Noto
+Sans Hebrew's own default instance is weight 100 (Thin), unlike the other
+three families' own default of 400 — pinning `wght=400` explicitly is what
+makes this one Regular rather than Thin; checked directly (`fvar` axes),
+not assumed to match the others.
 
 `HackNerdFontMono-Regular.ttf` is taken as-is (already a static TTF, no
 `fvar` table, nothing to instance) from the `nerd-fonts` project's `v3.5.1`
@@ -113,10 +128,14 @@ single-weight-per-role convention.)
 
 ## Licensing
 
-Roboto and Noto Sans are under the **SIL Open Font License 1.1** — see
-`LICENSE-Roboto.txt` and `LICENSE-NotoSans.txt`, which must be redistributed
-with them. OFL is compatible with pyCopper's MIT licence; the fonts remain
-under OFL and are not relicensed.
+Roboto, Noto Sans, Noto Sans Arabic, and Noto Sans Hebrew are all under the
+**SIL Open Font License 1.1** — see `LICENSE-Roboto.txt`, `LICENSE-NotoSans.txt`,
+`LICENSE-NotoSansArabic.txt`, and `LICENSE-NotoSansHebrew.txt`, which must be
+redistributed with them. OFL is compatible with pyCopper's MIT licence; the
+fonts remain under OFL and are not relicensed. The Arabic/Hebrew copyright
+lines differ from Noto Sans's own (`github.com/notofonts/arabic` and
+`.../hebrew`, vs. `.../latin-greek-cyrillic`) — checked directly, not assumed
+identical — but the OFL boilerplate itself is byte-identical.
 
 Note that Roboto was **relicensed**: copies predating the move to `ofl/` in
 `google/fonts` (for example the v2.137 build from 2017 still shipped by some

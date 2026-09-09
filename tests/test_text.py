@@ -87,7 +87,7 @@ def test_coverage_spans_latin_greek_cyrillic(face: Face) -> None:
 
 def test_loads_the_bundled_stack(db: FontDB) -> None:
     families = {f.family for f in db.faces}
-    assert families == {"Roboto", "Noto Sans"}
+    assert families == {"Roboto", "Noto Sans", "Noto Sans Arabic", "Noto Sans Hebrew"}
 
 
 def test_selects_by_weight(db: FontDB) -> None:
@@ -100,8 +100,14 @@ def test_falls_back_to_nearest_weight(db: FontDB) -> None:
 
 
 def test_fallback_chain_order(db: FontDB) -> None:
-    """M3's chain is Roboto then Noto Sans."""
-    assert [f.family for f in db.fallback_chain] == ["Roboto", "Noto Sans"]
+    """M3's chain is Roboto then Noto Sans; Arabic/Hebrew are appended after,
+    narrow single-script members with no ordering constraint between them."""
+    assert [f.family for f in db.fallback_chain] == [
+        "Roboto",
+        "Noto Sans",
+        "Noto Sans Arabic",
+        "Noto Sans Hebrew",
+    ]
 
 
 def test_fallback_resolves_a_codepoint_roboto_lacks(db: FontDB) -> None:

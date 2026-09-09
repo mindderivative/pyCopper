@@ -35,6 +35,8 @@ def test_licences_are_shipped_beside_the_fonts() -> None:
         (DEFAULT_FONT, "Roboto", 400),
         (MEDIUM_FONT, "Roboto", 500),
         (FONT_DIR / "NotoSans-Regular.ttf", "Noto Sans", 400),
+        (FONT_DIR / "NotoSansArabic-Regular.ttf", "Noto Sans Arabic", 400),
+        (FONT_DIR / "NotoSansHebrew-Regular.ttf", "Noto Sans Hebrew", 400),
     ],
 )
 def test_font_metadata(path, family: str, weight: int) -> None:
@@ -52,6 +54,8 @@ EXPECTED_LICENCES = {
     "Roboto-Regular.ttf": ("OFL 1.1", "Open Font License"),
     "Roboto-Medium.ttf": ("OFL 1.1", "Open Font License"),
     "NotoSans-Regular.ttf": ("OFL 1.1", "Open Font License"),
+    "NotoSansArabic-Regular.ttf": ("OFL 1.1", "Open Font License"),
+    "NotoSansHebrew-Regular.ttf": ("OFL 1.1", "Open Font License"),
     # Not OFL, despite the `nerd-fonts` project's own top-level LICENSE
     # claiming patched fonts are -- this font's own embedded nameID-13
     # record says otherwise (checked directly), so that is what is
@@ -67,6 +71,8 @@ LICENCE_FILES = {
     "Roboto-Regular.ttf": "LICENSE-Roboto.txt",
     "Roboto-Medium.ttf": "LICENSE-Roboto.txt",
     "NotoSans-Regular.ttf": "LICENSE-NotoSans.txt",
+    "NotoSansArabic-Regular.ttf": "LICENSE-NotoSansArabic.txt",
+    "NotoSansHebrew-Regular.ttf": "LICENSE-NotoSansHebrew.txt",
     "HackNerdFontMono-Regular.ttf": "LICENSE-HackNerdFontMono.txt",
     "MaterialSymbolsOutlined-Subset.ttf": "LICENSE-MaterialSymbols.txt",
 }
@@ -106,7 +112,7 @@ def test_licence_texts_ship_alongside_the_fonts() -> None:
 
 
 def test_fallback_widens_coverage() -> None:
-    """The fallback tier must actually add codepoints, or it is dead weight."""
+    """Each fallback tier must actually add codepoints, or it is dead weight."""
 
     def cps(p):
         tt = TTFont(p, lazy=True)
@@ -114,7 +120,30 @@ def test_fallback_widens_coverage() -> None:
         tt.close()
         return out
 
-    assert len(cps(FALLBACK_CHAIN[1]) - cps(DEFAULT_FONT)) > 1000
+    default = cps(DEFAULT_FONT)
+    assert len(cps(FALLBACK_CHAIN[1]) - default) > 1000
+    # Arabic/Hebrew: smaller, narrowly-scoped members (~1500/~460 codepoints
+    # total), so the bar is real coverage, not the four-figure threshold the
+    # much broader Latin/Greek/Cyrillic member clears.
+    assert len(cps(FALLBACK_CHAIN[2]) - default) > 500
+    assert len(cps(FALLBACK_CHAIN[3]) - default) > 100
+
+
+def test_arabic_and_hebrew_text_no_longer_falls_through_to_notdef() -> None:
+    """The real gap this bundling closes: RTL text used to render as tofu."""
+    from pycopper.text.fontdb import FontDB, FontRequest
+
+    db = FontDB()
+    request = FontRequest()
+    # A word each, not a lone codepoint -- `resolve()` snaps to grapheme
+    # clusters, and a single test that only ever asked for one codepoint
+    # wouldn't catch a face that covers isolated forms but not the
+    # contextual shaping cmap entries real words need.
+    for word, family in (("مرحبا", "Noto Sans Arabic"), ("שלום", "Noto Sans Hebrew")):
+        for char in word:
+            face = db.resolve(char, request)
+            assert face.covers_all(char), f"{char!r} in {word!r} falls through to .notdef"
+            assert face.family == family
 
 
 def test_font_path_rejects_unknown_names() -> None:
