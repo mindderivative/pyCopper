@@ -254,7 +254,7 @@ def test_the_default_font_is_genuinely_monospace() -> None:
     "hello" must land exactly on `n * cell_width`, not merely close to it."""
     element = terminal()
     request = element._font_request()
-    assert request.family == "Noto Sans Mono"
+    assert request.family == "Hack Nerd Font Mono"
     engine = element.text_engine
     cell = element._cell_size()
     m_width = engine.measure("M", px=element.style.font_size, request=request).width
@@ -262,6 +262,23 @@ def test_the_default_font_is_genuinely_monospace() -> None:
     hello_width = engine.measure("hello", px=element.style.font_size, request=request).width
     assert m_width == i_width == cell.width
     assert hello_width == 5 * cell.width
+
+
+def test_the_default_font_covers_the_prompt_glyphs_that_used_to_be_tofu() -> None:
+    """`pyCopper Terminal Symbol Glyph Coverage Gap`: fish-pure/starship-style
+    prompts draw U+21E1 (upwards dashed arrow, the git-ahead marker) and
+    U+276F (heavy right-pointing angle quotation mark, the prompt symbol)
+    -- confirmed live as real, reproducible tofu boxes under the old
+    Roboto/Noto Sans-only stack, which has no Arrows/Dingbats coverage.
+    Hack Nerd Font Mono's ~9,000 Nerd Font glyphs close this specific gap."""
+    element = terminal()
+    request = element._font_request()
+    db = element.text_engine.db
+    for codepoint in (0x21E1, 0x276F):
+        char = chr(codepoint)
+        face = db.resolve(char, request)
+        assert face.covers_all(char), f"U+{codepoint:04X} still falls through to .notdef"
+        assert face.family == "Hack Nerd Font Mono"
 
 
 def test_an_explicit_font_family_overrides_the_monospace_default() -> None:

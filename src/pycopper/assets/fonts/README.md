@@ -19,27 +19,34 @@ deliberately: the same page states it "isn't yet part of the M3 typescale".
 | `Roboto-Regular.ttf` | 154 KB | 400 | 927 | Default face |
 | `Roboto-Medium.ttf` | 154 KB | 500 | 927 | `label-large` and other medium-weight type-scale roles |
 | `NotoSans-Regular.ttf` | 612 KB | 400 | 3094 | Fallback tier |
-| `NotoSansMono-Regular.ttf` | 396 KB | 400 | 3490 | `MONOSPACE_FONT` -- Terminal's default face |
+| `HackNerdFontMono-Regular.ttf` | 2.65 MB | 400 | 12,415 | `MONOSPACE_FONT` -- Terminal's and CodeEditor's default face |
 
 | `MaterialSymbolsOutlined-Subset.ttf` | 102 KB | variable | 218 icons | Material Symbols |
 
-Total ≈ 1.4 MB.
+Total ≈ 3.6 MB.
 
 ## Monospace
 
-M3 names no monospace typeface -- it has no such role. `NotoSansMono-Regular.ttf`
-is bundled anyway, specifically for `Terminal` (`widgets/terminal.py`): a
-terminal's cell/cursor grid is positioned by `column * cell_width` regardless
-of what glyphs a run actually shapes to, which only lines up when every glyph
-shares one advance width. Found live, 2026-09-08: with the previous default
-(Roboto, proportional), five lowercase letters like `hello` measured ~2.5
-cell-widths narrower than the grid assumed, so the cursor visibly detached
-from typed text by several columns after only a few keystrokes -- confirmed
-by direct measurement (`TextEngine.measure`), and confirmed fixed by the same
-measurement against `NotoSansMono-Regular.ttf` (`M`/`i`/`hello` all land
-exactly on the grid, zero drift). Not part of `FALLBACK_CHAIN` -- an ordinary
-`Text` widget has no reason to fall back to a monospace face -- exported
-separately as `assets.MONOSPACE_FONT` instead.
+M3 names no monospace typeface -- it has no such role. `HackNerdFontMono-Regular.ttf`
+is bundled anyway, specifically for `Terminal` (`widgets/terminal.py`) and
+`CodeEditor` (`widgets/codeeditor.py`): a terminal's cell/cursor grid is
+positioned by `column * cell_width` regardless of what glyphs a run actually
+shapes to, which only lines up when every glyph shares one advance width, and
+a code editor's own column alignment (indentation, aligned comments, ASCII
+diagrams) needs the identical property. Found live, 2026-09-08: with the
+previous default (Roboto, proportional), five lowercase letters like `hello`
+measured ~2.5 cell-widths narrower than the grid assumed, so the cursor
+visibly detached from typed text by several columns after only a few
+keystrokes -- confirmed by direct measurement (`TextEngine.measure`), and
+confirmed fixed the same way against `HackNerdFontMono-Regular.ttf`: `M`,
+`i`, and `hello` all measure an identical 9.633px per glyph at 16px, zero
+drift -- including a Nerd Font icon glyph (Powerline separator U+E0B0),
+checked directly against the font's own `hmtx` table since it is not
+ordinary Latin content `TextEngine.measure` would exercise incidentally.
+Not part of `FALLBACK_CHAIN` -- an ordinary `Text` widget has no reason to
+fall back to a monospace face carrying ~9,000 icon glyphs -- exported
+separately as `assets.MONOSPACE_FONT` instead. (`NotoSansMono-Regular.ttf`
+served this role from 2026-09-08 until it was superseded below.)
 
 ## Icons
 
@@ -67,9 +74,19 @@ scripts; it does not add CJK, Arabic, or emoji. The full Noto Sans collection
 is 119 MB (plus 299 MB for CJK) and cannot be shipped in a Python package, so
 broader fallback depends on system font discovery, which is deferred past v1.
 
+`HackNerdFontMono-Regular.ttf`'s ~9,000 Nerd Font icon glyphs are a separate,
+unrelated icon system from Material Symbols above — they live in Arrows,
+Dingbats, and Private-Use-Area codepoints (Powerline separators, devicons,
+Octicons, Font Awesome, and others the Nerd Fonts patcher aggregates), the
+exact ranges icon-heavy shell prompt themes (starship, fish-pure,
+`eza --icons`) draw from and that the previous Roboto/Noto Sans-only stack
+rendered as tofu (found live, `pyCopper Terminal Symbol Glyph Coverage Gap`).
+They are reachable only through `MONOSPACE_FONT`, not `FALLBACK_CHAIN` — an
+ordinary `Text` widget never requests them.
+
 ## Provenance
 
-All three families were taken from the canonical `google/fonts` repository,
+Roboto and Noto Sans were taken from the canonical `google/fonts` repository,
 which publishes them only as variable fonts. The static faces here were
 produced with `fontTools.varLib.instancer`, pinning `wght` (400 / 500) and
 `wdth` (100):
@@ -77,19 +94,44 @@ produced with `fontTools.varLib.instancer`, pinning `wght` (400 / 500) and
 ```
 https://github.com/google/fonts/raw/main/ofl/roboto/Roboto[wdth,wght].ttf
 https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans[wdth,wght].ttf
-https://github.com/google/fonts/raw/main/ofl/notosansmono/NotoSansMono[wdth,wght].ttf
 ```
 
 Instancing rather than shipping the variable fonts saves several MB and keeps
 the font loader simple: no variation axes to configure at load time.
 
+`HackNerdFontMono-Regular.ttf` is taken as-is (already a static TTF, no
+`fvar` table, nothing to instance) from the `nerd-fonts` project's `v3.5.1`
+release:
+
+```
+https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip
+```
+(`HackNerdFontMono-Regular.ttf` inside the zip; the release also ships Bold/
+Italic/BoldItalic and non-Mono/Windows-compatible variants, none bundled
+here — only Regular is needed, matching every other bundled family's
+single-weight-per-role convention.)
+
 ## Licensing
 
-All three families are under the **SIL Open Font License 1.1** — see
-`LICENSE-Roboto.txt`, `LICENSE-NotoSans.txt`, and `LICENSE-NotoSansMono.txt`,
-which must be redistributed with them. OFL is compatible with pyCopper's MIT
-licence; the fonts remain under OFL and are not relicensed.
+Roboto and Noto Sans are under the **SIL Open Font License 1.1** — see
+`LICENSE-Roboto.txt` and `LICENSE-NotoSans.txt`, which must be redistributed
+with them. OFL is compatible with pyCopper's MIT licence; the fonts remain
+under OFL and are not relicensed.
 
 Note that Roboto was **relicensed**: copies predating the move to `ofl/` in
 `google/fonts` (for example the v2.137 build from 2017 still shipped by some
 distributions) carry Apache-2.0 instead. The files here are OFL.
+
+**`HackNerdFontMono-Regular.ttf` is MIT + Bitstream Vera, not OFL** — a real
+correction, not an assumption. The `nerd-fonts` project's own top-level
+`LICENSE` file claims "Nerd Fonts source fonts, patched fonts... are
+licensed under SIL OPEN FONT LICENSE Version 1.1," but the font's own
+embedded name-table record (checked directly with `fontTools`, nameID 13)
+says nothing of the kind: it states the Hack project is MIT (Source Foundry,
+2018), DejaVu is public domain, and Bitstream Vera Sans Mono carries the
+Bitstream Vera License — the same text as the release's own `LICENSE.md`,
+word-for-word. The patcher apparently never updated this font's embedded
+metadata to match the project-level OFL claim. Since the embedded,
+checkable declaration is the actual authoritative source for what ships,
+`LICENSE-HackNerdFontMono.txt` vendors that text (MIT + Bitstream Vera), and
+`tests/test_assets.py` checks against it, not the aspirational README claim.

@@ -52,7 +52,12 @@ EXPECTED_LICENCES = {
     "Roboto-Regular.ttf": ("OFL 1.1", "Open Font License"),
     "Roboto-Medium.ttf": ("OFL 1.1", "Open Font License"),
     "NotoSans-Regular.ttf": ("OFL 1.1", "Open Font License"),
-    "NotoSansMono-Regular.ttf": ("OFL 1.1", "Open Font License"),
+    # Not OFL, despite the `nerd-fonts` project's own top-level LICENSE
+    # claiming patched fonts are -- this font's own embedded nameID-13
+    # record says otherwise (checked directly), so that is what is
+    # vendored and tested against. See `fonts/README.md`'s Licensing
+    # section.
+    "HackNerdFontMono-Regular.ttf": ("MIT + Bitstream Vera", "MIT License"),
     "MaterialSymbolsOutlined-Subset.ttf": ("Apache-2.0", None),
 }
 
@@ -62,7 +67,7 @@ LICENCE_FILES = {
     "Roboto-Regular.ttf": "LICENSE-Roboto.txt",
     "Roboto-Medium.ttf": "LICENSE-Roboto.txt",
     "NotoSans-Regular.ttf": "LICENSE-NotoSans.txt",
-    "NotoSansMono-Regular.ttf": "LICENSE-NotoSansMono.txt",
+    "HackNerdFontMono-Regular.ttf": "LICENSE-HackNerdFontMono.txt",
     "MaterialSymbolsOutlined-Subset.ttf": "LICENSE-MaterialSymbols.txt",
 }
 

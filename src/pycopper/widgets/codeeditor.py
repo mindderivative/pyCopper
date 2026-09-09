@@ -39,15 +39,19 @@ parameter accepts a literal tuple: there are only four true M3 colour roles
 theme needs, and no semantic role exists to map the rest onto. A stated
 departure from "emit tokens, not colours," not an oversight.
 
-**No bundled monospace font.** Roboto and Noto Sans are pyCopper's only
-bundled faces, both proportional. `style.font_family` requests a family by
-name through the same `FontRequest`/`FontDB` machinery every widget already
-resolves against; an application that wants true monospace alignment loads
-one itself with `app.text.db.load(path)` -- already a public method, no new
-API -- before this widget ever asks for it. Left unset, or naming a family
-nobody loaded, `FontDB.face_for` already falls back to the primary bundled
-face, so an app that does nothing gets working, if proportional, text
-rather than a crash or a missing-glyph box.
+**Defaults to a real bundled monospace font (`Hack Nerd Font Mono`).**
+`style.font_family` requests a family by name through the same
+`FontRequest`/`FontDB` machinery every widget already resolves against, and
+wins if set. Left unset, `_font_request()` loads and requests
+`assets.MONOSPACE_FONT` -- the same fix and the same default
+`Terminal._font_request()` uses, closing this widget's own long-disclosed
+gap (it used to default to `"Roboto"`, proportional, which cannot give a
+code editor genuine column alignment for indentation or aligned comments).
+`Hack Nerd Font Mono` also carries ~9,000 Nerd-Font-patched icon glyphs, so
+ligature-style file-type/status icons some syntax themes lean on render as
+real glyphs rather than missing-glyph boxes. An application can still
+override with any other face via `style.font_family`, loaded itself with
+`app.text.db.load(path)` -- already a public method, no new API.
 
 **A new dispatcher capability was needed, not just a new widget.** Tab is
 intercepted and treated as focus traversal BEFORE any element's own
@@ -78,6 +82,7 @@ from typing import Any, Final
 
 import numpy as np
 
+from ..assets import MONOSPACE_FONT
 from ..layout import Constraints, EdgeInsets, Offset, Padding, Size
 from ..runtime.clipboard import clipboard
 from ..runtime.events import ChangeEvent, EventType, is_accelerator, modifiers_of
@@ -296,7 +301,19 @@ class CodeEditorElement(_StyledMixin, Padding):
     # --------------------------------------------------------------- layout
 
     def _font_request(self) -> FontRequest:
-        return FontRequest(family=self.style.font_family or "Roboto", weight=self.style.font_weight)
+        """`style.font_family` wins if set; otherwise this loads (idempotent
+        past the first call) and requests the bundled `Hack Nerd Font Mono`
+        -- the same default `Terminal._font_request()` uses, and for the
+        same reason: a code editor wants column alignment (indentation,
+        aligned comments, ASCII diagrams) that a proportional face like
+        Roboto cannot give it. See `assets/fonts/README.md`'s "Monospace"
+        section.
+        """
+        family = self.style.font_family
+        if not family:
+            self.text_engine.db.load(MONOSPACE_FONT)
+            family = "Hack Nerd Font Mono"
+        return FontRequest(family=family, weight=self.style.font_weight)
 
     def _paragraph(self) -> Any:
         style = self.style

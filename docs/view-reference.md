@@ -771,16 +771,18 @@ recognise, leaves the buffer uncoloured rather than raising. The colours
 themselves are fixed, not part of the M3 theme — there is no dark/light
 variant, and no way to override them from a view file today.
 
-**No monospace font ships with pyCopper** — only the proportional Roboto and
-Noto Sans. `style.font_family` names a face by family name; an application
-that wants true monospace alignment loads one itself before the view mounts:
+**Defaults to a bundled monospace font (Hack Nerd Font Mono)** when
+`style.font_family` is unset — closing this widget's own former
+proportional-default gap ("No monospace font ships with pyCopper" used to
+be true here; it no longer is). `style.font_family` still names any other
+face by family name if the application wants to override it:
 
 ```python
 app.text.db.load("/path/to/JetBrainsMono-Regular.ttf")
 ```
 
-Left unset, or naming a family nobody loaded, text still renders — with
-Roboto, proportionally — rather than failing.
+See `assets/fonts/README.md`'s "Monospace" section for the measurement and
+provenance.
 
 **What the keyboard does**, on top of everything [Text fields](#text-fields)
 already lists (arrows, word motion, selection, clipboard, undo/redo — all
@@ -841,15 +843,17 @@ WTFPL, `pexpect` is ISC). Without them, or on Windows (not yet
 implemented — see the widget's own docstring for why), the terminal area
 shows a message explaining what is missing instead of a shell.
 
-**Defaults to a bundled monospace font (Noto Sans Mono)** when
-`style.font_family` is unset — [Code editor](#code-editor) still has the
-proportional-default gap this used to share. Found live, 2026-09-08: with
-the previous default (Roboto, proportional), the cursor visibly detached
-from typed text by several columns after a few keystrokes, since the
-cell/cursor grid assumes every glyph shares one advance width — confirmed
-by direct measurement, not just visual impression (see
-`assets/fonts/README.md`'s "Monospace" section). Set `style.font_family` to
-any other face to override.
+**Defaults to a bundled monospace font (Hack Nerd Font Mono)** when
+`style.font_family` is unset — [Code editor](#code-editor) shares the same
+default now. Found live, 2026-09-08: with the previous default (Roboto,
+proportional), the cursor visibly detached from typed text by several
+columns after a few keystrokes, since the cell/cursor grid assumes every
+glyph shares one advance width — confirmed by direct measurement, not just
+visual impression (see `assets/fonts/README.md`'s "Monospace" section).
+Hack Nerd Font Mono also carries ~9,000 Nerd Font icon glyphs, closing a
+separate gap where icon-heavy shell prompt themes (starship, fish-pure,
+`eza --icons`) rendered their own glyphs as visible missing-glyph boxes.
+Set `style.font_family` to any other face to override.
 
 **No scrollback.** `bittty` (swapped in for `pyte` on 2026-09-08, after a
 real `pyte` parsing defect corrupted typed input under some shell prompt

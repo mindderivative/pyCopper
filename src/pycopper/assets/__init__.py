@@ -38,8 +38,14 @@ FALLBACK_CHAIN: Final = (DEFAULT_FONT, FONT_DIR / "NotoSans-Regular.ttf")
 #: bundled specifically for Terminal/CodeEditor, whose cell/cursor grid math
 #: assumes every glyph has the same advance width. Deliberately NOT in
 #: `FALLBACK_CHAIN`: an ordinary `Text` widget has no reason to ever silently
-#: fall back to a monospace face. See `fonts/README.md` for provenance.
-MONOSPACE_FONT: Final = FONT_DIR / "NotoSansMono-Regular.ttf"
+#: fall back to a monospace face carrying ~9,000 icon glyphs. Hack Nerd Font
+#: Mono, not plain Hack -- Nerd Fonts' own glyph patch is what closes the
+#: Arrows/Dingbats/Private-Use-Area coverage gap that icon-heavy shell prompt
+#: themes (starship, fish-pure, `eza --icons`) otherwise render as tofu
+#: boxes. See `fonts/README.md` for provenance and a licensing note: the
+#: font's own embedded metadata is MIT + Bitstream Vera, not the OFL the
+#: `nerd-fonts` project's top-level `LICENSE` claims for patched fonts.
+MONOSPACE_FONT: Final = FONT_DIR / "HackNerdFontMono-Regular.ttf"
 
 
 def font_path(name: str) -> Path:

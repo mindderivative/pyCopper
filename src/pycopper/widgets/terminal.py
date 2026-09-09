@@ -91,29 +91,41 @@ second either way. The wake is an optimisation for instant updates, not a
 correctness requirement -- output is never permanently stuck even if loop
 capture fails.
 
-**Defaults to a real bundled monospace font (`Noto Sans Mono`), found live
-2026-09-08 -- it did not before.** Cell backgrounds and the cursor are
+**Defaults to a real bundled monospace font (`Hack Nerd Font Mono`), found
+live 2026-09-08 -- it did not before.** Cell backgrounds and the cursor are
 positioned on an analytic `column * cell_width` grid regardless of the
 resolved font's own metrics, so they always line up; the *glyphs drawn
 inside* a run of same-styled cells are laid out with the text engine's
 ordinary shaping, which only lands exactly on that grid when the requested
 font is genuinely monospace. Defaulting to `"Roboto"` (proportional, the
-same gap `CodeEditor` still has) left `"hello"` shaping ~2.5 cell-widths
+same gap `CodeEditor` used to have) left `"hello"` shaping ~2.5 cell-widths
 narrower than the grid assumed -- confirmed by direct `TextEngine.measure`
 comparison, not just visual impression -- so the cursor visibly detached
 from typed text by several columns after only a few keystrokes. Fixed by
-bundling `assets.MONOSPACE_FONT` (`NotoSansMono-Regular.ttf`, OFL 1.1, same
-family as the existing Noto Sans fallback) and defaulting `_font_request()`
-to it whenever `style.font_family` is unset -- confirmed zero drift by the
-same measurement (`M`, `i`, and `hello` all land exactly on the grid). An
+bundling `assets.MONOSPACE_FONT` and defaulting `_font_request()` to it
+whenever `style.font_family` is unset -- confirmed zero drift by the same
+measurement (`M`, `i`, and `hello` all land exactly on the grid). An
 application can still override with any other face via `style.font_family`,
 same as before; see `assets/fonts/README.md`'s "Monospace" section for the
-measurement and provenance. Separately, and unrelated to monospace-ness: the
-bundled Roboto/Noto Sans set has no Arrows or Dingbats coverage, so
-icon-heavy shell prompt themes (powerline/Nerd-Font-style glyphs) render
-those specific glyphs as a visible missing-glyph box -- the same, deliberate
-"visible box, not a silent gap" fallback the font system uses everywhere,
-just hitting a real coverage gap for this content.
+measurement and provenance.
+
+**Nerd Font icon coverage closes a separately-diagnosed gap.** The original
+`NotoSansMono` fix above left a related but distinct problem: the bundled
+Roboto/Noto Sans set has no Arrows, Dingbats, or Private-Use-Area coverage,
+so icon-heavy shell prompt themes (starship, fish-pure, `eza --icons`) drew
+their own glyphs -- e.g. U+21E1 (upwards dashed arrow) and U+276F (heavy
+right-pointing angle quotation mark) -- as visible missing-glyph boxes,
+confirmed live and reproduced through the real VT parser (see the
+`pyCopper Terminal Symbol Glyph Coverage Gap` history). `MONOSPACE_FONT` was
+later swapped from `NotoSansMono-Regular.ttf` to `HackNerdFontMono-Regular.ttf`
+specifically to close this: same genuinely-uniform monospace advance width
+(confirmed directly via the font's own `hmtx` table, icon glyphs included,
+not just Latin letters), plus ~9,000 Nerd-Font-patched icon glyphs covering
+the prompt-theme content that used to render as tofu. `HackNerdFontMono`'s
+own embedded license metadata is MIT + Bitstream Vera, not the OFL the
+`nerd-fonts` project's top-level `LICENSE` claims for patched fonts --
+verified directly against the shipped font file, not assumed from the
+project's README; see `assets/fonts/README.md`.
 
 **Deliberately out of scope for this pass**: mouse text selection and
 copy (Ctrl+C is always the interrupt byte here, never a copy shortcut,
@@ -519,7 +531,7 @@ class TerminalElement(_StyledMixin, Padding):
     def _font_request(self) -> FontRequest:
         """`style.font_family` wins if set; otherwise this loads (idempotent
         past the first call -- `FontDB.load` is a dict lookup once a path has
-        been loaded) and requests the bundled `Noto Sans Mono`.
+        been loaded) and requests the bundled `Hack Nerd Font Mono`.
 
         Found live, 2026-09-08: defaulting to `"Roboto"` (proportional) here
         instead of a real monospace face left every glyph run measured
@@ -531,7 +543,7 @@ class TerminalElement(_StyledMixin, Padding):
         family = self.style.font_family
         if not family:
             self.text_engine.db.load(MONOSPACE_FONT)
-            family = "Noto Sans Mono"
+            family = "Hack Nerd Font Mono"
         return FontRequest(family=family, weight=self.style.font_weight)
 
     def _cell_size(self) -> Size:
