@@ -37,6 +37,13 @@ root:
             experience -- people can keep browsing without interacting with
             it. Only one snackbar may be shown at a time, and it can carry
             a single optional action.
+
+            `style.auto_dismiss` (seconds, opt-in) is M3's other rule:
+            "snackbars without actions can auto-dismiss after 4-10 seconds"
+            but "snackbars with actions shouldn't auto-dismiss." Below,
+            "Archive email" opens one with an Undo action -- it stays until
+            dismissed. "Mark read" opens the same snackbar with no action --
+            it auto-dismisses on its own after 5 seconds.
           style: {text_style: body-medium, color: on_surface_variant}
 
         - {name: div2, widget: Divider, style: {width: expand}}
@@ -51,6 +58,7 @@ root:
           style: {spacing: 16}
           children:
             - {name: trigger, widget: Button, text: "Archive email", style: {variant: filled_tonal}, handlers: {on_click: archive}}
+            - {name: trigger2, widget: Button, text: "Mark read", style: {variant: outlined}, handlers: {on_click: mark_read}}
 
         - {name: div3, widget: Divider, style: {width: expand}}
 
@@ -76,6 +84,7 @@ overlays:
   - name: bar
     widget: Snackbar
     open: "{{ bar_open.get() }}"
-    text: "Email archived"
-    supporting_text: "Undo"
+    text: "{{ message.get() }}"
+    supporting_text: "{{ action.get() }}"
+    style: {auto_dismiss: 5}
     handlers: {on_dismiss: close, on_action: undo}

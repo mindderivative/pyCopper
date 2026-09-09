@@ -447,6 +447,15 @@ class StyleSpec(_Frozen):
     size: Literal["extra_small", "small", "medium", "large", "extra_large"] = "extra_small"
     #: A Pagination's total number of pages.
     count: int = Field(default=1, ge=1)
+    #: Seconds after which an actionless Snackbar dismisses itself. `None`
+    #: (default) never auto-dismisses -- opt-in, so no existing Snackbar's
+    #: behaviour changes just from this field existing. `COMPONENT_SNACKBAR.md`:
+    #: "Snackbars without actions can auto-dismiss after 4-10 seconds... common
+    #: acceptable durations are 4-10 seconds" but "Snackbars with actions
+    #: shouldn't auto-dismiss" -- `SnackbarElement` enforces that second half
+    #: itself, ignoring this field outright whenever `supporting_text:` (its
+    #: action) is set, rather than trusting every caller to remember the gate.
+    auto_dismiss: float | None = Field(default=None, gt=0.0)
 
     # text
     font_size: float = Field(default=14.0, gt=0)

@@ -1747,7 +1747,7 @@ placement, scrim, modality and dismissal. A Dialog does not know it is centred.
 | `Menu` | 4dp radius, 112–280dp wide, 8dp vertical padding | `surface_container` |
 | `MenuItem` | 48dp high, 12dp side padding | denser than `ListItem`'s 56/72/88dp; `supporting_text` is the trailing shortcut. Optional `icon:` (24dp leading icon, `on_surface_variant`, `COMPONENT_MENUS.md`'s own "List item leading icon" anatomy) needed no schema change — already a generic `TEMPLATED_FIELDS` entry from the earlier Icon/IconButton/Fab/NavItem/SearchBar migration; independent of the trailing slot, so an icon and a shortcut/chevron can coexist. `style.has_submenu` swaps that trailing slot for a `chevron_right` instead (mutually exclusive with the shortcut) — the submenu is a second `Menu` overlay anchored to the item's `name`, positioned beside it rather than below it ("Submenus should open next to the parent menu item without overlapping it"). Anchoring to something inside *another* overlay is the one case `OverlayHost._anchored` falls back past `root` |
 | `Tooltip` | 24dp high, 8dp side padding | `inverse_surface` / `inverse_on_surface` |
-| `Snackbar` | 48dp growing to 64dp | `inverse_surface`; action label in `inverse_primary` |
+| `Snackbar` | 48dp growing to 64dp | `inverse_surface`; action label in `inverse_primary`; `style.auto_dismiss` (seconds, opt-in) auto-dismisses an actionless snackbar -- ignored whenever an action (`supporting_text:`) is present, per "snackbars with actions shouldn't auto-dismiss" |
 | `BottomSheet` | 28dp **top** corners, max 640dp wide | optional 32×4dp drag handle, 22dp above and below |
 | `SideSheet` | 16dp leading corners, max 400dp, 24dp padding | corners follow the docked edge |
 

@@ -1483,7 +1483,7 @@ scrolls by pixels.
 | `Popover` | M3's persistent rich tooltip. `text:` (subhead) + `supporting_text:` + an optional child action row. 12dp radius, max 320dp, **shrink-to-fit width** (unlike `Dialog`/`Menu`, no minimum). Defaults to `placement: anchor`. |
 | `Menu` + `MenuItem` | 4dp radius, 112–280dp / 48dp rows. A `MenuItem`'s optional `icon:` (24dp, `on_surface_variant`) sits leading the label; independent of the trailing shortcut/chevron slot. |
 | `Tooltip` | 24dp high, `inverse_surface`. |
-| `Snackbar` | 48dp growing to 64dp; `supporting_text` is the action label. |
+| `Snackbar` | 48dp growing to 64dp; `supporting_text` is the action label. `style.auto_dismiss` (seconds, opt-in) auto-dismisses it when there's no action; ignored when there is one. |
 | `BottomSheet` | 28dp top corners, max 640dp, optional `handle`. |
 | `SideSheet` | 16dp leading corners, max 400dp. |
 
@@ -1565,6 +1565,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `track_radius` | `Slider` — corner radius on each track segment's outer end; defaults to the size-appropriate value below unless set explicitly (default 8, `extra_small`'s figure) |
 | `size` | `Slider` — one of `extra_small` (default), `small`, `medium`, `large`, `extra_large`, `COMPONENT_SLIDERS.md`'s own named size scale; sets track height, handle height, and `track_radius`'s own default together |
 | `count` | `Pagination` — total number of pages |
+| `auto_dismiss` | `Snackbar` — seconds after which an actionless snackbar dismisses itself; `None` (default) never auto-dismisses. Ignored outright whenever `supporting_text:` (its action) is set, per M3: actionable snackbars shouldn't auto-dismiss |
 | `fit` | `Image` — `contain` (default), `cover`, `fill`, or `none` |
 | `x`, `y` | `Node` — initial world position in its `NodeGraph`; see [Node graph](#node-graph) |
 | `language` | `CodeEditor` — a Pygments lexer name/alias; unset or unrecognised means no highlighting |

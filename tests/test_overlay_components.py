@@ -658,6 +658,70 @@ def test_the_action_label_is_a_real_clickable_control() -> None:
     assert len(calls) == 1
 
 
+def test_an_actionless_snackbar_auto_dismisses_after_its_configured_duration() -> None:
+    """`COMPONENT_SNACKBAR.md`: "Snackbars without actions can auto-dismiss
+    after 4-10 seconds." `style.auto_dismiss` is the opt-in duration in
+    seconds; arming happens in `paint_self`, so a real paint pass is needed
+    before ticking the clock forward -- the same reason `test_dock.py`'s own
+    indicator-slide test drives `app.motion.tick` in small steps rather than
+    one big jump (`MAX_FRAME_DELTA` clamps a single tick).
+
+    Duration 5.0 specifically, not a rounder 4.0: traced a real run where a
+    `duration=5.0` countdown finished but never dismissed, because the
+    default `"standard"` easing curve flattens near its endpoint -- two
+    ticks that close to completion rounded to the identical float once
+    eased, so `Animation.advance`'s "only call `on_change` if `.value`
+    changed" check silently ate the one call this needed, on the exact
+    frame `.done` became true. `_maybe_arm_auto_dismiss` uses
+    `curve="linear"` to avoid it; 4.0 happened not to hit the same float
+    alignment with 0.1s ticks, so it would have passed either way."""
+    app = hosted({"widget": "Snackbar", "text": "Archived", "style": {"auto_dismiss": 5.0}})
+    entry = app.overlays.entries[0]
+    app.paint(DisplayList())  # arms the timer
+    assert not entry.dismissed
+
+    for _ in range(55):  # 5.5s in 0.1s steps
+        app.motion.tick(0.1)
+    app.paint(DisplayList())
+
+    assert entry.dismissed
+
+
+def test_a_snackbars_action_blocks_auto_dismiss_even_when_configured() -> None:
+    """`COMPONENT_SNACKBAR.md`: "Snackbars with actions shouldn't
+    auto-dismiss." The widget enforces this itself -- `style.auto_dismiss`
+    alone is not enough to dismiss an actionable snackbar."""
+    app = hosted(
+        {
+            "widget": "Snackbar",
+            "text": "Archived",
+            "supporting_text": "Undo",
+            "style": {"auto_dismiss": 4.0},
+        }
+    )
+    entry = app.overlays.entries[0]
+    app.paint(DisplayList())
+    for _ in range(100):  # far past any sourced 4-10s duration
+        app.motion.tick(0.1)
+    app.paint(DisplayList())
+
+    assert not entry.dismissed
+
+
+def test_auto_dismiss_is_off_by_default() -> None:
+    """No `auto_dismiss:` at all -- zero behaviour change for every existing
+    Snackbar, matching this session's own zero-impact bar for an opt-in
+    field (e.g. an un-`checked`, un-pressed Button's `effective_radii`)."""
+    app = hosted({"widget": "Snackbar", "text": "Archived"})
+    entry = app.overlays.entries[0]
+    app.paint(DisplayList())
+    for _ in range(200):  # far past any sourced duration
+        app.motion.tick(0.1)
+    app.paint(DisplayList())
+
+    assert not entry.dismissed
+
+
 def test_the_action_label_gives_a_pointer_cursor() -> None:
     bar = laid_out({"widget": "Snackbar", "text": "Archived", "supporting_text": "Undo"})
     action_x = bar.size.width - 5.0

@@ -858,6 +858,13 @@ class SnackbarElement(_StyledMixin, Padding):
     child this class never lays out or paints at all -- an orphaned element
     floating at whatever stale offset it last had. `supporting_text:` +
     `on_action:` is the only shape this widget actually supports.
+
+    `style.auto_dismiss` (seconds, opt-in, `None` by default) is the other
+    half of `COMPONENT_SNACKBAR.md`'s own behaviour section: an actionless
+    snackbar may auto-dismiss after 4-10 seconds; one with an action
+    shouldn't, so users can act on it "at their own pace." `_maybe_arm_auto_dismiss`
+    enforces that second half itself -- it ignores the field outright whenever
+    `supporting_text:` is set, rather than leaving the gate to the caller.
     """
 
     RADIUS: Final = 4.0
@@ -902,6 +909,54 @@ class SnackbarElement(_StyledMixin, Padding):
         if handler is not None:
             handler(event)
 
+    def _maybe_arm_auto_dismiss(self) -> None:
+        """Start (once) M3's auto-dismiss timer for an actionless snackbar.
+
+        Called from `paint_self`, which -- unlike layout's constraint-keyed
+        cache -- keeps running through the entrance and exit fades, since
+        `OverlayHost.paint` re-reads `entry.opacity` every frame either is
+        animating; that is what lets this see the open and the closed edge
+        of a toggle without a dedicated hook. `state.data["auto_dismiss_timer"]`
+        marks "already armed for this open" and is cleared the moment
+        `is_open` goes false, so a later reopen starts a fresh countdown --
+        the same flag-on-`state.data` shape `BottomSheetElement`'s own
+        `dismiss_requested`/`snap_back` already use, reused rather than
+        inventing a second mechanism.
+
+        One disclosed edge: `OverlayHost.paint` also skips a fully
+        transparent entry outright (`if opacity <= 0.0: continue`), so on
+        the very first frame of an open -- exactly zero motion time
+        elapsed, opacity still exactly 0.0 -- this can't run at all. A real
+        window self-corrects within one more frame (the entrance fade keeps
+        the ticker active, so another frame is always requested right
+        away); the one sequence this doesn't cover is closing and reopening
+        with *no* real frame rendered in between at all, which does not
+        happen from actual clicks (each dispatches its own frame).
+        """
+        if not self.is_open:
+            self.state.data.pop("auto_dismiss_timer", None)
+            return
+        duration = self.style.auto_dismiss
+        if duration is None or self._supporting.strip() or "auto_dismiss_timer" in self.state.data:
+            return
+
+        def _check_done() -> None:
+            if timer.done:
+                self.state.data["dismiss_requested"] = True
+
+        # `curve="linear"` is deliberate, not the default "standard" easing:
+        # an eased curve's derivative flattens toward its endpoint, so two
+        # ticks close to completion can round to the identical float once
+        # passed through it -- `advance()` only calls `on_change` when
+        # `.value` actually differs from the previous tick, so that flat
+        # tail silently ate the one call this needed, on the exact frame
+        # `.done` became true. A linear ramp has no flattening tail, so the
+        # completing tick always produces a new value and this fires. Found
+        # by tracing a real run where the countdown finished but never
+        # dismissed -- not a hypothetical.
+        timer = Animation(0.0, 1.0, duration=duration, curve="linear", on_change=_check_done)
+        self.state.data["auto_dismiss_timer"] = self.ticker.add(timer)
+
     def perform_layout(self, constraints: Constraints) -> Size:
         outer = self.sized(constraints, self.style)
         width = _clamped_width(
@@ -928,6 +983,7 @@ class SnackbarElement(_StyledMixin, Padding):
         return self.MIN_HEIGHT if text_height <= one_line + 1.0 else self.MAX_HEIGHT
 
     def paint_self(self, ctx: PaintContext, absolute: Any) -> None:
+        self._maybe_arm_auto_dismiss()
         style = self.style
         _surface(
             ctx,
