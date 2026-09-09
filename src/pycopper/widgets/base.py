@@ -332,17 +332,52 @@ class ButtonElement(ContainerElement):
     tokens come from the variant unless the view sets them explicitly.
 
     **Shape morph, sourced from `COMPONENT_BUTTONS.md`'s own "Corner sizes"
-    table** (a different file than `ButtonGroup`'s own citations) -- at this
-    widget's one shipped size (M): pressed always morphs to a 12dp corner
-    ("Both round and square buttons should have the same pressed shape"),
-    and a toggle button (`checked`, the same `value:`-bound convention
-    `Chip`'s filter variant and `Accordion` already use -- see `checked` on
-    `ElementMixin`) rests at a 16dp corner when selected instead of full
-    round. This applies to every `Button`, grouped or not -- the source
-    page describes it as ordinary Button behaviour, not something
-    `ButtonGroup` adds. An un-`checked`, unpressed `Button` (the
-    overwhelming majority in this codebase -- anything with no `value:`
-    binding at all) is completely unaffected.
+    table** (a different file than `ButtonGroup`'s own citations) -- pressed
+    always morphs to a size-appropriate corner ("Both round and square
+    buttons should have the same pressed shape"), and a toggle button
+    (`checked`, the same `value:`-bound convention `Chip`'s filter variant
+    and `Accordion` already use -- see `checked` on `ElementMixin`) rests at
+    a size-appropriate corner when selected instead of full round. This
+    applies to every `Button`, grouped or not -- the source page describes
+    it as ordinary Button behaviour, not something `ButtonGroup` adds. An
+    un-`checked`, unpressed `Button` (the overwhelming majority in this
+    codebase -- anything with no `value:` binding at all) is completely
+    unaffected.
+
+    **The real XS-XL size ladder, opt-in via `style.size`.** This widget
+    shipped with exactly one size, whose own dimensions (40dp height, 24dp
+    horizontal padding) turn out to be neither M3 Expressive's real "Small"
+    (40dp height, but 16dp padding) nor its "Medium" (56dp height, 24dp
+    padding) -- a pre-Expressive baseline figure that predates the 5-size
+    ladder entirely. Rather than silently reinterpreting every existing
+    Button in the codebase as one size or the other, that shape stays
+    exactly what it was -- `style.size`'s bare default -- and the five real
+    Expressive sizes are additive: `size:` only changes anything when a view
+    file actually sets it, the same `model_fields_set` override-detection
+    `SliderElement._track_radius` and `DockSplitElement.horizontal` already
+    use for an identical "explicit beats default" question. `COMPONENT_
+    BUTTONS.md`'s own "Padding and size measurements" section carries no
+    scraped table (an annotated diagram, not text) -- confirmed live against
+    the actual image at `m3.material.io` rather than guessed, and
+    cross-checked against `COMPONENT_BUTTON_GROUPS.md`'s own scraped token
+    residue for the `extra_small` row (32dp height, matching exactly):
+
+    | Size | Height | Padding | Checked corner | Pressed corner |
+    |------|--------|---------|-----------------|------------------|
+    | extra_small | 32dp | 12dp | 12dp | 8dp |
+    | small | 40dp | 16dp | 12dp | 8dp |
+    | medium | 56dp | 24dp | 16dp | 12dp |
+    | large | 96dp | 48dp | 28dp | 16dp |
+    | extra_large | 136dp | 64dp | 28dp | 16dp |
+
+    The checked/pressed corner columns are the one part with an independent,
+    already text-scraped source (`COMPONENT_BUTTONS.md`'s "Corner sizes"
+    table) -- confirmed to agree with the diagram at every row. `MIN_WIDTH`
+    and `LABEL_ROLE` are NOT scaled by size -- the diagram gives no min-width
+    figure at any size, and nothing sources a per-size type-scale role
+    either, so both stay their one existing value regardless of `size:`,
+    matching `Slider`'s own precedent for a quantity no size-specific figure
+    exists for.
     """
 
     #: "Container Height: 40dp", "Minimum Width: 64dp", "Padding: Horizontal
@@ -351,7 +386,9 @@ class ButtonElement(ContainerElement):
     #: inherited a Padding layout that measured its (absent) child and returned
     #: nothing. A button written without an explicit size laid out 0x0 and drew
     #: nothing at all. Every example carried a size or a stylesheet class,
-    #: which is why no golden ever caught it.
+    #: which is why no golden ever caught it. Also this class's own LEGACY
+    #: size-ladder row (`_geometry()` below) -- `style.size`'s bare default,
+    #: unchanged by the ladder's existence.
     HEIGHT: Final = 40.0
     MIN_WIDTH: Final = 64.0
     PAD_X: Final = 24.0
@@ -361,6 +398,8 @@ class ButtonElement(ContainerElement):
     #: medium weight)" -- quoted, and the reason a button label is Medium
     #: rather than Regular. The whole role travels as one object so its size,
     #: weight and tracking cannot arrive at measure and paint separately.
+    #: Not scaled by `style.size` -- no source gives a per-size type-scale
+    #: role, so every size shares this one.
     LABEL_ROLE: Final = TYPE_SCALE["label-large"]
 
     #: Set by a `ButtonGroup` parent (`buttongroup.py`) to merge this
@@ -371,14 +410,43 @@ class ButtonElement(ContainerElement):
     #: a frozen `StyleSpec` cannot express.
     _group_radii: tuple[float, float, float, float] | None = None
 
-    #: `COMPONENT_BUTTONS.md`'s own "Corner sizes" table, M size (this
-    #: widget's only shipped size today): round (unselected, unpressed)
-    #: stays `size.height / 2`, already correct below; `CHECKED_RADIUS` is
-    #: the toggle-selected resting shape; `PRESSED_RADIUS` applies to every
-    #: press regardless of selection ("Both round and square buttons should
-    #: have the same pressed shape").
+    #: `COMPONENT_BUTTONS.md`'s own "Corner sizes" table, this class's LEGACY
+    #: row (`style.size` unset) -- happens to equal the real ladder's own
+    #: `"medium"` row exactly, unlike `HEIGHT`/`PAD_X` above. Round
+    #: (unselected, unpressed) stays `size.height / 2` at every size,
+    #: already correct below; `CHECKED_RADIUS` is the toggle-selected
+    #: resting shape; `PRESSED_RADIUS` applies to every press regardless of
+    #: selection ("Both round and square buttons should have the same
+    #: pressed shape").
     CHECKED_RADIUS: Final = 16.0
     PRESSED_RADIUS: Final = 12.0
+
+    #: `style.size` -> (height, pad_x, checked_radius, pressed_radius). See
+    #: this class's own docstring for the sourced table and why the LEGACY
+    #: row above -- not any one of these five -- is `style.size`'s bare
+    #: default.
+    SIZES: Final = {
+        "extra_small": (32.0, 12.0, 12.0, 8.0),
+        "small": (40.0, 16.0, 12.0, 8.0),
+        "medium": (56.0, 24.0, 16.0, 12.0),
+        "large": (96.0, 48.0, 28.0, 16.0),
+        "extra_large": (136.0, 64.0, 28.0, 16.0),
+    }
+
+    def _geometry(self) -> tuple[float, float, float, float]:
+        """(height, pad_x, checked_radius, pressed_radius) for `style.size`.
+
+        Consults the ladder only when a view file actually wrote `size:` --
+        `model_fields_set` is the same "explicit beats bare default" check
+        `SliderElement._track_radius`/`DockSplitElement.horizontal` already
+        use, needed here because `style.size`'s own bare default
+        (`"extra_small"`, correct for `Slider`, the field's first owner) is
+        NOT this class's own legacy shape.
+        """
+        legacy = (self.HEIGHT, self.PAD_X, self.CHECKED_RADIUS, self.PRESSED_RADIUS)
+        if "size" not in self.style.model_fields_set:
+            return legacy
+        return self.SIZES.get(self.style.size, legacy)
 
     #: Set by a `ButtonGroup` parent, `standard` variant only -- mirrors
     #: `_group_radii`'s own pattern above. `False` (the default: no such
@@ -423,14 +491,15 @@ class ButtonElement(ContainerElement):
         measure the text itself -- with the same role its paint pass uses, or
         the box would be sized for one rendering and drawn in another.
         """
+        height, pad_x, _checked_radius, _pressed_radius = self._geometry()
         outer = self.sized(constraints, self.style)
         label = (
             measure_text(self._text, self.LABEL_ROLE, engine=self.text_engine)
             if self._text.strip()
             else Size(0.0, 0.0)
         )
-        pad = self.PAD_X + self.GROUP_SELECT_PAD_EXTRA * self._select_progress()
-        return outer.constrain(Size(max(self.MIN_WIDTH, label.width + 2 * pad), self.HEIGHT))
+        pad = pad_x + self.GROUP_SELECT_PAD_EXTRA * self._select_progress()
+        return outer.constrain(Size(max(self.MIN_WIDTH, label.width + 2 * pad), height))
 
     #: Only the `elevated` variant rests above the surface; M3 puts filled,
     #: tonal and outlined buttons at level 0.
@@ -457,10 +526,11 @@ class ButtonElement(ContainerElement):
         # group's own button still morphs on selection independent of its
         # neighbours (`COMPONENT_BUTTON_GROUPS.md`: "only affect the shape
         # of the button being selected").
+        _height, _pad_x, checked_radius, pressed_radius = self._geometry()
         if self.state.pressed:
-            return (self.PRESSED_RADIUS,) * 4
+            return (pressed_radius,) * 4
         if self.checked:
-            return (self.CHECKED_RADIUS,) * 4
+            return (checked_radius,) * 4
         if self._group_radii is not None:
             return self._group_radii
         radii = self.style.corner_radius

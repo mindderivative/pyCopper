@@ -3567,39 +3567,61 @@ spaces `Button` children and, for the connected variant, overrides their
 corner radii -- nothing paints its own container.
 
 **Spacing.** The source's "between-space" table has one row per size (XS
-18dp, S 12dp, M/L/XL 8dp); `Button` has only one size today, so the M/L/XL
-row (8dp) is the value used for `variant: standard`. Connected groups use a
-flat 2dp "at every size", quoted directly.
+18dp, S 12dp, M/L/XL 8dp), confirmed against the same page's own scraped
+token residue for the XS row (32dp container height, 18dp between-space --
+both agree). `STANDARD_SPACING` (8dp) is both the M/L/XL figure and this
+group's own pre-ladder legacy value, so an unsized group sees it either way.
+Connected groups use a flat 2dp "at every size", quoted directly -- no
+ladder applies there at all.
 
 **Connected shape.** "the outer shape is fully round, and the inner shape
-remains square with the following corner sizes" (4dp at XS rising to 20dp
-at XL) -- read here as: the group's two outward-facing ends stay fully
-round, every corner where two buttons meet squares to the M-size figure
-(8dp). The source describes this in prose with no anatomy diagram for the
-shape itself, so the exact reading is pyCopper's own, not a quoted layout.
+remains square with the following corner sizes" -- XS 4dp, S 8dp, M 8dp,
+L 16dp, XL 20dp -- read here as: the group's two outward-facing ends stay
+fully round, every corner where two buttons meet squares to the
+size-appropriate figure. `INNER_RADIUS` (8dp) is both the M figure and this
+group's own pre-ladder legacy value, the same "unsized group unaffected"
+shape spacing has.
 
 **Shape morph and selection, built.** The round<->square morph itself
 lives entirely on `ButtonElement`, not here -- `COMPONENT_BUTTONS.md`'s own
-"Corner sizes" table (M size, `Button`'s only shipped size) gives exact
-figures: pressed always morphs to 12dp ("both round and square buttons
-should have the same pressed shape"), and a toggle button (`checked`, the
-same `value:`-bound convention `Chip`'s filter variant and `Accordion`
-already use) rests at 16dp when selected instead of full round. This
-applies to *every* `Button`, grouped or not -- the source page describes it
-as ordinary Button behaviour. `ButtonGroup`'s own, narrower contribution is
-what `COMPONENT_BUTTON_GROUPS.md`'s "Selection & activation" section
-actually adds: a **standard** group's selected/pressed button also grows
-WIDTH (`ButtonElement.GROUP_SELECT_PAD_EXTRA`, not sourced -- the spec
-gives no number, only that it happens), which visibly shifts every later
-sibling along the row as an ordinary consequence of `ButtonGroup` already
-being a plain `Flex` row -- no new cross-element layout coupling was built
-or needed for that. A **connected** group's own selection changes shape
-only, per the spec's own "don't add any interaction between buttons...
-only affect the shape."
+"Corner sizes" table gives exact per-size figures: pressed always morphs to
+a size-appropriate corner ("both round and square buttons should have the
+same pressed shape"), and a toggle button (`checked`, the same
+`value:`-bound convention `Chip`'s filter variant and `Accordion` already
+use) rests at a size-appropriate corner when selected instead of full
+round. This applies to *every* `Button`, grouped or not -- the source page
+describes it as ordinary Button behaviour. `ButtonGroup`'s own, narrower
+contribution is what `COMPONENT_BUTTON_GROUPS.md`'s "Selection &
+activation" section actually adds: a **standard** group's selected/pressed
+button also grows WIDTH (`ButtonElement.GROUP_SELECT_PAD_EXTRA`, not
+sourced -- the spec gives no number, only that it happens, and not scaled
+by size either since no size-specific figure exists for it at any size),
+which visibly shifts every later sibling along the row as an ordinary
+consequence of `ButtonGroup` already being a plain `Flex` row -- no new
+cross-element layout coupling was built or needed for that. A **connected**
+group's own selection changes shape only, per the spec's own "don't add any
+interaction between buttons... only affect the shape."
 
-Still not built: the XS/S/M/L/XL size ladder button groups are meant to
-span, which has nowhere to attach until `Button` itself grows a size axis
-the way `Fab`/`Slider` already have.
+**The XS/S/M/L/XL size ladder, built.** `ButtonElement.SIZES` (`extra_small`
+through `extra_large` -- height, horizontal padding, checked/pressed corner
+radii) is sourced from the actual annotated diagram at m3.material.io,
+fetched live since `COMPONENT_BUTTONS.md`'s own "Padding and size
+measurements" section carries no scraped table for it, only an image;
+cross-checked against `COMPONENT_BUTTON_GROUPS.md`'s own scraped token
+residue for the `extra_small` row (32dp height), which agrees exactly. The
+widget's pre-existing single size (40dp height, 24dp padding) turns out to
+match neither the real ladder's `"small"` (40dp height, 16dp padding) nor
+its `"medium"` (56dp height, 24dp padding) -- a pre-Expressive figure that
+predates the 5-size ladder entirely -- so it stays `style.size`'s bare
+default rather than being folded into either real row, via the same
+`model_fields_set` "explicit beats default" check `SliderElement.
+_track_radius`/`DockSplitElement.horizontal` already use. `ButtonGroup` has
+no `size:` of its own; it derives its spacing/connected-inner-radius from
+the first `Button` child that actually set one, since M3 expects a group's
+buttons to share a size ("By default, all buttons in a standard group
+should be the same size... Avoid mixing sizes frequently"). `MIN_WIDTH` and
+`LABEL_ROLE` are not scaled by size -- no source gives a per-size figure
+for either.
 
 `ButtonElement` gained `_group_radii` (`None` by default, so every button
 with no `ButtonGroup` parent is unaffected; `effective_radii` checks it

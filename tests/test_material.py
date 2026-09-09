@@ -674,6 +674,65 @@ def test_group_select_pad_extra_does_not_apply_outside_a_standard_group() -> Non
     )
 
 
+# -------------------------------------------------------------- size ladder
+
+
+def test_a_button_with_no_size_keeps_its_legacy_dimensions() -> None:
+    """`style.size`'s own bare Pydantic default is `"extra_small"` (correct
+    for `Slider`, the field's first owner) -- a Button that never mentions
+    `size:` at all must NOT silently become a 32dp extra_small button. Zero
+    behaviour change is the bar every opt-in field in this codebase is held
+    to; `model_fields_set` is what makes that possible here."""
+    from pycopper.widgets.base import ButtonElement
+
+    button = laid_out(widget="Button", text="Go")
+    assert button.size.height == ButtonElement.HEIGHT == 40.0
+    assert button.effective_radii == (ButtonElement.HEIGHT / 2,) * 4
+
+    checked = laid_out(widget="Button", text="Go", value="true")
+    assert checked.effective_radii == (ButtonElement.CHECKED_RADIUS,) * 4 == (16.0,) * 4
+
+
+@pytest.mark.parametrize(
+    ("size", "height", "checked_radius", "pressed_radius"),
+    [
+        ("extra_small", 32.0, 12.0, 8.0),
+        ("small", 40.0, 12.0, 8.0),
+        ("medium", 56.0, 16.0, 12.0),
+        ("large", 96.0, 28.0, 16.0),
+        ("extra_large", 136.0, 28.0, 16.0),
+    ],
+)
+def test_button_size_ladder_matches_the_sourced_table(
+    size: str, height: float, checked_radius: float, pressed_radius: float
+) -> None:
+    """The real M3 Expressive ladder, confirmed live against the actual
+    diagram at m3.material.io (the scraped text carries no table for it) and
+    cross-checked against COMPONENT_BUTTON_GROUPS.md's own scraped token
+    residue for the extra_small row -- both agree."""
+    button = laid_out(widget="Button", text="Go", style={"size": size})
+    assert button.size.height == height
+
+    checked = laid_out(widget="Button", text="Go", value="true", style={"size": size})
+    assert checked.effective_radii == (checked_radius,) * 4
+
+    pressed = laid_out(widget="Button", text="Go", style={"size": size})
+    pressed.state.pressed = True
+    assert pressed.effective_radii == (pressed_radius,) * 4
+
+
+def test_an_explicit_size_widens_the_horizontal_padding_too() -> None:
+    """The ladder is not height-only -- `large`'s 48dp padding must actually
+    reach `perform_layout`'s own width math, not just the container height."""
+    from pycopper.widgets.base import ButtonElement
+
+    default = laid_out(widget="Button", text="Launch")
+    large = laid_out(widget="Button", text="Launch", style={"size": "large"})
+    label_width = measure_text("Launch", ButtonElement.LABEL_ROLE, engine=default.text_engine).width
+    assert default.size.width == pytest.approx(label_width + 2 * 24.0)
+    assert large.size.width == pytest.approx(label_width + 2 * 48.0)
+
+
 # ------------------------------------------------------------------- link
 
 

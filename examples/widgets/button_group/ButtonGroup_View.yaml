@@ -28,10 +28,16 @@ children:
           "Button groups are invisible containers that add padding
           between buttons and modify button shape" -- quoted directly.
           Standard uses 8dp gaps and leaves every button fully rounded;
-          connected uses 2dp gaps and squares every touching corner to
-          8dp while the group's two outer ends stay fully round. M size
-          only -- the XS/S/M/L/XL size ladder isn't built (`Button` itself
-          has one size today).
+          connected uses 2dp gaps and squares every touching corner to a
+          size-appropriate figure while the group's two outer ends stay
+          fully round.
+
+          `Button` itself carries `style.size` now -- `extra_small`
+          through `extra_large` -- and a group reads it from its own
+          children rather than needing a `size:` of its own, since M3
+          expects every button in one group to share a size. Leaving
+          `size:` unset keeps a button's original 40dp/24dp shape exactly,
+          unrelated to any single row of the real ladder below it.
 
           Click a button below to toggle it: COMPONENT_BUTTONS.md's own
           "Corner sizes" table gives the shape morph exact dp figures --
@@ -108,6 +114,86 @@ children:
                 value: "{{ period.get() == 'month' }}"
                 style: {variant: outlined}
                 handlers: {on_click: select_month}
+
+      - {name: div_ladder, widget: Divider, style: {width: expand}}
+
+      - name: ladder_heading
+        widget: Text
+        text: "Size ladder -- extra_small through extra_large"
+        style: {text_style: title-medium, color: primary}
+
+      - name: ladder_explanation
+        widget: Text
+        text: |
+          Each row is a connected group at one `style.size` -- set on its
+          `Button` children, not the group. The first button in each row
+          is toggled on, showing the selected-shape morph at that size too.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - name: ladder_demo
+        widget: Vertical
+        style: {spacing: 16, width: expand, cross_alignment: start}
+        children:
+          - name: row_xs
+            widget: Horizontal
+            style: {spacing: 16, cross_alignment: center}
+            children:
+              - {widget: Text, text: "extra_small", style: {width: 100, color: on_surface_variant}}
+              - name: ladder_xs
+                widget: ButtonGroup
+                style: {variant: connected}
+                children:
+                  - {name: xs_a, widget: Button, text: "A", value: "true", style: {variant: outlined, size: extra_small}}
+                  - {name: xs_b, widget: Button, text: "B", style: {variant: outlined, size: extra_small}}
+                  - {name: xs_c, widget: Button, text: "C", style: {variant: outlined, size: extra_small}}
+          - name: row_s
+            widget: Horizontal
+            style: {spacing: 16, cross_alignment: center}
+            children:
+              - {widget: Text, text: "small", style: {width: 100, color: on_surface_variant}}
+              - name: ladder_s
+                widget: ButtonGroup
+                style: {variant: connected}
+                children:
+                  - {name: s_a, widget: Button, text: "A", value: "true", style: {variant: outlined, size: small}}
+                  - {name: s_b, widget: Button, text: "B", style: {variant: outlined, size: small}}
+                  - {name: s_c, widget: Button, text: "C", style: {variant: outlined, size: small}}
+          - name: row_m
+            widget: Horizontal
+            style: {spacing: 16, cross_alignment: center}
+            children:
+              - {widget: Text, text: "medium", style: {width: 100, color: on_surface_variant}}
+              - name: ladder_m
+                widget: ButtonGroup
+                style: {variant: connected}
+                children:
+                  - {name: m_a, widget: Button, text: "A", value: "true", style: {variant: outlined, size: medium}}
+                  - {name: m_b, widget: Button, text: "B", style: {variant: outlined, size: medium}}
+                  - {name: m_c, widget: Button, text: "C", style: {variant: outlined, size: medium}}
+          - name: row_l
+            widget: Horizontal
+            style: {spacing: 16, cross_alignment: center}
+            children:
+              - {widget: Text, text: "large", style: {width: 100, color: on_surface_variant}}
+              - name: ladder_l
+                widget: ButtonGroup
+                style: {variant: connected}
+                children:
+                  - {name: l_a, widget: Button, text: "A", value: "true", style: {variant: outlined, size: large}}
+                  - {name: l_b, widget: Button, text: "B", style: {variant: outlined, size: large}}
+                  - {name: l_c, widget: Button, text: "C", style: {variant: outlined, size: large}}
+          - name: row_xl
+            widget: Horizontal
+            style: {spacing: 16, cross_alignment: center}
+            children:
+              - {widget: Text, text: "extra_large", style: {width: 100, color: on_surface_variant}}
+              - name: ladder_xl
+                widget: ButtonGroup
+                style: {variant: connected}
+                children:
+                  - {name: xl_a, widget: Button, text: "A", value: "true", style: {variant: outlined, size: extra_large}}
+                  - {name: xl_b, widget: Button, text: "B", style: {variant: outlined, size: extra_large}}
+                  - {name: xl_c, widget: Button, text: "C", style: {variant: outlined, size: extra_large}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 

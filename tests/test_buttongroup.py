@@ -5,8 +5,9 @@ See the module docstring in `buttongroup.py` for the shape morph/selection
 split: the round<->square morph itself lives on `ButtonElement` (tested in
 `test_material.py`), while this file covers what is genuinely
 `ButtonGroup`-specific -- a standard group's selected button also growing
-width, and a connected group's own selection changing shape only. Still not
-built: the XS/S/L/XL size ladder (`Button` itself has one size).
+width, a connected group's own selection changing shape only, and the
+group-level spacing/inner-radius ladder derived from its own `Button`
+children's `style.size`.
 """
 
 from __future__ import annotations
@@ -23,7 +24,8 @@ from pycopper.widgets.base import _REGISTRY, create_element
 from pycopper.widgets.buttongroup import ButtonGroupElement
 
 
-def _app(variant: str, count: int = 3):
+def _app(variant: str, count: int = 3, size: str | None = None):
+    button_style = {"size": size} if size else {}
     view = {
         "name": "root",
         "widget": "Vertical",
@@ -33,7 +35,12 @@ def _app(variant: str, count: int = 3):
                 "widget": "ButtonGroup",
                 "style": {"variant": variant},
                 "children": [
-                    {"name": f"btn{i}", "widget": "Button", "text": f"Item {i}"}
+                    {
+                        "name": f"btn{i}",
+                        "widget": "Button",
+                        "text": f"Item {i}",
+                        "style": button_style,
+                    }
                     for i in range(count)
                 ],
             }
@@ -95,6 +102,82 @@ def test_a_single_connected_button_is_rounded_on_both_outer_ends() -> None:
     _, _group, (only,) = _app("connected", count=1)
     outer = only.size.height / 2
     assert only.effective_radii == (outer, outer, outer, outer)
+
+
+# ------------------------------------------------------------- size ladder
+
+
+def test_an_unsized_groups_spacing_and_inner_radius_are_unchanged() -> None:
+    """No `Button` child sets `size:` -- both figures must stay exactly
+    what they were before the ladder existed (`STANDARD_SPACING`/
+    `INNER_RADIUS`'s own bare values), the same zero-impact bar every
+    other opt-in field in this codebase is held to."""
+    _, standard_group, _ = _app("standard")
+    assert standard_group._spacing == ButtonGroupElement.STANDARD_SPACING == 8.0
+
+    _, _connected_group, (_first, middle, _last) = _app("connected")
+    assert middle.effective_radii == (ButtonGroupElement.INNER_RADIUS,) * 4 == (8.0,) * 4
+
+
+@pytest.mark.parametrize(
+    ("size", "spacing"),
+    [
+        ("extra_small", 18.0),
+        ("small", 12.0),
+        ("medium", 8.0),
+        ("large", 8.0),
+        ("extra_large", 8.0),
+    ],
+)
+def test_standard_spacing_follows_its_buttons_size(size: str, spacing: float) -> None:
+    """`COMPONENT_BUTTON_GROUPS.md`'s own "between-space" table, every row."""
+    _, group, _buttons = _app("standard", size=size)
+    assert group._spacing == spacing
+
+
+@pytest.mark.parametrize(
+    ("size", "inner"),
+    [
+        ("extra_small", 4.0),
+        ("small", 8.0),
+        ("medium", 8.0),
+        ("large", 16.0),
+        ("extra_large", 20.0),
+    ],
+)
+def test_connected_inner_radius_follows_its_buttons_size(size: str, inner: float) -> None:
+    """`COMPONENT_BUTTON_GROUPS.md`'s own connected inner-corner table."""
+    _, _group, (_first, middle, _last) = _app("connected", size=size)
+    assert middle.effective_radii == (inner,) * 4
+
+
+def test_connected_spacing_stays_flat_regardless_of_size() -> None:
+    """ "For all connected button groups, use 2dp padding... at every size" --
+    a real, explicit exception to the ladder, not an oversight."""
+    for size in ("extra_small", "small", "medium", "large", "extra_large"):
+        _, group, _buttons = _app("connected", size=size)
+        assert group._spacing == ButtonGroupElement.CONNECTED_SPACING == 2.0
+
+
+def test_group_size_reads_the_first_child_that_actually_set_size() -> None:
+    """`ButtonGroup` has no `size:` of its own -- it derives the ladder row
+    from its children, per M3's own "all buttons in a group should be the
+    same size" guidance. An earlier, unsized sibling must not block a later
+    one's explicit `size:` from being picked up -- "first sized child",
+    not "first child, sized or not"."""
+    view = {
+        "name": "root",
+        "widget": "ButtonGroup",
+        "style": {"variant": "standard"},
+        "children": [
+            {"name": "a", "widget": "Button", "text": "A"},  # unsized
+            {"name": "b", "widget": "Button", "text": "B", "style": {"size": "extra_small"}},
+        ],
+    }
+    app = App(view, theme=Theme(dark=True))
+    app.mount()
+    app.update()
+    assert app.root._spacing == 18.0  # extra_small's row, not the 8.0 legacy default
 
 
 # --------------------------------------------------------- selection / morph
