@@ -36,6 +36,16 @@ class ButtonGroupDemo(ViewModel):
         # look selected at once, which doesn't read as a real switch.
         self.period = Signal("day", name="period")
 
+        # Size-ladder demo -- one standard group per size, each with its own
+        # independent toggle on the "A" button (same convention as bold/
+        # italic/underline above), so clicking it genuinely grows/shrinks
+        # and shifts its siblings at every size, not just morphs shape.
+        self.ladder_xs = Signal(True, name="ladder_xs")
+        self.ladder_s = Signal(True, name="ladder_s")
+        self.ladder_m = Signal(True, name="ladder_m")
+        self.ladder_l = Signal(True, name="ladder_l")
+        self.ladder_xl = Signal(True, name="ladder_xl")
+
         self.view_source = (Path(__file__).parent / "ButtonGroup_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
 
@@ -56,3 +66,18 @@ class ButtonGroupDemo(ViewModel):
 
     def select_month(self, event: Any) -> None:
         self.period.set("month")
+
+    def toggle_ladder_xs(self, event: Any) -> None:
+        self.ladder_xs.update(lambda v: not v)
+
+    def toggle_ladder_s(self, event: Any) -> None:
+        self.ladder_s.update(lambda v: not v)
+
+    def toggle_ladder_m(self, event: Any) -> None:
+        self.ladder_m.update(lambda v: not v)
+
+    def toggle_ladder_l(self, event: Any) -> None:
+        self.ladder_l.update(lambda v: not v)
+
+    def toggle_ladder_xl(self, event: Any) -> None:
+        self.ladder_xl.update(lambda v: not v)
