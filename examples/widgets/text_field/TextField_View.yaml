@@ -66,6 +66,34 @@ children:
         text: "Bound value: {{ name.get() }}"
         style: {color: on_surface_variant}
 
+      - {name: div_bidi, widget: Divider, style: {width: expand}}
+
+      - name: bidi_heading
+        widget: Text
+        text: "Mixed-direction editing"
+        style: {text_style: title-medium, color: primary}
+
+      - name: bidi_explanation
+        widget: Text
+        text: |
+          Type into this field with English and Arabic or Hebrew mixed
+          together (the field already starts with some) -- real UAX #9 bidi
+          resolution, not a single whole-paragraph reversal. Click or arrow
+          through the boundary between scripts and the caret lands on the
+          correct side rather than jumping erratically; a selection that
+          spans the boundary highlights as two separate rects, since the
+          selected text isn't one visually-contiguous span once direction
+          flips partway through it.
+        style: {text_style: body-medium, color: on_surface_variant}
+
+      - name: field_bidi
+        widget: TextField
+        text: "Mixed direction"
+        value: "{{ bidi_text.get() }}"
+        supporting_text: "English, Arabic, and Hebrew, freely mixed"
+        style: {width: expand, variant: outlined}
+        handlers: {on_change: change_bidi_text}
+
       - {name: div3, widget: Divider, style: {width: expand}}
 
       - name: code_heading

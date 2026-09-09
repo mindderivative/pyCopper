@@ -475,9 +475,11 @@ escape-sequence parser produces and because the two do not correspond: a
 ligature is one glyph for several characters, and a blank glyph is dropped
 entirely, so `"def foo"` emits six quads and not seven. Doing the mapping once
 here is what stops every consumer getting ligatures wrong differently.
-`GlyphPlacement.offset` carries the paragraph-absolute offset for it — only
-meaningful for LTR text, since an RTL paragraph's runs are reordered into
-visual order (the R9 boundary again).
+`GlyphPlacement.offset` carries the paragraph-absolute offset for it, correct
+regardless of direction — `TextLine.run_starts` records each run's true
+logical start once, at layout time, rather than reconstructing it later by
+accumulating run lengths in visual order (which only works for pure LTR;
+§5.7.7 covers the fix in full).
 
 The mapping is a `searchsorted` over span starts, not a lookup per glyph, and
 the result is written as whole columns like every other instance field. **990
@@ -517,14 +519,16 @@ Material Design 3 names **Roboto** as the default typeface of its type scale and
 |---|---|---|---|---|
 | `Roboto-Regular.ttf` | 154 KB | 400 | 927 | Default face |
 | `Roboto-Medium.ttf` | 154 KB | 500 | 927 | `label-large` and other medium-weight roles |
-| `NotoSans-Regular.ttf` | 612 KB | 400 | 3,094 | Fallback tier |
+| `NotoSans-Regular.ttf` | 612 KB | 400 | 3,094 | Fallback tier — Latin/Greek/Cyrillic |
+| `NotoSansArabic-Regular.ttf` | 190 KB | 400 | 1,561 | Fallback tier — Arabic |
+| `NotoSansHebrew-Regular.ttf` | 47 KB | 400 | 464 | Fallback tier — Hebrew |
 | `MaterialSymbolsOutlined-Subset.ttf` | 102 KB | variable | 218 icons | Icons (§5.7.8) |
 
-**≈1.0 MB total** (620 KB compressed in the wheel), exposed through `pycopper.assets` (`DEFAULT_FONT`, `MEDIUM_FONT`, `FALLBACK_CHAIN`) and `pycopper.text.icons`.
+**≈3.8 MB total**, exposed through `pycopper.assets` (`DEFAULT_FONT`, `MEDIUM_FONT`, `FALLBACK_CHAIN`) and `pycopper.text.icons`.
 
 Three decisions worth recording:
 
-- **M3's fallback collection cannot be shipped.** The full Noto Sans set is 119 MB, plus 299 MB for CJK — against PyPI's ~60 MB project cap. Only the Latin/Greek/Cyrillic Noto family is bundled. It adds **2,187 codepoints** over Roboto (841 extended Latin, 289 Greek, 533 combining marks and modifiers, 129 Devanagari, 115 Cyrillic), so the fallback chain is genuinely exercised in v1 rather than being dead code — but it widens coverage *within* those scripts and adds no CJK, Arabic, or emoji. Broader fallback waits on system font discovery.
+- **M3's fallback collection cannot be shipped.** The full Noto Sans set is 119 MB, plus 299 MB for CJK — against PyPI's ~60 MB project cap. Only Latin/Greek/Cyrillic, Arabic, and Hebrew Noto families are bundled — one small per-script member each, nowhere near the excluded omnibus case. `NotoSans-Regular.ttf` adds **2,187 codepoints** over Roboto (841 extended Latin, 289 Greek, 533 combining marks and modifiers, 129 Devanagari, 115 Cyrillic); `NotoSansArabic-Regular.ttf`/`NotoSansHebrew-Regular.ttf` add real Arabic and Hebrew coverage, making Tier 2/3 RTL support (§5.7.7) demonstrable without a system font. Fallback is genuinely exercised in v1 rather than being dead code, but still adds no CJK or emoji. Broader fallback waits on system font discovery.
 - **Static instances, not variable fonts.** `google/fonts` publishes both families only as variable fonts. The bundled faces are produced with `fontTools.varLib.instancer`, pinning `wght` and `wdth`. That saves ~1.6 MB and keeps the loader free of variation-axis configuration.
 - **Roboto's coverage matches Tier 1 exactly.** Its 927 codepoints span Latin, Greek, and Cyrillic — precisely the scope §5.7.7 commits to, so the bundled font and the documented text tier agree without either being bent to fit.
 
@@ -678,11 +682,11 @@ Revised upward from the previous revision, which deferred all shaping past v1. W
 | Tier | Coverage | Status |
 |---|---|---|
 | **1** | Full OpenType shaping — ligatures, GPOS kerning, mark attachment, contextual forms. Grapheme clusters, UAX #14 breaking, font fallback. | ✅ **shipped, M4** |
-| **2** | RTL and mixed-direction *rendering*. Itemisation resolves direction per run and orders runs visually; **glyph coverage for Arabic and Hebrew is absent from the bundled fonts**, so this is structurally present but not yet demonstrable without a system font. | partial, M4 |
-| **3** | RTL *editing* — caret movement, affinity at direction boundaries, selection spanning runs. Genuinely hard UI work, independent of any dependency. | v1.1 |
+| **2** | RTL and mixed-direction *rendering*. `text/bidi.py` drives real UAX #9 embedding-level resolution (not a single-flip heuristic — nested LTR-in-RTL-in-LTR resolves correctly per rule I2); `itemize.py` splits level-runs before script/font runs, so a level boundary always produces a separate `ItemRun` even where script alone would not. `NotoSansArabic-Regular.ttf`/`NotoSansHebrew-Regular.ttf` are bundled, so Arabic and Hebrew render as real glyphs, not tofu. | ✅ **shipped** |
+| **3** | RTL *editing* — caret movement, affinity at direction boundaries, selection spanning runs. `EditState.affinity` (`Affinity.UPSTREAM`/`DOWNSTREAM`) disambiguates a caret sitting exactly at a direction boundary; `Editor.move()`'s left/right walk steps through a precomputed, full visual ordering of every caret position (`editing._visual_positions`) rather than deriving each step incrementally — an earlier incremental design oscillated forever near a boundary instead of making progress, caught by live testing before it shipped. `rects_for` emits one rect per disjoint span, so a selection crossing a direction boundary paints as multiple rects rather than one stretched across the gap. | ✅ **shipped** |
 | **4** | Vertical CJK, ruby annotation, `COLRv1` gradient emoji, variable-font axes. | post-1.0 |
 
-The tier the release supports is stated in user-facing documentation. Tier 3 is called out separately because it is the one place where people assume that installing a bidi library finished the job: reordering glyphs is the easy half; a caret that moves sensibly through `"The title is مرحبا today"` is the hard half.
+The tier the release supports is stated in user-facing documentation. Reordering was always the easy half; a caret that moves sensibly through `"The title is مرحبا today"` — including landing on the correct one of two valid on-screen positions when the offset sits exactly at a direction boundary — was the hard half, and is what Tier 3 closes.
 
 ### 5.8 GPU pipeline — `render/`, `render/shaders/ui.wgsl`
 
@@ -2350,12 +2354,13 @@ frame: the in-process copy happens first and exceptions are swallowed.
 
 #### Not implemented, and stated
 
-Selection across widgets, and bidirectional selection. The second is risk R9:
-the highlight is contiguous in character order, which is not what a caret
-should do across a direction boundary. (Editable text was listed here until
-`TextField` shipped -- see 5.9.1.) Double-click uses whitespace
-delimiting rather than UAX #29 word segmentation — simple and predictable, and
-labelled as such rather than presented as Unicode-correct.
+Selection across widgets. Bidirectional selection (risk R9) is closed — see
+§5.7.7 Tier 3 — `rects_for` now emits one rect per disjoint span, and
+`EditState.affinity` disambiguates a caret offset that sits exactly at a
+direction boundary. (Editable text was listed here until `TextField` shipped
+-- see 5.9.1.) Double-click uses whitespace delimiting rather than UAX #29
+word segmentation — simple and predictable, and labelled as such rather than
+presented as Unicode-correct.
 
 ### 5.17.7 Type-scale roles — `spec/typescale.py`
 
@@ -3949,12 +3954,12 @@ The subtree cache is the strongest lever available: reusing a clean subtree's in
 | # | Risk | Severity | Mitigation / status |
 |---|---|---|---|
 | R1 | Python frame budget insufficient at high element counts | High | Retained mode + typed invalidation + numpy paint are all aimed here. Benchmark early, at M2, not at M6. |
-| R2 | ~~Text scope creep~~ | **Closed** | **Delivered in M4.** Shaping, fallback, segmentation, itemisation, atlas, and paragraph layout all ship and are tested. Residual work is now RTL caret semantics (R9) alone; the quadratic wrap in §5.7.1 is closed. |
+| R2 | ~~Text scope creep~~ | **Closed** | **Delivered in M4.** Shaping, fallback, segmentation, itemisation, atlas, and paragraph layout all ship and are tested. R9 (RTL caret semantics) is also closed; the quadratic wrap in §5.7.1 is closed. |
 | R3 | `wgpu-native` backend variance across Vulkan/Metal/DX12 | Medium | Keep WGSL conservative; golden tests per platform; no optional GPU features. |
 | R4 | Single draw call broken by a future feature | Medium | Stated as a design constraint (§1.3). Clipping already solved analytically; transforms and blend modes are the next pressure points. |
 | R5 | IME / CJK text *input* unsupported | Medium | **Open.** GLFW preedit support is limited; likely needs platform code or a rendercanvas contribution. Note this is input only — CJK *rendering* is covered by Tier 1. |
-| R9 | RTL caret/selection semantics (Tier 3) | Medium | Deferred to v1.1 and stated as such. Reordering is solved; bidirectional caret affinity is independent UI work. |
-| R10 | ~~Bundled font licensing and size~~ | **Closed** | **Resolved.** Roboto and Noto Sans are both **SIL OFL 1.1**, compatible with MIT, with licence texts redistributed alongside them (§5.7.2). Note Roboto was *relicensed*: builds predating its move to `ofl/` in `google/fonts` — including the v2.137 copy some distributions still ship — are Apache-2.0 instead. Size resolved at ≈920 KB by instancing static faces and bundling only the Latin/Greek/Cyrillic Noto family. |
+| R9 | ~~RTL caret/selection semantics (Tier 3)~~ | **Closed** | **Resolved.** `text/bidi.py` drives real UAX #9 embedding-level resolution; `EditState.affinity` disambiguates a boundary offset; `Editor.move()` steps through a precomputed global visual ordering rather than an incremental heuristic (an earlier incremental design oscillated forever near a boundary, caught by live testing before it shipped); `rects_for` emits multiple rects for a selection crossing a direction boundary. `NotoSansArabic-Regular.ttf`/`NotoSansHebrew-Regular.ttf` are bundled so this is demonstrable without a system font. See §5.7.7 Tier 3. |
+| R10 | ~~Bundled font licensing and size~~ | **Closed** | **Resolved.** Roboto and every bundled Noto family are **SIL OFL 1.1**, compatible with MIT, with licence texts redistributed alongside them (§5.7.2). Note Roboto was *relicensed*: builds predating its move to `ofl/` in `google/fonts` — including the v2.137 copy some distributions still ship — are Apache-2.0 instead. Size resolved at ≈3.8 MB by instancing static faces and bundling only small per-script Noto members (Latin/Greek/Cyrillic, Arabic, Hebrew), nowhere near the omnibus multi-script build's own PyPI-cap-busting size. |
 | R6 | ~~No accessibility tree~~ | **Closed** | **Delivered.** `runtime/accessibility.py` builds the semantic tree from the Element tree as reserved; `runtime/accesskit_bridge.py` pushes it to AT-SPI through AccessKit and was verified against a live screen reader. Windows and macOS need their own AccessKit platform wheels and are untested here, which `available()` reports rather than leaving to be discovered. |
 | R7 | Over-invalidation silently costs frames | Medium | Tested directly (§11) rather than left to profiling. |
 | R8 | Atlas thrashing under many fonts/sizes | Low | LRU + skyline; budgeted at 2048², growable to 4096². |
@@ -4067,7 +4072,7 @@ The original `architectural_plan.md` has been superseded by this document and re
 | Clipping | Unaddressed | Analytic, in-shader, rounded | Scissor rects would split the draw call |
 | Text | "freetype does layout" | Five-package pipeline (§2.3.1, §5.7), all verified | freetype rasterises; it does not shape, break, or reorder |
 | Shaping | Deferred to v1.1 | **In v1** via `uharfbuzz` | Dependency proven on 3.14; GPOS kerning and ligatures confirmed working |
-| Bidi / RTL | "post-1.0" | Rendering in v1; editing in v1.1 | `python-bidi` works; the residual work is caret semantics, not reordering |
+| Bidi / RTL | "post-1.0" | Rendering and editing both shipped | `python-bidi` drives real UAX #9 embedding levels; caret affinity and multi-rect selection close the editing half too |
 | Font fallback | Unaddressed | `FontDB` coverage index, per-grapheme resolution | DejaVu Sans covers neither CJK nor emoji — fallback is required, not optional |
 | Default font | Unaddressed | Bundled with the package | Golden tests cannot be deterministic against system fonts |
 | Colour emoji | Unaddressed | Routed to the RGBA8 image atlas as kind=2 | Colour bitmaps do not belong in an R8 coverage texture; needs no shader change |

@@ -977,11 +977,14 @@ clipboard.install(SystemClipboard())
 - **Editing.** This is selection on a `Text`, which is read-only. For typing,
   use [`TextField`](#text-fields).
 - **Selection across widgets.** A drag selects within one `Text`.
-- **Bidirectional text.** Selecting across a left-to-right / right-to-left
-  boundary is not handled; the highlight is contiguous in character order,
-  which is not what a bidi caret should do (ARCHITECTURE risk R9).
 - **UAX #29 word boundaries.** Double-click uses whitespace delimiting, which
   is simple and predictable rather than Unicode-correct.
+
+Bidirectional text is handled: selecting across a left-to-right /
+right-to-left boundary paints as separate rects rather than one span
+stretched across the gap, and a caret sitting exactly at a direction
+boundary lands at the correct on-screen position rather than one derived
+by accident of iteration order.
 
 The pointer changes shape over what it is on, without you asking:
 
@@ -1596,9 +1599,6 @@ Stated plainly so you can design around it:
   or carousel parallax, which follow a position rather than a clock.
 - **IME preedit.** Committed characters only, so an input method that composes
   before committing — CJK, in practice — is not supported.
-- **Bidirectional carets.** Text reorders correctly for display, but a caret or
-  selection spanning a left-to-right / right-to-left boundary is contiguous in
-  character order, which is not what a bidi caret should do.
 - **Reading the clipboard without focus.** Copy and paste use the system
   clipboard, but Wayland only lets a client read the selection while it has
   keyboard focus, and only accept a *new* selection when a real input event is

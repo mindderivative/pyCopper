@@ -655,9 +655,20 @@ amend, per §2's no-amend rule).
 - **Text rendering quality**: phil is not yet satisfied with the overall
   result even after both hinting/gamma fixes landed — see §7. A Skia/Skrifa
   rasterizer swap was discussed, not attempted (cost, not rejection).
-- **RTL text**: direction/run ordering works, but the bundled fonts carry
-  no Arabic/Hebrew glyphs and caret/selection across a direction boundary
-  is unimplemented (risk R9).
+- ~~RTL text: no Arabic/Hebrew glyphs, caret/selection across a direction
+  boundary unimplemented~~ **RESOLVED 2026-09-09 — real UAX #9 bidi
+  shipped (risk R9 closed).** `text/bidi.py` drives real embedding-level
+  resolution (re-adopting `python-bidi`, which had been imported but its
+  actual call site deleted as "dead code" in an earlier cleanup) instead
+  of the previous single-whole-list-reverse heuristic. `NotoSansArabic-
+  Regular.ttf`/`NotoSansHebrew-Regular.ttf` are now bundled, so Arabic and
+  Hebrew render as real glyphs. `EditState.affinity` disambiguates a caret
+  sitting exactly at a direction boundary; `Editor.move()` steps through a
+  precomputed full visual ordering rather than deriving each step
+  incrementally — an earlier incremental design oscillated forever near a
+  boundary, caught by live testing before it shipped; `rects_for` emits
+  one rect per disjoint span so a selection crossing a boundary paints as
+  multiple rects. See `ARCHITECTURE.md` §5.7.7 Tier 3.
 - **IME preedit** (R5) — likely needs a `rendercanvas` upstream
   contribution.
 - **Windows/macOS accessibility bridges** — blocked on AccessKit platform
