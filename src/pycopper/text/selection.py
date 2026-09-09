@@ -7,9 +7,18 @@ Selection needs two questions answered, and they are inverses:
 
 Both are derived from `Paragraph` as it already exists. A `ShapedRun` carries
 cluster indices into **its own** text rather than into the paragraph, and no
-offset back to it -- but the runs of a line concatenate in order, so walking
-them while accumulating `len(run.text)` recovers the paragraph offset without
-touching the shaping structures or the shape cache's key.
+offset back to it -- `TextLine.run_starts` (parallel to `runs`, in the SAME
+visual order) is what recovers the paragraph offset, recorded once at layout
+time rather than reconstructed here by accumulating run lengths, which only
+works when visual order matches logical order (pure LTR text).
+
+A logical offset can be genuinely AMBIGUOUS on screen: within one run, an
+LTR run's glyphs advance in the same direction its source text reads, but an
+RTL run's glyphs paint left-to-right while its source offsets *descend* --
+the visually-leftmost glyph is the run's own last character. `caret_at` and
+`index_at` account for this per run (`run.direction`); a caller walking a run's
+glyphs left-to-right and comparing against an ascending offset, the way pure
+LTR code can, silently gets the wrong answer for RTL content.
 
 Advances come from `ShapedRun.advances_px`, the same call the paint pass uses,
 so a caret cannot land somewhere the glyphs are not -- letter spacing in
@@ -24,6 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .itemize import Direction
 from .layout import Paragraph, TextLine
 from .segment import cluster_boundaries
 
@@ -91,51 +101,121 @@ def index_at(para: Paragraph, x: float, y: float) -> int:
     The *nearest* edge, not the containing glyph: clicking the left half of a
     character puts the caret before it and the right half after it, which is
     what every text control does and what makes click-and-drag feel right.
+
+    Localizes to a run, then a glyph, by BOX CONTAINMENT (`x` inside
+    `[pen, pen + advance)`) before deciding which half -- a single global
+    threshold comparison (the natural approach for LTR, where a glyph's own
+    pen position and its source offset both increase together) does not
+    localize correctly for RTL, where pen increases but source offset
+    *decreases* along the same walk: a naive mirrored condition
+    (`x >= midpoint`) stays true for every `x` past the FIRST glyph's own
+    midpoint, including `x` values that actually belong to a much later
+    glyph, and returns the wrong (too-early) answer. Verified against a
+    hand-traced three-glyph RTL example, box by box, before writing it
+    this way.
+
+    Once localized: an LTR glyph's LEFT half is `before` it (this glyph's
+    own cluster) and the RIGHT half is `after` (the next cluster along, or
+    the line's own end for the very last glyph) -- unchanged from before
+    this module supported RTL. An RTL glyph is the mirror image on both
+    axes: its RIGHT half is `before` (this glyph's own cluster, since the
+    visually-rightmost content is read FIRST in RTL) and its LEFT half is
+    `after` (the PREVIOUS glyph walked, i.e. `clusters[i - 1]` -- earlier
+    in visual/array order but LATER in reading order for RTL -- or the
+    run's own end, for the first glyph walked).
     """
     if not para.lines or not para.text:
         return 0
     line = para.lines[line_index_at(para, y)]
     pen = line.x
-    char = line.start
-
-    for run in line.runs:
+    for run, run_start in zip(line.runs, line.run_starts, strict=True):
         advances = run.advances_px(para.px, para.tracking)
-        for i in range(len(run)):
-            advance = float(advances[i])
-            if x < pen + advance / 2.0:
-                return _snap(para.text, char + int(run.clusters[i]))
-            pen += advance
-        char += len(run.text)
+        run_width = float(run.width(para.px, para.tracking))
+        is_last_run = run is line.runs[-1]
+        if x < pen + run_width or is_last_run:
+            local_pen = pen
+            for i in range(len(run)):
+                advance = float(advances[i])
+                is_last_glyph = i == len(run) - 1
+                if x < local_pen + advance or is_last_glyph:
+                    cluster = run_start + int(run.clusters[i])
+                    midpoint = local_pen + advance / 2.0
+                    if run.direction == Direction.RTL:
+                        if x >= midpoint:
+                            return _snap(para.text, cluster)
+                        if i == 0:
+                            return _snap(para.text, run_start + len(run.text))
+                        return _snap(para.text, run_start + int(run.clusters[i - 1]))
+                    if x < midpoint:
+                        return _snap(para.text, cluster)
+                    if not is_last_glyph:
+                        return _snap(para.text, run_start + int(run.clusters[i + 1]))
+                    break  # last glyph, right half -- fall through to the next run
+                local_pen += advance
+        pen += run_width
     return _snap(para.text, line_end(para, line))
 
 
-def _span_x(line: TextLine, para: Paragraph, start: int, end: int) -> tuple[float, float]:
-    """Horizontal extent of `[start, end)` within one line."""
-    pen = line.x
-    char = line.start
-    left: float | None = None
-    right = line.x
+def _spans_x(line: TextLine, para: Paragraph, start: int, end: int) -> list[tuple[float, float]]:
+    """Horizontal extents of `[start, end)` within one line -- one span per
+    contiguous VISUAL run of matching glyphs, not one span overall.
 
-    for run in line.runs:
+    A logically-contiguous range can render as more than one span the
+    moment it crosses a direction boundary: selecting "lo مرحبا" (an LTR
+    prefix into an embedded RTL word) highlights two disjoint rectangles,
+    not one that spans the visual gap between them. Walking visually and
+    testing logical-range membership per glyph produces this naturally --
+    no direction-specific branching needed here, unlike `caret_at`, since
+    this never stops early on a single glyph's own condition.
+    """
+    pen = line.x
+    open_left: float | None = None
+    spans: list[tuple[float, float]] = []
+    for run, run_start in zip(line.runs, line.run_starts, strict=True):
         advances = run.advances_px(para.px, para.tracking)
         for i in range(len(run)):
             advance = float(advances[i])
-            position = char + int(run.clusters[i])
-            if start <= position < end:
-                if left is None:
-                    left = pen
-                right = pen + advance
+            in_range = start <= run_start + int(run.clusters[i]) < end
+            if in_range and open_left is None:
+                open_left = pen
+            elif not in_range and open_left is not None:
+                spans.append((open_left, pen))
+                open_left = None
             pen += advance
-        char += len(run.text)
-    return (left if left is not None else line.x, right)
+    if open_left is not None:
+        spans.append((open_left, pen))
+    return spans
 
 
 def caret_at(para: Paragraph, offset: int) -> SelectionRect:
     """Where a caret sitting *before* `offset` belongs, as a zero-width rect.
 
-    The inverse of `index_at`, and it must walk advances the same way that does
-    -- through `ShapedRun.advances_px` -- or clicking would put the caret
-    somewhere the caret then would not draw.
+    Finds which RUN owns `offset` first (`run_start <= offset <= run_end`,
+    closed on both ends -- a boundary offset shared by two adjacent runs
+    resolves to whichever is visited first in VISUAL order, a deterministic
+    default; picking the intended side deliberately is `EditState.affinity`'s
+    job, not this function's own), since a run whose own range does not
+    contain it can otherwise trip a false match: an LTR run positioned
+    earlier on screen than the run that actually owns `offset` (real in an
+    RTL-base paragraph with embedded LTR content -- the LTR run's own
+    `run_start` can already exceed `offset`) would otherwise satisfy "first
+    cluster >= offset" immediately, at its very first glyph, for the wrong
+    reason.
+
+    Within the owning run, an RTL run's glyphs paint left-to-right while
+    their source offsets *descend* (the visually-leftmost glyph is the
+    run's own LAST character) -- inverted from LTR, where walking left to
+    right and stopping at the first glyph whose offset has reached `offset`
+    is correct as-is. An RTL run instead has to walk until the offset has
+    dropped BELOW `offset`, the exact mirror image -- found the hard way:
+    a first draft used a half-open `< run_end` upper bound (matching the
+    "skip past, add full width" logic that's correct for LTR), which put
+    an RTL run's own END offset (e.g. `caret_at(para, len(text))` for a
+    pure-RTL paragraph) at the WRONG edge, since "skip this run" silently
+    assumes skipping always means "continue rightward" -- true for LTR,
+    backwards for RTL. Caught by computing actual pixel values for a real
+    Arabic paragraph and checking them by hand before trusting the code,
+    not by reasoning about the algorithm alone.
     """
     if not para.lines:
         # An empty paragraph still records a correct line height (see
@@ -155,19 +235,29 @@ def caret_at(para: Paragraph, offset: int) -> SelectionRect:
         top -= line.height
 
     pen = line.x
-    char = line.start
-    for run in line.runs:
+    for run, run_start in zip(line.runs, line.run_starts, strict=True):
         advances = run.advances_px(para.px, para.tracking)
-        for i in range(len(run)):
-            if char + int(run.clusters[i]) >= offset:
-                return SelectionRect(pen, top, 0.0, line.height)
-            pen += float(advances[i])
-        char += len(run.text)
+        run_end = run_start + len(run.text)
+        if run_start <= offset <= run_end:
+            if run.direction == Direction.RTL:
+                for i in range(len(run)):
+                    if run_start + int(run.clusters[i]) < offset:
+                        return SelectionRect(pen, top, 0.0, line.height)
+                    pen += float(advances[i])
+            else:
+                for i in range(len(run)):
+                    if run_start + int(run.clusters[i]) >= offset:
+                        return SelectionRect(pen, top, 0.0, line.height)
+                    pen += float(advances[i])
+            return SelectionRect(pen, top, 0.0, line.height)
+        pen += float(run.width(para.px, para.tracking))
     return SelectionRect(pen, top, 0.0, line.height)
 
 
 def rects_for(para: Paragraph, start: int, end: int) -> list[SelectionRect]:
-    """Highlight rectangles covering `[start, end)`, one per line touched.
+    """Highlight rectangles covering `[start, end)`, possibly several per
+    line touched -- see `_spans_x` for why a single logically-contiguous
+    range can render as more than one rectangle on one line.
 
     Empty when the range is empty -- a caret is not a selection, and drawing a
     zero-width rectangle for one would put a stray sliver on screen.
@@ -180,9 +270,9 @@ def rects_for(para: Paragraph, start: int, end: int) -> list[SelectionRect]:
     top = 0.0
     for line in para.lines:
         if line.end > lo and line.start < hi:
-            left, right = _span_x(line, para, max(lo, line.start), min(hi, line.end))
-            if right > left:
-                rects.append(SelectionRect(left, top, right - left, line.height))
+            for left, right in _spans_x(line, para, max(lo, line.start), min(hi, line.end)):
+                if right > left:
+                    rects.append(SelectionRect(left, top, right - left, line.height))
         top += line.height
     return rects
 

@@ -13,7 +13,7 @@ from pycopper.paint import DisplayList
 from pycopper.runtime.clipboard import Clipboard, clipboard
 from pycopper.runtime.events import EventType, KeyEvent, PointerEvent
 from pycopper.text import TextEngine
-from pycopper.text.selection import index_at, rects_for, word_at
+from pycopper.text.selection import caret_at, index_at, rects_for, word_at
 
 ENGINE = TextEngine()
 
@@ -98,6 +98,75 @@ def test_word_at_finds_the_surrounding_word(offset: int, expected: str) -> None:
 
 def test_word_at_on_empty_text_is_safe() -> None:
     assert word_at("", 0) == (0, 0)
+
+
+# --------------------------------------------------------------------- bidi
+
+
+def test_caret_at_zero_lands_at_the_right_edge_of_pure_rtl_text() -> None:
+    """Inverted from LTR intuition, and the point of this whole feature:
+    offset 0 (before the FIRST character) is where reading STARTS, and RTL
+    reading starts at the right. Real Arabic glyphs, not a hand-built
+    level array -- this exercises the actual bundled font + HarfBuzz RTL
+    shaping + `caret_at`'s own per-run direction handling together."""
+    p = para("مرحبا")
+    zero = caret_at(p, 0)
+    end = caret_at(p, len(p.text))
+    assert zero.x == pytest.approx(p.size.width)
+    assert end.x == pytest.approx(0.0)
+    assert zero.x > end.x
+
+
+def test_caret_at_moves_monotonically_backward_through_rtl_text() -> None:
+    """As the logical offset increases (reading further into the RTL word),
+    the caret moves right-to-left on screen -- the mirror image of LTR,
+    checked as a monotonic sequence rather than individual pixel values so
+    this doesn't depend on any one font's specific glyph metrics."""
+    p = para("مرحبا")
+    xs = [caret_at(p, offset).x for offset in range(len(p.text) + 1)]
+    assert xs == sorted(xs, reverse=True)
+
+
+def test_index_at_is_inverted_for_pure_rtl_text() -> None:
+    """Clicking near the visual left edge of RTL text lands near the END of
+    the text (offset close to len), and the right edge lands near the
+    START (offset close to 0) -- the opposite of `test_the_offset_increases_
+    across_the_line`'s own LTR expectation."""
+    p = para("مرحبا")
+    near_left = index_at(p, 1.0, 5.0)
+    near_right = index_at(p, p.size.width - 1.0, 5.0)
+    assert near_left > near_right
+
+
+def test_rects_for_splits_across_a_direction_boundary() -> None:
+    """A selection that is logically contiguous but visually crosses an
+    LTR/RTL boundary highlights as TWO disjoint rectangles, not one rect
+    spanning the visual gap between them -- the real behavioural change
+    `rects_for` gained for this feature (`_spans_x`)."""
+    p = para("lo مرحبا")
+    # "o مر" -- starts in the LTR prefix, ends partway into the RTL word.
+    start = p.text.index("o")
+    end = p.text.index("مر") + 2
+    rects = rects_for(p, start, end)
+    assert len(rects) == 2
+    first, second = sorted(rects, key=lambda r: r.x)
+    assert first.x + first.width <= second.x, "the two rects must not overlap"
+
+
+def test_rects_for_a_pure_ltr_selection_still_gives_one_rect() -> None:
+    """The multi-rect change is a strict generalisation -- text with no
+    direction boundary at all must still produce exactly one rect per line,
+    matching every existing LTR test in this file."""
+    p = para("Hello world")
+    assert len(rects_for(p, 0, len(p.text))) == 1
+
+
+def test_selecting_the_whole_mixed_line_still_gives_one_rect() -> None:
+    """Selecting EVERYTHING is trivially contiguous in both logical and
+    visual space regardless of internal direction boundaries -- multi-rect
+    splitting is specifically for a PARTIAL range that crosses one."""
+    p = para("lo مرحبا")
+    assert len(rects_for(p, 0, len(p.text))) == 1
 
 
 # ------------------------------------------------------------------ widget
