@@ -33,9 +33,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .editing import Affinity
 from .itemize import Direction
 from .layout import Paragraph, TextLine
 from .segment import cluster_boundaries
+from .shaping import ShapedRun
 
 __all__ = [
     "SelectionRect",
@@ -187,35 +189,39 @@ def _spans_x(line: TextLine, para: Paragraph, start: int, end: int) -> list[tupl
     return spans
 
 
-def caret_at(para: Paragraph, offset: int) -> SelectionRect:
+def caret_at(para: Paragraph, offset: int, *, affinity: str = Affinity.DOWNSTREAM) -> SelectionRect:
     """Where a caret sitting *before* `offset` belongs, as a zero-width rect.
 
-    Finds which RUN owns `offset` first (`run_start <= offset <= run_end`,
-    closed on both ends -- a boundary offset shared by two adjacent runs
-    resolves to whichever is visited first in VISUAL order, a deterministic
-    default; picking the intended side deliberately is `EditState.affinity`'s
-    job, not this function's own), since a run whose own range does not
-    contain it can otherwise trip a false match: an LTR run positioned
-    earlier on screen than the run that actually owns `offset` (real in an
-    RTL-base paragraph with embedded LTR content -- the LTR run's own
-    `run_start` can already exceed `offset`) would otherwise satisfy "first
-    cluster >= offset" immediately, at its very first glyph, for the wrong
-    reason.
+    Finds every RUN whose own `[run_start, run_end]` contains `offset`
+    (closed on both ends) and the pen position at each candidate's own
+    entry -- normally exactly one, but exactly two when `offset` sits at a
+    boundary shared by two adjacent runs, which is genuinely ambiguous
+    (two different, both-correct on-screen positions). `affinity` breaks
+    the tie deliberately: `UPSTREAM` picks whichever candidate `offset`
+    equals the END of (the content already read), `DOWNSTREAM` (the
+    default) picks whichever it equals the START of (the content about to
+    be read). Collecting candidates first, rather than returning on the
+    first run whose range matches, is what makes this a deliberate choice
+    instead of an accident of visual iteration order -- which run happens
+    to be visited first at a boundary is not consistently "upstream" or
+    "downstream" (it depends on the specific paragraph's own L2 reordering,
+    verified directly against two paragraphs where the answer came out
+    opposite ways), so it cannot be trusted as an implicit default.
 
-    Within the owning run, an RTL run's glyphs paint left-to-right while
-    their source offsets *descend* (the visually-leftmost glyph is the
-    run's own LAST character) -- inverted from LTR, where walking left to
-    right and stopping at the first glyph whose offset has reached `offset`
-    is correct as-is. An RTL run instead has to walk until the offset has
-    dropped BELOW `offset`, the exact mirror image -- found the hard way:
-    a first draft used a half-open `< run_end` upper bound (matching the
-    "skip past, add full width" logic that's correct for LTR), which put
-    an RTL run's own END offset (e.g. `caret_at(para, len(text))` for a
-    pure-RTL paragraph) at the WRONG edge, since "skip this run" silently
-    assumes skipping always means "continue rightward" -- true for LTR,
-    backwards for RTL. Caught by computing actual pixel values for a real
-    Arabic paragraph and checking them by hand before trusting the code,
-    not by reasoning about the algorithm alone.
+    Once localized to one run: an RTL run's glyphs paint left-to-right
+    while their source offsets *descend* (the visually-leftmost glyph is
+    the run's own LAST character) -- inverted from LTR, where walking left
+    to right and stopping at the first glyph whose offset has reached
+    `offset` is correct as-is. An RTL run instead has to walk until the
+    offset has dropped BELOW `offset`, the exact mirror image -- found the
+    hard way: a first draft used a half-open `< run_end` upper bound
+    (matching the "skip past, add full width" logic that's correct for
+    LTR), which put an RTL run's own END offset (e.g. `caret_at(para,
+    len(text))` for a pure-RTL paragraph) at the WRONG edge, since "skip
+    this run" silently assumes skipping always means "continue rightward"
+    -- true for LTR, backwards for RTL. Caught by computing actual pixel
+    values for a real Arabic paragraph and checking them by hand before
+    trusting the code, not by reasoning about the algorithm alone.
     """
     if not para.lines:
         # An empty paragraph still records a correct line height (see
@@ -225,32 +231,42 @@ def caret_at(para: Paragraph, offset: int) -> SelectionRect:
         return SelectionRect(0.0, 0.0, 0.0, para.size.height)
     top = 0.0
     line = para.lines[0]
-    for candidate in para.lines:
-        if candidate.start <= offset <= candidate.end:
-            line = candidate
+    for candidate_line in para.lines:
+        if candidate_line.start <= offset <= candidate_line.end:
+            line = candidate_line
             break
-        top += candidate.height
+        top += candidate_line.height
     else:
         line = para.lines[-1]
         top -= line.height
 
     pen = line.x
+    candidates: list[tuple[ShapedRun, int, float, bool]] = []
     for run, run_start in zip(line.runs, line.run_starts, strict=True):
-        advances = run.advances_px(para.px, para.tracking)
         run_end = run_start + len(run.text)
         if run_start <= offset <= run_end:
-            if run.direction == Direction.RTL:
-                for i in range(len(run)):
-                    if run_start + int(run.clusters[i]) < offset:
-                        return SelectionRect(pen, top, 0.0, line.height)
-                    pen += float(advances[i])
-            else:
-                for i in range(len(run)):
-                    if run_start + int(run.clusters[i]) >= offset:
-                        return SelectionRect(pen, top, 0.0, line.height)
-                    pen += float(advances[i])
-            return SelectionRect(pen, top, 0.0, line.height)
+            candidates.append((run, run_start, pen, offset == run_end))
         pen += float(run.width(para.px, para.tracking))
+    if not candidates:
+        return SelectionRect(pen, top, 0.0, line.height)
+
+    chosen = candidates[0]
+    if len(candidates) > 1:
+        wants_end = affinity == Affinity.UPSTREAM
+        chosen = next((c for c in candidates if c[3] == wants_end), candidates[0])
+    run, run_start, pen, _ = chosen
+
+    advances = run.advances_px(para.px, para.tracking)
+    if run.direction == Direction.RTL:
+        for i in range(len(run)):
+            if run_start + int(run.clusters[i]) < offset:
+                return SelectionRect(pen, top, 0.0, line.height)
+            pen += float(advances[i])
+    else:
+        for i in range(len(run)):
+            if run_start + int(run.clusters[i]) >= offset:
+                return SelectionRect(pen, top, 0.0, line.height)
+            pen += float(advances[i])
     return SelectionRect(pen, top, 0.0, line.height)
 
 

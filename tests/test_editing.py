@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from pycopper.text.editing import (
+    Affinity,
     Editor,
     EditState,
     delete_backward,
@@ -105,6 +106,86 @@ def test_an_unextended_arrow_collapses_to_the_edge_of_a_selection() -> None:
 def test_an_unknown_motion_is_an_error() -> None:
     with pytest.raises(ValueError, match="unknown motion"):
         move(HELLO, "sideways")
+
+
+# ---------------------------------------------------------------- bidi motion
+
+
+def test_right_moves_backward_through_pure_rtl_text() -> None:
+    """Inverted from LTR: inside RTL content, visual Right is logically
+    BACKWARD (toward the text's own start) and visual Left is FORWARD --
+    the mirror image `test_arrow_keys_move_one_cluster` already asserts
+    for plain LTR text."""
+    state = EditState("مرحبا", 2, 2)
+    assert move(state, "right").focus == 1
+    assert move(state, "left").focus == 3
+
+
+def test_repeated_right_crosses_a_direction_boundary_without_getting_stuck() -> None:
+    """The real bug this design was built to avoid: an early draft that
+    derived each step incrementally from the current position oscillated
+    forever between three offsets near a direction boundary instead of
+    reaching the end of the text. Walking Right from the very start must
+    visit every offset (the boundary offset twice, since it has two
+    genuinely different on-screen positions -- see `_visual_positions`),
+    then hold at the VISUALLY rightmost one and stop -- which is offset 3
+    (the Arabic word's own reading-START, downstream-affinitized), not
+    `len(text)` (offset 8, its reading-end): the RTL word's start renders
+    further right than its own end, so "keep pressing Right" legitimately
+    terminates there, not at the highest logical offset."""
+    text = "lo مرحبا"
+    state = EditState(text, 0, 0)
+    path = [state.focus]
+    for _ in range(12):
+        state = move(state, "right")
+        path.append(state.focus)
+    assert set(path) == set(range(len(text) + 1)), "every offset must be reached at least once"
+    boundary = text.index("م")
+    assert path[-1] == path[-2] == boundary
+    assert state.affinity == Affinity.DOWNSTREAM
+
+
+def test_repeated_left_from_the_start_of_arabic_reading_holds() -> None:
+    """The mirror of the above: walking Left repeatedly from the RTL
+    word's own reading-start (offset 3, downstream) must reach every
+    offset and then hold at offset 0 -- the visually LEFTMOST position,
+    which for this string coincides with the true start of the text."""
+    text = "lo مرحبا"
+    boundary = text.index("م")
+    state = EditState(text, boundary, boundary, affinity=Affinity.DOWNSTREAM)
+    path = [state.focus]
+    for _ in range(12):
+        state = move(state, "left")
+        path.append(state.focus)
+    assert set(path) == set(range(len(text) + 1))
+    assert path[-1] == path[-2] == 0
+
+
+def test_move_at_a_direction_boundary_uses_the_landing_affinity() -> None:
+    """A move that lands exactly on a boundary offset records which side
+    it arrived at, not the field's own default -- proven by checking the
+    resulting `EditState.affinity`, not just `.focus`, matches whichever
+    of the two boundary positions the walk actually reached.
+
+    Both approaches use the key that moves TOWARD the boundary given each
+    side's own direction: visual Right from inside the LTR prefix (2 ->
+    3), and visual Right from inside the RTL word too -- Right is
+    logically BACKWARD inside RTL content (`test_right_moves_backward_
+    through_pure_rtl_text`), so it is what walks from offset 4 back down
+    to the same boundary offset 3, just arriving from the opposite side.
+    """
+    text = "lo مرحبا"
+    boundary = text.index("م")
+    # Arriving at the boundary from the LTR side lands on its LEFT-hand
+    # rendering -- the "lo " run's own end.
+    from_ltr = move(EditState(text, 2, 2), "right")
+    assert from_ltr.focus == boundary
+    assert from_ltr.affinity == Affinity.UPSTREAM
+    # Arriving at it from the RTL side lands on its RIGHT-hand rendering --
+    # the Arabic run's own start.
+    from_rtl = move(EditState(text, boundary + 1, boundary + 1), "right")
+    assert from_rtl.focus == boundary
+    assert from_rtl.affinity == Affinity.DOWNSTREAM
 
 
 # ------------------------------------------------------------------- edits

@@ -13,6 +13,7 @@ from pycopper.paint import DisplayList
 from pycopper.runtime.clipboard import Clipboard, clipboard
 from pycopper.runtime.events import EventType, KeyEvent, PointerEvent
 from pycopper.text import TextEngine
+from pycopper.text.editing import Affinity
 from pycopper.text.selection import caret_at, index_at, rects_for, word_at
 
 ENGINE = TextEngine()
@@ -159,6 +160,34 @@ def test_rects_for_a_pure_ltr_selection_still_gives_one_rect() -> None:
     matching every existing LTR test in this file."""
     p = para("Hello world")
     assert len(rects_for(p, 0, len(p.text))) == 1
+
+
+def test_caret_affinity_changes_where_a_boundary_offset_renders() -> None:
+    """The load-bearing affinity test: proves `affinity` is actually
+    threaded through and changes rendered output, not just accepted and
+    ignored. At the boundary between an LTR prefix and an embedded RTL
+    word, UPSTREAM (content already read) lands at the end of the LTR
+    prefix; DOWNSTREAM (content about to be read, the default) lands at
+    the RTL word's own reading-start -- its far visual RIGHT edge, since
+    Arabic reads right-to-left. These are genuinely different points, not
+    a rounding difference."""
+    p = para("lo مرحبا")
+    boundary = p.text.index("م")
+    upstream = caret_at(p, boundary, affinity=Affinity.UPSTREAM)
+    downstream = caret_at(p, boundary, affinity=Affinity.DOWNSTREAM)
+    assert upstream.x != downstream.x
+    # Sanity-check the actual semantics, not just "they differ": upstream
+    # sits at the LTR prefix's own end; downstream sits at the RTL word's
+    # own far edge, which is further right (Arabic starts at the right).
+    assert upstream.x < downstream.x
+
+
+def test_caret_at_default_affinity_is_downstream() -> None:
+    """Omitting `affinity` must behave identically to passing DOWNSTREAM
+    explicitly -- the keyword's own default, not a separate code path."""
+    p = para("lo مرحبا")
+    boundary = p.text.index("م")
+    assert caret_at(p, boundary).x == caret_at(p, boundary, affinity=Affinity.DOWNSTREAM).x
 
 
 def test_selecting_the_whole_mixed_line_still_gives_one_rect() -> None:
