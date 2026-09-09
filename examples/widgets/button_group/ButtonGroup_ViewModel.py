@@ -36,15 +36,26 @@ class ButtonGroupDemo(ViewModel):
         # look selected at once, which doesn't read as a real switch.
         self.period = Signal("day", name="period")
 
-        # Size-ladder demo -- one standard group per size, each with its own
-        # independent toggle on the "A" button (same convention as bold/
-        # italic/underline above), so clicking it genuinely grows/shrinks
-        # and shifts its siblings at every size, not just morphs shape.
-        self.ladder_xs = Signal(True, name="ladder_xs")
-        self.ladder_s = Signal(True, name="ladder_s")
-        self.ladder_m = Signal(True, name="ladder_m")
-        self.ladder_l = Signal(True, name="ladder_l")
-        self.ladder_xl = Signal(True, name="ladder_xl")
+        # Size-ladder demo -- one standard group per size, all three buttons
+        # independently toggleable (same convention as bold/italic/
+        # underline above -- every button in a standard group can be
+        # selected on its own, not just the first), so clicking any of them
+        # genuinely grows/shrinks and shifts its siblings at every size.
+        self.ladder_xs_save = Signal(True, name="ladder_xs_save")
+        self.ladder_xs_share = Signal(False, name="ladder_xs_share")
+        self.ladder_xs_delete = Signal(False, name="ladder_xs_delete")
+        self.ladder_s_save = Signal(True, name="ladder_s_save")
+        self.ladder_s_share = Signal(False, name="ladder_s_share")
+        self.ladder_s_delete = Signal(False, name="ladder_s_delete")
+        self.ladder_m_save = Signal(True, name="ladder_m_save")
+        self.ladder_m_share = Signal(False, name="ladder_m_share")
+        self.ladder_m_delete = Signal(False, name="ladder_m_delete")
+        self.ladder_l_save = Signal(True, name="ladder_l_save")
+        self.ladder_l_share = Signal(False, name="ladder_l_share")
+        self.ladder_l_delete = Signal(False, name="ladder_l_delete")
+        self.ladder_xl_save = Signal(True, name="ladder_xl_save")
+        self.ladder_xl_share = Signal(False, name="ladder_xl_share")
+        self.ladder_xl_delete = Signal(False, name="ladder_xl_delete")
 
         self.view_source = (Path(__file__).parent / "ButtonGroup_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
@@ -67,17 +78,47 @@ class ButtonGroupDemo(ViewModel):
     def select_month(self, event: Any) -> None:
         self.period.set("month")
 
-    def toggle_ladder_xs(self, event: Any) -> None:
-        self.ladder_xs.update(lambda v: not v)
+    def toggle_ladder_xs_save(self, event: Any) -> None:
+        self.ladder_xs_save.update(lambda v: not v)
 
-    def toggle_ladder_s(self, event: Any) -> None:
-        self.ladder_s.update(lambda v: not v)
+    def toggle_ladder_xs_share(self, event: Any) -> None:
+        self.ladder_xs_share.update(lambda v: not v)
 
-    def toggle_ladder_m(self, event: Any) -> None:
-        self.ladder_m.update(lambda v: not v)
+    def toggle_ladder_xs_delete(self, event: Any) -> None:
+        self.ladder_xs_delete.update(lambda v: not v)
 
-    def toggle_ladder_l(self, event: Any) -> None:
-        self.ladder_l.update(lambda v: not v)
+    def toggle_ladder_s_save(self, event: Any) -> None:
+        self.ladder_s_save.update(lambda v: not v)
 
-    def toggle_ladder_xl(self, event: Any) -> None:
-        self.ladder_xl.update(lambda v: not v)
+    def toggle_ladder_s_share(self, event: Any) -> None:
+        self.ladder_s_share.update(lambda v: not v)
+
+    def toggle_ladder_s_delete(self, event: Any) -> None:
+        self.ladder_s_delete.update(lambda v: not v)
+
+    def toggle_ladder_m_save(self, event: Any) -> None:
+        self.ladder_m_save.update(lambda v: not v)
+
+    def toggle_ladder_m_share(self, event: Any) -> None:
+        self.ladder_m_share.update(lambda v: not v)
+
+    def toggle_ladder_m_delete(self, event: Any) -> None:
+        self.ladder_m_delete.update(lambda v: not v)
+
+    def toggle_ladder_l_save(self, event: Any) -> None:
+        self.ladder_l_save.update(lambda v: not v)
+
+    def toggle_ladder_l_share(self, event: Any) -> None:
+        self.ladder_l_share.update(lambda v: not v)
+
+    def toggle_ladder_l_delete(self, event: Any) -> None:
+        self.ladder_l_delete.update(lambda v: not v)
+
+    def toggle_ladder_xl_save(self, event: Any) -> None:
+        self.ladder_xl_save.update(lambda v: not v)
+
+    def toggle_ladder_xl_share(self, event: Any) -> None:
+        self.ladder_xl_share.update(lambda v: not v)
+
+    def toggle_ladder_xl_delete(self, event: Any) -> None:
+        self.ladder_xl_delete.update(lambda v: not v)

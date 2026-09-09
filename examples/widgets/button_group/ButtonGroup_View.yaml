@@ -125,11 +125,11 @@ children:
       - name: ladder_explanation
         widget: Text
         text: |
-          Each row is a STANDARD group (like the toolbar above, so
-          selecting "Save" grows it and shifts "Share"/"Delete" along the
-          row -- the same animated pattern, just at a different
-          `style.size`, set on the `Button` children rather than the
-          group). Click "Save" in any row.
+          Each row is a STANDARD group (like the toolbar above) at a
+          different `style.size`, set on the `Button` children rather
+          than the group. All three buttons are independently toggleable,
+          same as Bold/Italic/Underline -- click any of them and it grows
+          and shifts the others along the row.
         style: {text_style: body-medium, color: on_surface_variant}
 
       - name: ladder_demo
@@ -145,9 +145,9 @@ children:
                 widget: ButtonGroup
                 style: {variant: standard}
                 children:
-                  - {name: xs_a, widget: Button, text: "Save", value: "{{ ladder_xs.get() }}", style: {variant: outlined, size: extra_small}, handlers: {on_click: toggle_ladder_xs}}
-                  - {name: xs_b, widget: Button, text: "Share", style: {variant: outlined, size: extra_small}}
-                  - {name: xs_c, widget: Button, text: "Delete", style: {variant: outlined, size: extra_small}}
+                  - {name: xs_a, widget: Button, text: "Save", value: "{{ ladder_xs_save.get() }}", style: {variant: outlined, size: extra_small}, handlers: {on_click: toggle_ladder_xs_save}}
+                  - {name: xs_b, widget: Button, text: "Share", value: "{{ ladder_xs_share.get() }}", style: {variant: outlined, size: extra_small}, handlers: {on_click: toggle_ladder_xs_share}}
+                  - {name: xs_c, widget: Button, text: "Delete", value: "{{ ladder_xs_delete.get() }}", style: {variant: outlined, size: extra_small}, handlers: {on_click: toggle_ladder_xs_delete}}
           - name: row_s
             widget: Horizontal
             style: {spacing: 16, cross_alignment: center}
@@ -157,9 +157,9 @@ children:
                 widget: ButtonGroup
                 style: {variant: standard}
                 children:
-                  - {name: s_a, widget: Button, text: "Save", value: "{{ ladder_s.get() }}", style: {variant: outlined, size: small}, handlers: {on_click: toggle_ladder_s}}
-                  - {name: s_b, widget: Button, text: "Share", style: {variant: outlined, size: small}}
-                  - {name: s_c, widget: Button, text: "Delete", style: {variant: outlined, size: small}}
+                  - {name: s_a, widget: Button, text: "Save", value: "{{ ladder_s_save.get() }}", style: {variant: outlined, size: small}, handlers: {on_click: toggle_ladder_s_save}}
+                  - {name: s_b, widget: Button, text: "Share", value: "{{ ladder_s_share.get() }}", style: {variant: outlined, size: small}, handlers: {on_click: toggle_ladder_s_share}}
+                  - {name: s_c, widget: Button, text: "Delete", value: "{{ ladder_s_delete.get() }}", style: {variant: outlined, size: small}, handlers: {on_click: toggle_ladder_s_delete}}
           - name: row_m
             widget: Horizontal
             style: {spacing: 16, cross_alignment: center}
@@ -169,9 +169,9 @@ children:
                 widget: ButtonGroup
                 style: {variant: standard}
                 children:
-                  - {name: m_a, widget: Button, text: "Save", value: "{{ ladder_m.get() }}", style: {variant: outlined, size: medium}, handlers: {on_click: toggle_ladder_m}}
-                  - {name: m_b, widget: Button, text: "Share", style: {variant: outlined, size: medium}}
-                  - {name: m_c, widget: Button, text: "Delete", style: {variant: outlined, size: medium}}
+                  - {name: m_a, widget: Button, text: "Save", value: "{{ ladder_m_save.get() }}", style: {variant: outlined, size: medium}, handlers: {on_click: toggle_ladder_m_save}}
+                  - {name: m_b, widget: Button, text: "Share", value: "{{ ladder_m_share.get() }}", style: {variant: outlined, size: medium}, handlers: {on_click: toggle_ladder_m_share}}
+                  - {name: m_c, widget: Button, text: "Delete", value: "{{ ladder_m_delete.get() }}", style: {variant: outlined, size: medium}, handlers: {on_click: toggle_ladder_m_delete}}
           - name: row_l
             widget: Horizontal
             style: {spacing: 16, cross_alignment: center}
@@ -181,9 +181,9 @@ children:
                 widget: ButtonGroup
                 style: {variant: standard}
                 children:
-                  - {name: l_a, widget: Button, text: "Save", value: "{{ ladder_l.get() }}", style: {variant: outlined, size: large}, handlers: {on_click: toggle_ladder_l}}
-                  - {name: l_b, widget: Button, text: "Share", style: {variant: outlined, size: large}}
-                  - {name: l_c, widget: Button, text: "Delete", style: {variant: outlined, size: large}}
+                  - {name: l_a, widget: Button, text: "Save", value: "{{ ladder_l_save.get() }}", style: {variant: outlined, size: large}, handlers: {on_click: toggle_ladder_l_save}}
+                  - {name: l_b, widget: Button, text: "Share", value: "{{ ladder_l_share.get() }}", style: {variant: outlined, size: large}, handlers: {on_click: toggle_ladder_l_share}}
+                  - {name: l_c, widget: Button, text: "Delete", value: "{{ ladder_l_delete.get() }}", style: {variant: outlined, size: large}, handlers: {on_click: toggle_ladder_l_delete}}
           - name: row_xl
             widget: Horizontal
             style: {spacing: 16, cross_alignment: center}
@@ -193,9 +193,9 @@ children:
                 widget: ButtonGroup
                 style: {variant: standard}
                 children:
-                  - {name: xl_a, widget: Button, text: "Save", value: "{{ ladder_xl.get() }}", style: {variant: outlined, size: extra_large}, handlers: {on_click: toggle_ladder_xl}}
-                  - {name: xl_b, widget: Button, text: "Share", style: {variant: outlined, size: extra_large}}
-                  - {name: xl_c, widget: Button, text: "Delete", style: {variant: outlined, size: extra_large}}
+                  - {name: xl_a, widget: Button, text: "Save", value: "{{ ladder_xl_save.get() }}", style: {variant: outlined, size: extra_large}, handlers: {on_click: toggle_ladder_xl_save}}
+                  - {name: xl_b, widget: Button, text: "Share", value: "{{ ladder_xl_share.get() }}", style: {variant: outlined, size: extra_large}, handlers: {on_click: toggle_ladder_xl_share}}
+                  - {name: xl_c, widget: Button, text: "Delete", value: "{{ ladder_xl_delete.get() }}", style: {variant: outlined, size: extra_large}, handlers: {on_click: toggle_ladder_xl_delete}}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 
