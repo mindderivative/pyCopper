@@ -37,7 +37,15 @@ from ..spec import WidgetSpec
 from ..spec.typescale import TYPE_SCALE
 from ..tree.element import ElementMixin, PaintContext
 from .base import _StyledMixin, content_token, measure_text, paint_text
-from .material import SELECTION_CURVE, SELECTION_MOTION, _arc, _box, _emit_state_layer, _state_alpha
+from .material import (
+    SELECTION_CURVE,
+    SELECTION_MOTION,
+    BadgeElement,
+    _arc,
+    _box,
+    _emit_state_layer,
+    _state_alpha,
+)
 
 __all__ = [
     "CircularProgressElement",
@@ -625,6 +633,42 @@ class TabElement(_StyledMixin, Padding):
     widget's own label (it never overloaded `text:` to mean an icon glyph
     the way those five did before that migration), so only `icon:` (and
     now `icon_position`) are new here.
+
+    **`badge:` -- optional notification content, the M3 anatomy's own
+    "Badge (optional)" element, present on both primary and secondary tabs.**
+    Reuses `Badge`'s own sizing constants (`BadgeElement.DOT`/`HEIGHT`/
+    `PAD_X`/`LABEL_SIZE`) rather than re-deriving them, and its own
+    `error`/`on_error` colour pair -- a badge's notification state is
+    independent of whether ITS OWN tab happens to be selected, the same way
+    a real notification dot on an app icon doesn't change colour when the
+    app is in focus. `style.badge_variant: dot` shows a bare dot and ignores
+    `badge:`'s own content entirely, mirroring `Badge`'s identical
+    `variant: dot` distinction ("Small and large badges can both be used
+    with tabs").
+
+    Placement is genuinely two different rules, both from `COMPONENT_
+    TABS.md`'s own Measurements table, and neither changes with `icon_
+    position` (`leading`/`trailing` behave like `stacked` here -- only
+    whether the block has a STACKED icon at all matters):
+
+    * **A stacked icon present** (icon-only, or icon+label with `icon_
+      position: stacked`): the badge OVERLAPS the icon's own top-right
+      corner ("overlap of badge on stacked icon: 6dp"), and the tab's
+      measured width is untouched -- a deliberate overlap, not an addition.
+      The exact corner offset (`BADGE_OVERLAP`, both axes) is a best-effort
+      diagram read (`m3.material.io`, fetched live -- the scraped text
+      gives the 6dp figure but not the geometry it applies to), flagged as
+      approximate the same way `STACK_GAP` already is; a bare notification
+      dot may read as slightly more tucked into the icon than an idealised
+      rendering, since 6dp is a much larger fraction of a 6dp dot than of a
+      16dp numbered pill.
+    * **No stacked icon** (label only, or an inline icon+label): the badge
+      sits trailing the whole content block with a 4dp gap ("padding
+      between inline text and badge: 4dp", confirmed in the same live
+      diagram fetch for the inline-icon case too), and the block's own
+      measured width grows to include it -- unlike the overlap case, this
+      would otherwise visibly collide with the tab's own edge or the next
+      tab's divider.
     """
 
     HEIGHT: Final = 48.0
@@ -647,6 +691,15 @@ class TabElement(_StyledMixin, Padding):
     #: "Padding between inline icon and text: 8dp" -- a real scraped
     #: figure, unlike `STACK_GAP` above.
     INLINE_GAP: Final = 8.0
+    #: `COMPONENT_TABS.md`'s own Measurements table: "Padding between inline
+    #: text and badge: 4dp" -- a real scraped figure, used whenever there is
+    #: no stacked icon for the badge to overlap instead (see the class
+    #: docstring's own two-rule split).
+    TEXT_BADGE_GAP: Final = 4.0
+    #: "Overlap of badge on stacked icon: 6dp" -- also a real scraped
+    #: figure, but the *geometry* it inset from (which corner, which axes)
+    #: is a diagram read, not scraped text; see the class docstring.
+    BADGE_OVERLAP: Final = 6.0
 
     def __init__(self, spec: WidgetSpec) -> None:
         Padding.__init__(self, None, EdgeInsets())
@@ -657,6 +710,50 @@ class TabElement(_StyledMixin, Padding):
         return bool(self._icon.strip())
 
     @property
+    def _has_badge(self) -> bool:
+        return bool(self._badge.strip()) or self.style.badge_variant == "dot"
+
+    def _badge_size(self) -> Size:
+        """The badge's own box, reusing `Badge`'s own sizing formula
+        (`BadgeElement.DOT`/`HEIGHT`/`PAD_X`/`LABEL_SIZE`) rather than
+        re-deriving it -- one source of truth for "how big is a badge"."""
+        if self.style.badge_variant == "dot":
+            return Size(BadgeElement.DOT, BadgeElement.DOT)
+        content = self._badge.strip()
+        label = measure_text(content, BadgeElement.LABEL_SIZE, engine=self.text_engine)
+        width = max(BadgeElement.HEIGHT, label.width + BadgeElement.PAD_X * 2)
+        return Size(width, BadgeElement.HEIGHT)
+
+    def _paint_badge(self, ctx: PaintContext, x: float, y: float) -> None:
+        """Paint the badge box (and its content, unless a bare dot) with its
+        top-left at `(x, y)` -- callers work out where that is, since the
+        two placement rules (overlap vs. trailing) differ in more than just
+        position."""
+        size = self._badge_size()
+        content_token_ = ctx.palette.index("on_error")
+        _box(
+            ctx,
+            x,
+            y,
+            size.width,
+            size.height,
+            token=ctx.palette.index("error"),
+            radius=size.height / 2,
+        )
+        if self.style.badge_variant == "dot":
+            return
+        content = self._badge.strip()
+        label = measure_text(content, BadgeElement.LABEL_SIZE, engine=self.text_engine)
+        paint_text(
+            ctx,
+            x + (size.width - label.width) / 2,
+            y + (size.height - label.height) / 2,
+            content,
+            BadgeElement.LABEL_SIZE,
+            content_token_,
+        )
+
+    @property
     def _icon_position(self) -> str:
         return self.style.icon_position
 
@@ -665,12 +762,18 @@ class TabElement(_StyledMixin, Padding):
         label = measure_text(label_text, TAB_LABEL_ROLE, engine=self.text_engine)
         has_icon = self._has_icon
         height = self.ICON_HEIGHT if has_icon else self.HEIGHT
+        # A stacked icon (or an icon with no label at all) is where the
+        # badge OVERLAPS instead of adding width -- see the class
+        # docstring's own two-rule split.
+        stacked_icon = has_icon and (not label_text or self._icon_position == "stacked")
         if not has_icon:
             content_width = label.width
-        elif not label_text or self._icon_position == "stacked":
+        elif stacked_icon:
             content_width = max(label.width, ICON) if label_text else ICON
         else:
             content_width = ICON + self.INLINE_GAP + label.width
+        if self._has_badge and not stacked_icon:
+            content_width += self.TEXT_BADGE_GAP + self._badge_size().width
         return self.sized(constraints, self.style).constrain(
             Size(content_width + self.PAD_X * 2, height)
         )
@@ -687,6 +790,22 @@ class TabElement(_StyledMixin, Padding):
             label = measure_text(label_text, TAB_LABEL_ROLE, engine=self.text_engine)
         if not has_icon:
             assert label is not None  # not has_icon and not label_text already returned above
+            self._paint_label_with_badge(ctx, absolute, token, label_text, label)
+            return
+        if not label_text or self._icon_position == "stacked":
+            self._paint_stacked(ctx, absolute, token, label)
+        else:
+            assert label is not None  # inline with no label falls into the stacked branch above
+            leading = self._icon_position == "leading"
+            self._paint_inline(ctx, absolute, token, label, leading=leading)
+
+    def _paint_label_with_badge(
+        self, ctx: PaintContext, absolute: Any, token: int, label_text: str, label: Any
+    ) -> None:
+        """No-icon tab: the label alone, or (label + gap + badge) centred as
+        one block -- the same "one block" principle `_paint_stacked`/
+        `_paint_inline` already establish for icon+label."""
+        if not self._has_badge:
             paint_text(
                 ctx,
                 absolute.x + (self.size.width - label.width) / 2,
@@ -696,25 +815,40 @@ class TabElement(_StyledMixin, Padding):
                 token,
             )
             return
-        if not label_text or self._icon_position == "stacked":
-            self._paint_stacked(ctx, absolute, token, label)
-        else:
-            assert label is not None  # inline with no label falls into the stacked branch above
-            leading = self._icon_position == "leading"
-            self._paint_inline(ctx, absolute, token, label, leading=leading)
+        badge_size = self._badge_size()
+        block_width = label.width + self.TEXT_BADGE_GAP + badge_size.width
+        block_height = max(label.height, badge_size.height)
+        left = absolute.x + (self.size.width - block_width) / 2
+        top = absolute.y + (self.size.height - block_height) / 2
+        paint_text(
+            ctx,
+            left,
+            top + (block_height - label.height) / 2,
+            label_text,
+            TAB_LABEL_ROLE,
+            token,
+        )
+        self._paint_badge(
+            ctx,
+            left + label.width + self.TEXT_BADGE_GAP,
+            top + (block_height - badge_size.height) / 2,
+        )
 
     def _paint_stacked(self, ctx: PaintContext, absolute: Any, token: int, label: Any) -> None:
         # Icon above label, the pair vertically centred as one block
         # ("vertically centered within the container" -- not two
         # independently-centred halves, which is why this measures the
         # whole block's height once rather than centring the icon and the
-        # label against the container separately).
+        # label against the container separately). A badge, if present,
+        # OVERLAPS the icon's own corner instead of joining this block --
+        # it does not change the block's height or centring at all.
         block_height = ICON + (self.STACK_GAP + label.height if label is not None else 0.0)
         top = absolute.y + (self.size.height - block_height) / 2
+        icon_x = absolute.x + (self.size.width - ICON) / 2
         ctx.text.emit_icon(
             ctx.display_list,
             self._icon.strip(),
-            x=absolute.x + (self.size.width - ICON) / 2,
+            x=icon_x,
             y=top,
             size=ICON,
             pixel_ratio=ctx.pixel_ratio,
@@ -722,6 +856,13 @@ class TabElement(_StyledMixin, Padding):
             clip=ctx.clip,
             clip_radii=ctx.clip_radii,
         )
+        if self._has_badge:
+            badge_size = self._badge_size()
+            badge_cx = icon_x + ICON - self.BADGE_OVERLAP
+            badge_cy = top + self.BADGE_OVERLAP
+            self._paint_badge(
+                ctx, badge_cx - badge_size.width / 2, badge_cy - badge_size.height / 2
+            )
         if label is not None:
             paint_text(
                 ctx,
@@ -741,17 +882,30 @@ class TabElement(_StyledMixin, Padding):
         # axis. Icon and label each centre against the block's own height,
         # which may exceed either one alone (a tall icon, a multi-line
         # label neither of these callers actually has today, but the
-        # centring still has to be correct if one does).
-        block_width = ICON + self.INLINE_GAP + label.width
-        block_height = max(ICON, label.height)
+        # centring still has to be correct if one does). A badge, if
+        # present, joins this block immediately after the label -- before a
+        # trailing icon, after a leading one -- since it is the label the
+        # spec ties it to ("padding between inline text and badge"), not
+        # whichever side the icon happens to be on.
+        has_badge = self._has_badge
+        badge_size = self._badge_size() if has_badge else Size(0.0, 0.0)
+        extra = (self.TEXT_BADGE_GAP + badge_size.width) if has_badge else 0.0
+        block_width = ICON + self.INLINE_GAP + label.width + extra
+        block_height = max(ICON, label.height, badge_size.height if has_badge else 0.0)
         left = absolute.x + (self.size.width - block_width) / 2
         top = absolute.y + (self.size.height - block_height) / 2
         if leading:
             icon_x = left
             label_x = left + ICON + self.INLINE_GAP
+            badge_x = label_x + label.width + self.TEXT_BADGE_GAP
         else:
             label_x = left
-            icon_x = left + label.width + self.INLINE_GAP
+            badge_x = label_x + label.width + self.TEXT_BADGE_GAP
+            icon_x = (
+                badge_x + badge_size.width + self.INLINE_GAP
+                if has_badge
+                else label_x + label.width + self.INLINE_GAP
+            )
         ctx.text.emit_icon(
             ctx.display_list,
             self._icon.strip(),
@@ -771,6 +925,8 @@ class TabElement(_StyledMixin, Padding):
             TAB_LABEL_ROLE,
             token,
         )
+        if has_badge:
+            self._paint_badge(ctx, badge_x, top + (block_height - badge_size.height) / 2)
 
 
 class TabsElement(_SelectionContainer):

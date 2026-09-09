@@ -223,6 +223,7 @@ class ElementMixin:
     _path: str
     _icon: str
     _label: str
+    _badge: str
     _cached: np.ndarray | None
     #: Everything the cached slice was built from. Compared whole, because a
     #: cached slice holds *resolved physical geometry* -- if any of these

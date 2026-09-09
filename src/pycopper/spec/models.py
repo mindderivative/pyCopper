@@ -552,6 +552,11 @@ class StyleSpec(_Frozen):
     #: row, which names a real, sourced gap but no diagram example of the
     #: arrangement itself, so left/right was a judgment call, not scraped.
     icon_position: Literal["stacked", "leading", "trailing"] = "stacked"
+    #: `Tab`'s `badge:` shape -- `"numbered"` (default) shows `badge:`'s own
+    #: content in a pill; `"dot"` shows a bare notification dot and ignores
+    #: `badge:`'s content entirely, the same `variant` name/values `Badge`
+    #: itself already uses for the identical distinction.
+    badge_variant: Literal["numbered", "dot"] = "numbered"
 
     # shapes. A regular polygon is an analytic SDF like the rounded box, not a
     # rasterised path, which is what makes these free to animate: `sides` and
@@ -658,6 +663,7 @@ TEMPLATED_FIELDS: Final[tuple[tuple[str, str], ...]] = (
     ("path", "_path"),
     ("icon", "_icon"),
     ("label", "_label"),
+    ("badge", "_badge"),
 )
 
 
@@ -704,6 +710,16 @@ class WidgetSpec(_Frozen):
     #: label. Templated like `text`. Meaningless on a widget with no label
     #: anatomy of its own.
     label: str | None = None
+    #: A `Tab`'s optional notification badge content -- a count ("3", "22")
+    #: or, per `COMPONENT_TABS.md`'s own "limit badge content to four
+    #: characters, including a '+'" guidance, something like "999+". Empty/
+    #: unset means no badge at all, the same way `icon:`/`label:` read
+    #: "meaningless on a widget with no such anatomy" for everything else.
+    #: `style.badge_variant: dot` shows a bare notification dot instead and
+    #: ignores this field's content entirely (mirrors `Badge`'s own
+    #: `variant: dot` -- "small and large badges can both be used with
+    #: tabs"). Templated like `text`.
+    badge: str | None = None
     #: `PageHost`'s fallback child name, used whenever `value:` resolves to a
     #: name that doesn't match any declared child (unset, a typo, a Signal
     #: not yet initialised). **Not templated** -- unlike `value:`, this names

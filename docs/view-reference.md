@@ -50,6 +50,7 @@ Every node accepts these. Only `widget` is required.
 | `supporting_text` | string | Second line, trailing text, or action label, per widget. |
 | `icon` | string | A Material Symbols glyph name. Templated like `text`. Meaningless on a widget with no icon anatomy. |
 | `label` | string | A widget's own visible/accessible label, distinct from `text:`'s primary-content role. Templated like `text`. Meaningless on a widget with no label anatomy of its own. |
+| `badge` | string | `Tab`'s optional notification content — a count or short string. Templated like `text`. Ignored (but see `style.badge_variant: dot`) when unset. Meaningless outside `Tab`. |
 | `open` | string | Whether an overlay is showing. Templated like `value`. |
 | `disabled` | string | Whether the control is inert. Templated. Inherited by children. |
 | `error` | string | Whether a `TextField` is showing an error. Templated like `disabled`. |
@@ -85,7 +86,7 @@ meaningless; for anything holding focus, scroll, or text, give it a name.
 
 ## Bindings
 
-`text`, `value`, `open`, `supporting_text`, `path`, `icon`, and `label` accept
+`text`, `value`, `open`, `supporting_text`, `path`, `icon`, `label`, and `badge` accept
 `{{ expression }}` templates evaluated against signals exposed from Python:
 
 ```yaml
@@ -1170,7 +1171,7 @@ A `SpinBox` or `Pagination` fires `on_change` with its new value already compute
 | `TopAppBar` | 64dp small, 112dp `medium`, 152dp `large`. |
 | `StatusBar` | 24dp, `surface_container`. No M3 component or even the phrase "status bar" anywhere in M3's own vocabulary — the docked *toolbar* it might sound like is a row of action buttons, a different thing. A plain `Horizontal` a view populates freely; a `Spacer` splits it into leading/trailing groups. |
 | `NavigationRail` + `NavItem` | One widget, two states, animated between them: collapsed (80dp, 56×32dp indicator, icon-only) and expanded (240–360dp, 56dp items, full-radius pill, with labels) — `collapsed: "{{ }}"` switches between them (default false, so an unset rail starts expanded). M3 Expressive's own merger of the old, separate NavigationDrawer into this widget's expanded state. |
-| `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. A `Tab`'s optional `icon:` (24dp) grows the whole bar to 64dp — every tab in one bar shares the taller height, even an icon-less sibling. `style.icon_position`: `stacked` (default, above the label) or `leading`/`trailing` (opt-in, beside the label). |
+| `Tabs` + `Tab` | 48dp, 3dp indicator. `primary`, `secondary`. A `Tab`'s optional `icon:` (24dp) grows the whole bar to 64dp — every tab in one bar shares the taller height, even an icon-less sibling. `style.icon_position`: `stacked` (default, above the label) or `leading`/`trailing` (opt-in, beside the label). A `Tab`'s optional `badge:` (with `style.badge_variant: numbered`/`dot`) overlaps a stacked icon's own top-right corner (6dp, no width change) or trails the label with a 4dp gap (widens the tab) when there's no stacked icon to overlap. |
 | `SegmentedButton` + `Segment` | 40dp, 20dp outer corners. `style: {multi_select: true}` selects M3's multi-select form — `value:` becomes a comma-separated set instead of one name. |
 | `DockSplit` + `DockGroup` + `DockPanel` | No M3 component at all. A resizable, tabbed panel layout arranged once in the view file — see [Dock layout](#dock-layout) below. |
 | `Canvas` | No M3 component. A freeform drawing surface for an `on_paint` handler — see [Canvas](#canvas) below. |
@@ -1541,6 +1542,7 @@ single buffer upload. There are 59 tokens; `pycopper.is_token()` checks one and
 | `icon_fill` | 0–1. M3 uses this for selected state — prefer it to swapping icon names. |
 | `icon_weight` | 100–700 |
 | `icon_position` | `Tab` — `stacked` (default, icon above the label) or `leading`/`trailing` (icon beside the label, opt-in) |
+| `badge_variant` | `Tab` — `numbered` (default, shows `badge:`'s content) or `dot` (a bare notification dot; ignores `badge:`'s own content) |
 | `sides` | `Shape` — 3 or more. A **float**: 5.5 is a real shape, so a square morphs continuously into a hexagon. |
 | `rotation` | `Shape` — degrees, clockwise |
 | `spin` | `Shape` — when true, spins continuously on top of `rotation:`'s own value. Free, like every other Shape parameter. |

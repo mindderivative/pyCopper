@@ -1,5 +1,5 @@
-"""Tabs demo's logic: five independent selections (primary, secondary, and
-stacked/leading/trailing icon+label), and the two source panels.
+"""Tabs demo's logic: six independent selections (primary, secondary,
+stacked/leading/trailing icon+label, and badges), and the two source panels.
 
 See app.py in this directory for the entry point.
 """
@@ -21,6 +21,10 @@ class TabsDemo(ViewModel):
         self.tab3 = Signal("i0", name="tab3")
         self.tab4 = Signal("l0", name="tab4")
         self.tab5 = Signal("r0", name="tab5")
+        self.tab6 = Signal("b0", name="tab6")
+        #: `Inbox`'s badge -- templated like any other `badge:`, to show it
+        #: tracks a signal the same way `text:`/`icon:` already do.
+        self.inbox_count = Signal("3", name="inbox_count")
 
         self.view_source = (Path(__file__).parent / "Tabs_View.yaml").read_text()
         self.viewmodel_source = Path(__file__).read_text()
@@ -39,3 +43,6 @@ class TabsDemo(ViewModel):
 
     def select_tab5(self, event: Any) -> None:
         self.tab5.set(event.target.name)
+
+    def select_tab6(self, event: Any) -> None:
+        self.tab6.set(event.target.name)

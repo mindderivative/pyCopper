@@ -208,7 +208,7 @@ work off the per-frame path. §12 of ARCHITECTURE.md has the measurements.
 
 ## Testing
 
-2337 tests, `ruff` and `mypy --strict` clean. Golden-image baselines cover the
+2365 tests, `ruff` and `mypy --strict` clean. Golden-image baselines cover the
 rendered output; everything else — layout, reactivity, reconciliation, text
 segmentation, event dispatch — runs with no GPU on any runner.
 

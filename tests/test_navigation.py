@@ -10,7 +10,9 @@ from pycopper.paint import NO_TOKEN, DisplayList, Kind
 from pycopper.spec import WidgetKind, parse_view
 from pycopper.theme import Palette
 from pycopper.widgets import build_element
-from pycopper.widgets.navigation import TabElement
+from pycopper.widgets.base import measure_text
+from pycopper.widgets.material import BadgeElement
+from pycopper.widgets.navigation import ICON, TAB_LABEL_ROLE, TabElement
 
 PAL = Palette(Theme(dark=True))
 
@@ -225,6 +227,157 @@ def test_a_text_only_tab_is_unaffected_by_the_icon_anatomy() -> None:
     must see zero change from this feature."""
     e = laid_out({"name": "w", "widget": "Tab", "text": "Overview"})
     assert e.size.height == TabElement.HEIGHT == 48.0
+
+
+# --------------------------------------------------------------- tab badges
+
+
+def _badge_boxes(dl):
+    """The badge's own painted box -- a fully-round BOX at exactly the dot
+    or numbered-badge height, which nothing else a Tab paints matches (a
+    hover/focus state layer is neither that size nor that shape)."""
+    heights = {BadgeElement.DOT, BadgeElement.HEIGHT}
+    return [
+        s
+        for s in dl.view
+        if s["flags"][0] == Kind.BOX
+        and any(abs(float(s["rect"][3]) - h) < 0.01 for h in heights)
+        and abs(float(s["radii"][0]) - float(s["rect"][3]) / 2) < 0.01
+    ]
+
+
+def test_a_tab_with_no_badge_is_unaffected() -> None:
+    """No `badge:` at all -- the overwhelming majority of existing tabs --
+    must see zero change from this feature."""
+    e = laid_out({"name": "w", "widget": "Tab", "text": "Overview"})
+    label = measure_text("Overview", TAB_LABEL_ROLE, engine=e.text_engine)
+    assert e.size.width == pytest.approx(label.width + 2 * TabElement.PAD_X)
+
+    app = app_with([{"name": "t0", "widget": "Tab", "text": "Overview"}])
+    assert _badge_boxes(paint(app)) == []
+
+
+def test_a_numbered_badge_widens_a_label_only_tab_and_paints_after_it() -> None:
+    """`COMPONENT_TABS.md`'s own Measurements table: "padding between
+    inline text and badge: 4dp" -- and the tab's own measured width must
+    grow to fit it, or it would collide with the tab's own edge."""
+    without = laid_out({"name": "w", "widget": "Tab", "text": "Overview"})
+    with_badge = laid_out({"name": "w", "widget": "Tab", "text": "Overview", "badge": "3"})
+    assert with_badge.size.width > without.size.width + TabElement.TEXT_BADGE_GAP
+
+    app = app_with([{"name": "t0", "widget": "Tab", "text": "Overview", "badge": "3"}])
+    dl = paint(app)
+    boxes = _badge_boxes(dl)
+    assert len(boxes) == 1
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    label_right = max(float(s["rect"][0]) + float(s["rect"][2]) for s in glyphs)
+    assert float(boxes[0]["rect"][0]) < label_right, "the badge's own digit sits among the glyphs"
+    assert len(glyphs) == len("Overview") + 1, "the label's own glyphs, plus the badge's digit"
+
+
+def test_a_dot_badge_ignores_its_own_content() -> None:
+    """`style.badge_variant: dot` shows a bare dot -- `Badge`'s own
+    identical distinction -- and paints no digits at all."""
+    app = app_with(
+        [
+            {
+                "name": "t0",
+                "widget": "Tab",
+                "text": "Overview",
+                "badge": "3",
+                "style": {"badge_variant": "dot"},
+            }
+        ]
+    )
+    dl = paint(app)
+    boxes = _badge_boxes(dl)
+    assert len(boxes) == 1
+    assert round(float(boxes[0]["rect"][2]), 3) == round(float(boxes[0]["rect"][3]), 3) == 6.0
+    glyphs = [s for s in dl.view if s["flags"][0] == Kind.GLYPH]
+    assert len(glyphs) == len("Overview"), "label glyphs only -- no '3' painted for the dot"
+
+
+def test_a_badge_on_a_stacked_icon_does_not_widen_the_tab() -> None:
+    """A stacked icon's badge OVERLAPS the icon instead of adding width --
+    `COMPONENT_TABS.md`'s own "overlap of badge on stacked icon: 6dp" is a
+    deliberate overlap, not an addition."""
+    without_badge = laid_out({"name": "w", "widget": "Tab", "text": "Home", "icon": "home"})
+    with_badge = laid_out(
+        {"name": "w", "widget": "Tab", "text": "Home", "icon": "home", "badge": "3"}
+    )
+    assert with_badge.size.width == without_badge.size.width
+
+
+def test_a_badge_on_a_stacked_icon_overlaps_its_top_right_corner() -> None:
+    """Independently recomputes the icon's own block geometry (the same
+    formula `_paint_stacked` uses) rather than trying to pick "the icon
+    glyph" out of the display list -- a badge that overlaps the icon's own
+    top edge can itself paint glyphs above the icon, so glyph y-order alone
+    can't tell them apart once a badge is involved."""
+    app = app_with(
+        [{"name": "t0", "widget": "Tab", "text": "Home", "icon": "home", "badge": "3"}],
+        value="t0",
+    )
+    tab = app.root.find("t0")
+    label = measure_text("Home", TAB_LABEL_ROLE, engine=tab.text_engine)
+    block_height = ICON + TabElement.STACK_GAP + label.height
+    rect = tab.absolute_rect()
+    top = rect.y + (tab.size.height - block_height) / 2
+    icon_left = rect.x + (tab.size.width - ICON) / 2
+
+    dl = paint(app)
+    boxes = _badge_boxes(dl)
+    assert len(boxes) == 1
+    badge = boxes[0]
+    badge_cx = float(badge["rect"][0]) + float(badge["rect"][2]) / 2
+    badge_cy = float(badge["rect"][1]) + float(badge["rect"][3]) / 2
+    assert badge_cx == pytest.approx(icon_left + ICON - TabElement.BADGE_OVERLAP, abs=0.5)
+    assert badge_cy == pytest.approx(top + TabElement.BADGE_OVERLAP, abs=0.5)
+
+
+def test_an_inline_icon_with_a_badge_widens_the_tab_and_trails_the_label() -> None:
+    without_badge = laid_out(
+        {
+            "name": "w",
+            "widget": "Tab",
+            "text": "Home",
+            "icon": "home",
+            "style": {"icon_position": "leading"},
+        }
+    )
+    with_badge = laid_out(
+        {
+            "name": "w",
+            "widget": "Tab",
+            "text": "Home",
+            "icon": "home",
+            "badge": "3",
+            "style": {"icon_position": "leading"},
+        }
+    )
+    assert with_badge.size.width > without_badge.size.width + TabElement.TEXT_BADGE_GAP
+
+    app = app_with(
+        [
+            {
+                "name": "t0",
+                "widget": "Tab",
+                "text": "Home",
+                "icon": "home",
+                "badge": "3",
+                "style": {"icon_position": "leading"},
+            }
+        ],
+        value="t0",
+    )
+    dl = paint(app)
+    boxes = _badge_boxes(dl)
+    assert len(boxes) == 1
+    icon_glyph = min(
+        (s for s in dl.view if s["flags"][0] == Kind.GLYPH), key=lambda s: float(s["rect"][0])
+    )
+    icon_x = float(icon_glyph["rect"][0])
+    assert float(boxes[0]["rect"][0]) > icon_x + ICON, "badge trails the leading icon and label"
 
 
 def test_segmented_button_is_forty_high() -> None:

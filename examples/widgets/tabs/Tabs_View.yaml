@@ -97,6 +97,20 @@ children:
               - {name: r0, widget: Tab, text: "Video", icon: videocam, style: {icon_position: trailing}, handlers: {on_click: select_tab5}}
               - {name: r1, widget: Tab, text: "Photos", icon: photo_camera, style: {icon_position: trailing}, handlers: {on_click: select_tab5}}
               - {name: r2, widget: Tab, text: "Audio", icon: music_note, style: {icon_position: trailing}, handlers: {on_click: select_tab5}}
+          - {widget: Text, text: "With badge: -- overlaps a stacked icon's corner (no width change), or trails a label-only/inline tab with a 4dp gap (widens it)", style: {color: on_surface_variant}}
+          - name: tabs_badge
+            widget: Tabs
+            value: "{{ tab6.get() }}"
+            style: {width: expand}
+            children:
+              - {name: b0, widget: Tab, text: "Inbox", icon: mail, badge: "{{ inbox_count.get() }}", handlers: {on_click: select_tab6}}
+              - {name: b1, widget: Tab, text: "Updates", badge: "12", handlers: {on_click: select_tab6}}
+              - name: b2
+                widget: Tab
+                text: "Alerts"
+                icon: notifications
+                style: {icon_position: leading, badge_variant: dot}
+                handlers: {on_click: select_tab6}
 
       - {name: div3, widget: Divider, style: {width: expand}}
 
